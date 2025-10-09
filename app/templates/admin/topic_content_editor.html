@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Content – {{ topic.name }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  .ck-editor__editable_inline { min-height: 200px; }
+  .content-preview {
+    max-width: 350px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block; /* Required for text-overflow to work */
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid py-4">
+  <!-- Breadcrumbs -->
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{{ g.user_context.dashboard_url or url_for('frontend.index', **org_param) }}">Dashboard</a>
+      </li>
+      {% if topic.subject and topic.subject.exam %}
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('frontend.exam_management', **org_param) }}">Exams</a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('frontend.subject_management', exam_id=topic.subject.exam_id, **org_param) }}">{{ topic.subject.exam.name }}</a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{{ url_for('frontend.topic_management', subject_id=topic.subject_id, **org_param) }}">{{ topic.subject.name }}</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">{{ topic.name }}</li>
+      {% endif %}
+    </ol>
+  </nav>
+
+  <!-- Heading -->
+  <div class="text-center">
+    <h1 class="h2 mb-2">Manage Topic Content</h1>
+    <p class="lead text-muted mb-4">
+      Add, edit, and arrange learning materials for topic:
+      <strong class="text-primary">{{ topic.name }}</strong>
+    </p>
+  </div>
+
+  <!-- Page message area -->
+  <div id="pageMessage" class="mb-4"></div>
+
+  <!-- Add/Edit Form Card -->
+  <div class="card shadow-sm mb-5">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+      <h5 class="mb-0" id="contentFormTitle">
+        <i class="bi bi-plus-circle-fill me-2 text-primary"></i>Add New Content Item
+      </h5>
+
+      <!-- Unified Upload trigger -->
+      <button type="button"
+              class="btn btn-outline-secondary"
+              data-bs-toggle="modal"
+              data-bs-target="#unifiedUploadModal"
+              data-entity-type="topic_content"
+              data-entity-id="{{ topic.id }}">
+        <i class="bi bi-upload me-2"></i>Upload File
+      </button>
+    </div>
+
+    <div class="card-body p-4">
+      <form id="contentForm" novalidate>
+        <input type="hidden" id="contentId">
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <label for="itemTitle" class="form-label fw-bold">Title</label>
+            <input type="text" class="form-control" id="itemTitle">
+          </div>
+          <div class="col-md-4">
+            <label for="itemType" class="form-label fw-bold">Content Type <span class="text-danger">*</span></label>
+            <select class="form-select" id="itemType">
+              <option value="text">Text</option>
+              <option value="video_link">Video Link</option>
+              <option value="pdf_link">PDF Link</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-3" id="textWrapper">
+          <label class="form-label fw-bold">Text Content <span class="text-danger">*</span></label>
+          <div id="textContent"></div>
+        </div>
+
+        <!-- URL wrapper -->
+        <div class="mb-3" id="urlWrapper" style="display: none;">
+          <label for="urlContent" class="form-label fw-bold">URL <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="url" class="form-control" id="urlContent" placeholder="https://example.com/resource">
+          </div>
+          <div class="form-text">Paste a URL for a video or PDF.</div>
+        </div>
+
+        <div class="mb-3" style="max-width: 200px;">
+          <label for="itemOrder" class="form-label fw-bold">Display Order</label>
+          <input type="number" class="form-control" id="itemOrder" value="0" min="0">
+          <small class="form-text text-muted">Lower numbers appear first.</small>
+        </div>
+
+        <button type="submit" class="btn btn-primary me-2" id="submitBtn">
+          <span class="spinner-border spinner-border-sm d-none"></span>
+          <span class="button-text">Add Item</span>
+        </button>
+        <button type="button" class="btn btn-secondary d-none" id="cancelBtn">Cancel Edit</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Existing Content Items -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-white py-3">
+      <h5 class="mb-0"><i class="bi bi-list-ul me-2 text-success"></i>Existing Content Items</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table
+          id="contentsTable"
+          class="table table-bordered table-hover table-striped table-sm align-middle w-100"
+          width="100%">
+          <thead class="table-light"></thead>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Confirm Deletion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you want to delete this content item: "<strong id="deleteTitle"></strong>"?
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include 'admin/_unified_upload_modal.html' %}
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function () {
+  // --- SETUP ---
+  const topicId = "{{ topic.id }}";
+
+  const $pageMessage = $('#pageMessage');
+  const $form        = $('#contentForm');
+  const $contentId   = $('#contentId');
+  const $submitBtn   = $('#submitBtn');
+  const $cancelBtn   = $('#cancelBtn');
+  const $formTitle   = $('#contentFormTitle');
+  const $table       = $('#contentsTable');
+
+  const $itemType    = $('#itemType');
+  const $textWrapper = $('#textWrapper');
+  const $urlWrapper  = $('#urlWrapper');
+  const $urlContent  = $('#urlContent');
+
+  const deleteModal  = new bootstrap.Modal($('#deleteModal')[0]);
+  let editor, contentsDataTable, contentToDeleteId = null;
+
+  // CKEditor
+  initEditor(document.querySelector('#textContent')).then(e => editor = e);
+
+  // --- HELPERS ---
+  const showMessage = (msg, type='danger') => {
+    $pageMessage.html(`
+      <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        ${msg}
+        <button class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    `);
+  };
+
+  const toggleSpinner = ($btn, on) => {
+    $btn.prop('disabled', on)
+        .find('.spinner-border').toggleClass('d-none', !on);
+  };
+
+  const normalizeType = (v) => {
+    v = (v || '').toLowerCase();
+    if (v === 'pdf_link')   return 'pdf';
+    if (v === 'video_link') return 'video';
+    return v; // 'text' or any future 'link'
+  };
+
+  const uiTypeFromBackend = (t) => {
+    t = (t || '').toLowerCase();
+    if (t === 'pdf')   return 'pdf_link';
+    if (t === 'video') return 'video_link';
+    return t; // 'text' or 'link'
+  };
+
+  const isEmptyHtml = (html) => {
+    if (!html) return true;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    const text = tmp.textContent.replace(/\u00A0/g,' ').trim();
+    const hasMedia = tmp.querySelector('img, video, iframe, embed, object') !== null;
+    return !hasMedia && text.length === 0;
+  };
+
+  const isValidHttpUrl = (value) => {
+    try {
+      const u = new URL(value);
+      return (u.protocol === 'http:' || u.protocol === 'https:');
+    } catch { return false; }
+  };
+
+  const toggleEditors = () => {
+    const t = $itemType.val();
+    const needsUrl = (t === 'pdf_link' || t === 'video_link');
+    $textWrapper.toggle(!needsUrl);
+    $urlWrapper.toggle(needsUrl);
+
+    // enforce required on the active input
+    if (needsUrl) {
+      $urlContent.prop('required', true);
+    } else {
+      $urlContent.prop('required', false);
+    }
+  };
+  $itemType.on('change', toggleEditors);
+  toggleEditors(); // run once
+
+  const resetForm = () => {
+    $form[0].reset();
+    $contentId.val('');
+    $itemType.val('text').trigger('change');
+    $formTitle.html('<i class="bi bi-plus-circle-fill me-2 text-primary"></i>Add New Content Item');
+    $submitBtn.find('.button-text').text('Add Item');
+    $cancelBtn.addClass('d-none');
+    editor?.setData('');
+    $urlContent.val('');
+  };
+
+  // --- DATATABLE ---
+  const initTable = () => {
+    contentsDataTable = $table.DataTable({
+      responsive: true,
+      processing: true,
+      ajax: (data, callback) => {
+        (async () => {
+          try {
+            const res  = await window.authenticatedFetch(`/api/main-co-admin/topics/${topicId}/contents`);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.message || `Status ${res.status}`);
+            callback({ data: json });
+          } catch (err) {
+            showMessage(`Could not load content items: ${err.message}`, 'danger');
+            callback({ data: [] });
+          }
+        })();
+        return { abort: () => {} };
+      },
+      columns: [
+        { data: 'item_order', title: 'Order' },
+        { data: 'title', title: 'Title', defaultContent: '<em>(no title)</em>' },
+        {
+          data: 'content_type', title: 'Type',
+          render: d => {
+            const t = (d||'').toLowerCase();
+            const label = t==='pdf' ? 'PDF' : t==='video' ? 'Video' : t==='text' ? 'Text' : (t||'Link');
+            return `<span class="badge bg-secondary">${label}</span>`;
+          }
+        },
+        {
+          data: 'content_value', title: 'Preview',
+          render: (data, type, row) => {
+            const txt = row.content_type==='text'
+              ? $('<div>').html(data||'').text()
+              : (data||'');
+            return `<span class="content-preview" title="${txt}">${txt}</span>`;
+          }
+        },
+        {
+          data: 'id', title: 'Actions', orderable: false,
+          render: id => `
+            <div class="btn-group">
+              <button class="btn btn-sm btn-outline-warning edit-btn" data-id="${id}" title="Edit">
+                <i class="bi bi-pencil-fill"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${id}" title="Delete">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>`
+        }
+      ],
+      order: [[0,'asc']]
+    });
+  };
+
+  // --- SUBMIT ---
+  $form.on('submit', async e => {
+    e.preventDefault();
+
+    const rawType = $itemType.val();
+    const ctype   = normalizeType(rawType);
+    const title   = $('#itemTitle').val().trim();
+    const order   = +$('#itemOrder').val() || 0;
+
+    let contentValue = '';
+    if (ctype === 'text') {
+      contentValue = (editor?.getData() || '').trim();
+      if (isEmptyHtml(contentValue)) {
+        showMessage('Content is required: please enter some text for the content.', 'warning');
+        return;
+      }
+    } else {
+      contentValue = ($urlContent.val() || '').trim();
+      if (!contentValue) {
+        showMessage('Content is required: please paste a valid URL for PDF/Video.', 'warning');
+        return;
+      }
+      if (!isValidHttpUrl(contentValue)) {
+        showMessage('Please enter a valid URL starting with http:// or https://', 'warning');
+        return;
+      }
+    }
+
+    const payload = {
+      title,
+      content_type: ctype,
+      content_value: contentValue,
+      item_order: order
+    };
+
+    toggleSpinner($submitBtn, true);
+
+    const id     = $contentId.val();
+    const url    = id ? `/api/main-co-admin/topic_content/${id}`
+                      : `/api/main-co-admin/topics/${topicId}/contents`;
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+      const res  = await window.authenticatedFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Status ${res.status}`);
+
+      showMessage(data.message || 'Saved.', 'success');
+      contentsDataTable.ajax.reload();
+      resetForm();
+    } catch (err) {
+      showMessage(`Save failed: ${err.message}`, 'danger');
+    } finally {
+      toggleSpinner($submitBtn, false);
+    }
+  });
+
+  // --- EDIT ---
+  $table.on('click', '.edit-btn', async function () {
+    const id = $(this).data('id');
+    try {
+      const res = await window.authenticatedFetch(`/api/main-co-admin/topic_content/${id}`);
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.message || `Status ${res.status}`);
+
+      const data = payload.content || payload;
+
+      $contentId.val(data.id);
+      $('#itemTitle').val(data.title || '');
+      $('#itemOrder').val(data.item_order ?? 0);
+
+      const uiType = uiTypeFromBackend(data.content_type || 'text');
+      $itemType.val(uiType).trigger('change');
+
+      if (uiType === 'text') {
+        editor?.setData(data.content_value || '');
+        $urlContent.val('');
+      } else {
+        $urlContent.val(data.content_value || '');
+        editor?.setData('');
+      }
+
+      $formTitle.html('<i class="bi bi-pencil-square me-2 text-warning"></i>Edit Content Item');
+      $submitBtn.find('.button-text').text('Update Item');
+      $cancelBtn.removeClass('d-none');
+      $form[0].scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+      showMessage(`Load for edit failed: ${err.message}`, 'danger');
+    }
+  });
+
+  // --- CANCEL EDIT ---
+  $cancelBtn.on('click', resetForm);
+
+  // --- DELETE ---
+  $table.on('click', '.delete-btn', function(){
+    contentToDeleteId = $(this).data('id');
+    const row = contentsDataTable.row($(this).closest('tr')).data();
+    $('#deleteTitle').text(row?.title || '');
+    deleteModal.show();
+  });
+
+  $('#confirmDeleteBtn').on('click', async function(){
+    if (!contentToDeleteId) return;
+    try {
+      const res  = await window.authenticatedFetch(
+        `/api/main-co-admin/topic_content/${contentToDeleteId}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Status ${res.status}`);
+      showMessage(data.message || 'Deleted.', 'success');
+      contentsDataTable.ajax.reload();
+    } catch (err) {
+      showMessage(`Delete failed: ${err.message}`, 'danger');
+    } finally {
+      deleteModal.hide();
+    }
+  });
+
+  // --- INIT ---
+  initTable();
+});
+</script>
+{% endblock %}
+

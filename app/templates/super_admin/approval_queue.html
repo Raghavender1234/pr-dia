@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Organization Approval Queue{% endblock %}
+
+{% block head_extra %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+  .page-head {
+    display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem;
+  }
+  .page-head h2 {
+    font-weight: 700; margin: 0;
+    background: linear-gradient(135deg,#1e293b 0%,#6366f1 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .page-sub { color: #6b7280; }
+
+  .card.shadow-sm {
+    border: 1px solid #eef2f7; border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(2,6,23,.06);
+  }
+
+  /* Table polish */
+  #approvalTable thead th {
+    background: #f8fafc; color: #334155; font-weight: 600; border-bottom: 1px solid #e5e7eb;
+  }
+  #approvalTable tbody tr:hover { background: #fafafa; }
+  #approvalTable td, #approvalTable th { vertical-align: middle; }
+
+  .btn-action {
+    border-radius: 999px; padding: .35rem .75rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: .4rem;
+  }
+  .btn-approve  { background: #10b981; color: #fff; border: none; }
+  .btn-approve:hover { filter: brightness(.95); }
+  .btn-reject   { background: #ef4444; color: #fff; border: none; }
+  .btn-reject:hover { filter: brightness(.95); }
+
+  .badge-plan { font-weight: 600; padding: .4rem .6rem; border-radius: 999px; }
+
+  /* Dismissible alert spacing */
+  #approvalMessage .alert { border-radius: 12px; }
+
+  /* Small spinner in buttons */
+  .btn-spinner {
+    width: 1rem; height: 1rem; border-width: .15rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="page-head">
+    <h2>Organizations Awaiting Approval</h2>
+    <span class="page-sub">Review and approve or reject new sign-ups.</span>
+  </div>
+
+  <div id="approvalMessage" class="my-3"></div>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="approvalTable" class="table table-hover w-100"></table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function () {
+  const $msg = $('#approvalMessage');
+
+  // Dismissible + auto-hide alerts
+  function showMessage(text, type='success', autohideMs=4000) {
+    const id = 'msg_' + Date.now();
+    $msg.html(`
+      <div id="${id}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+        ${text}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    `);
+    if (autohideMs) {
+      setTimeout(() => { const el = document.getElementById(id); if (el) bootstrap.Alert.getOrCreateInstance(el).close(); }, autohideMs);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Helper: pretty plan badge
+  function planBadge(planRaw) {
+    const plan = (planRaw || '').toString().toLowerCase();
+    const map = { free: 'secondary', basic: 'info', pro: 'primary', premium: 'warning', enterprise: 'dark' };
+    const cls = map[plan] || 'secondary';
+    const label = (planRaw || '—').toString();
+    return `<span class="badge bg-${cls} badge-plan">${label}</span>`;
+  }
+
+  const table = $('#approvalTable').DataTable({
+    ajax: {
+      url: '/api/super-admin/organizations/pending',
+      dataSrc: '',
+      headers: { 'Authorization': 'Bearer ' + (window.APP_CONTEXT?.accessToken || '') }
+    },
+    order: [[3,'desc']],
+    columns: [
+      { data: 'name',       title: 'Organization' },
+      { data: 'code',       title: 'Org Code' },
+      { data: 'plan',       title: 'Plan', render: (p)=>planBadge(p), className: 'text-nowrap' },
+      { data: 'created_at', title: 'Registered On',
+        render: (d)=> d ? new Date(d).toLocaleString() : '—',
+        className: 'text-nowrap'
+      },
+      {
+        data: 'id',
+        title: 'Actions',
+        orderable: false,
+        searchable: false,
+        render: (id, _type, row) => `
+          <div class="d-flex gap-2">
+            <button class="btn btn-action btn-approve approve-btn" data-id="${id}" data-name="${row.name}">
+              <i class="bi bi-check2"></i> Approve
+            </button>
+            <button class="btn btn-action btn-reject reject-btn" data-id="${id}">
+              <i class="bi bi-x-lg"></i> Reject
+            </button>
+          </div>
+        `
+      }
+    ]
+  });
+
+  // Small utility to set a button into "loading" state
+  function setLoading($btn, loading=true) {
+    if (loading) {
+      $btn.data('oldHtml', $btn.html());
+      $btn.prop('disabled', true).html(
+        `<span class="spinner-border btn-spinner me-1" role="status" aria-hidden="true"></span>${$btn.text().trim()}`
+      );
+    } else {
+      $btn.prop('disabled', false).html($btn.data('oldHtml') || $btn.html());
+    }
+  }
+
+  // APPROVE
+  $('#approvalTable').on('click', '.approve-btn', async function () {
+    const $btn = $(this);
+    const orgId = $btn.data('id');
+    const orgName = $btn.data('name') || 'this organization';
+
+    if (!confirm(`Approve ${orgName}?`)) return;
+
+    try {
+      setLoading($btn, true);
+      const res = await window.authenticatedFetch(`/api/super-admin/organizations/${orgId}/approve`, { method: 'POST' });
+      const data = await res.json().catch(()=>({ message: 'Approved.' }));
+      if (!res.ok) throw new Error(data.message || 'Approval failed');
+      showMessage(data.message || 'Organization approved.', 'success');
+      table.ajax.reload(null, false);
+    } catch (err) {
+      showMessage(err.message || 'Something went wrong.', 'danger', 7000);
+    } finally {
+      setLoading($btn, false);
+    }
+  });
+
+  // REJECT
+  $('#approvalTable').on('click', '.reject-btn', async function () {
+    const $btn = $(this);
+    const orgId = $btn.data('id');
+    const orgName = $(this).closest('tr').find('td:first').text().trim() || 'this organization';
+
+    if (!confirm(`Are you sure you want to REJECT "${orgName}"? This action cannot be easily undone.`)) return;
+
+    try {
+      setLoading($btn, true);
+      const res = await window.authenticatedFetch(`/api/super-admin/organizations/${orgId}/reject`, { method: 'POST' });
+      const data = await res.json().catch(()=>({ message: 'Rejected.' }));
+      if (!res.ok) throw new Error(data.message || 'Rejection failed');
+      showMessage(data.message || 'Organization rejected.', 'warning');
+      table.ajax.reload(null, false);
+    } catch (err) {
+      showMessage(err.message || 'Something went wrong.', 'danger', 7000);
+    } finally {
+      setLoading($btn, false);
+    }
+  });
+};
+</script>
+{% endblock %}

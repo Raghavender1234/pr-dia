@@ -1,0 +1,742 @@
+{% extends "base.html" %}
+{% block title %}{{ post.title }} - Community Forum{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --accent-color: #3b82f6;
+        --light-bg: #f8fafc;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --border-color: #e2e8f0;
+        --text-muted: #64748b;
+        --success-color: #059669;
+    }
+
+    .post-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 1rem 1rem;
+        position: relative;
+    }
+
+    .post-header::before {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-top: 10px solid var(--secondary-color);
+        opacity: 0.7;
+    }
+
+    .breadcrumb {
+        background: none;
+        padding: 0;
+        margin-bottom: 1rem;
+    }
+
+    .breadcrumb-item a {
+        color: rgba(255, 255, 255, 0.8);
+        text-decoration: none;
+    }
+
+    .breadcrumb-item a:hover {
+        color: white;
+    }
+
+    .breadcrumb-item.active {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .post-card {
+        background: white;
+        border: none;
+        border-radius: 1rem;
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+
+    .post-content {
+        padding: 2rem;
+    }
+
+    .post-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        line-height: 1.3;
+        margin-bottom: 1rem;
+    }
+
+    .post-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        align-items: center;
+        padding: 1rem 2rem;
+        background: var(--light-bg);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .author-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .author-avatar {
+        width: 40px;
+        height: 40px;
+        background: var(--accent-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 1rem;
+    }
+
+    .author-details h6 {
+        margin: 0;
+        color: #1e293b;
+        font-weight: 600;
+    }
+
+    .author-details small {
+        color: var(--text-muted);
+    }
+
+    .org-badge {
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .post-body {
+        font-size: 1.125rem;
+        line-height: 1.7;
+        color: #374151;
+        padding: 0 2rem 2rem;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .replies-count {
+        background: var(--accent-color);
+        color: white;
+        border-radius: 1rem;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .reply-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+        overflow: hidden;
+    }
+
+    .reply-card:hover {
+        border-color: var(--accent-color);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .reply-header {
+        background: var(--light-bg);
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .reply-author {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .reply-avatar {
+        width: 32px;
+        height: 32px;
+        background: var(--accent-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .reply-content {
+        padding: 1.25rem;
+        line-height: 1.6;
+        color: #374151;
+    }
+
+    .reply-form-card {
+        background: white;
+        border: none;
+        border-radius: 1rem;
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+    }
+
+    .reply-form-header {
+        background: linear-gradient(135deg, var(--accent-color) 0%, var(--primary-color) 100%);
+        color: white;
+        padding: 1.5rem;
+    }
+
+    .reply-form-body {
+        padding: 2rem;
+    }
+
+    .form-control {
+        border: 2px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        resize: vertical;
+        min-height: 120px;
+    }
+
+    .form-control:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px 0 rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-outline-secondary {
+        border: 2px solid var(--border-color);
+        color: var(--text-muted);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .btn-outline-secondary:hover {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    .loading-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem;
+        background: white;
+        border-radius: 1rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .loading-spinner {
+        width: 3rem;
+        height: 3rem;
+        border: 3px solid var(--border-color);
+        border-top: 3px solid var(--accent-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        background: white;
+        border-radius: 1rem;
+        border: 2px dashed var(--border-color);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+    }
+
+    .back-button {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        backdrop-filter: blur(10px);
+    }
+
+    .back-button:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+        color: white;
+    }
+
+    .post-actions {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 2rem;
+        background: var(--light-bg);
+        border-top: 1px solid var(--border-color);
+    }
+
+    .character-count {
+        text-align: right;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+
+    .character-count.warning {
+        color: #f59e0b;
+    }
+
+    .character-count.danger {
+        color: #ef4444;
+    }
+
+    @media (max-width: 768px) {
+        .post-title {
+            font-size: 1.5rem;
+        }
+        
+        .post-meta {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .post-content,
+        .post-body,
+        .reply-form-body {
+            padding: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="post-header">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="/forum"><i class="bi bi-house-door me-1"></i>Forum</a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">Discussion</li>
+            </ol>
+        </nav>
+        <button class="btn btn-outline-light back-button" onclick="history.back()">
+            <i class="bi bi-arrow-left me-1"></i>Back
+        </button>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Page-level message area -->
+    <div id="pageMessage"></div>
+
+    <!-- Post content -->
+    <div id="post-content">
+        <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <div class="mt-3 text-muted">Loading discussion...</div>
+        </div>
+    </div>
+    
+    <!-- Replies Section -->
+    <div class="mb-4">
+        <h3 class="section-title">
+            <i class="bi bi-chat-left-text"></i>
+            Replies
+            <span class="replies-count" id="replies-count">0</span>
+        </h3>
+        <div id="replies-container">
+            <div class="loading-state">
+                <div class="loading-spinner"></div>
+                <div class="mt-3 text-muted">Loading replies...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply form -->
+    <div class="card reply-form-card">
+        <div class="reply-form-header">
+            <h5 class="mb-0">
+                <i class="bi bi-reply me-2"></i>
+                Join the Discussion
+            </h5>
+        </div>
+        <div class="reply-form-body">
+            <form id="newReplyForm" novalidate>
+                <div class="mb-3">
+                    <label for="replyContent" class="form-label fw-semibold">Your Reply</label>
+                    <textarea class="form-control" id="replyContent" 
+                              placeholder="Share your thoughts, ask questions, or provide helpful insights..." 
+                              required maxlength="2000"></textarea>
+                    <div class="character-count">
+                        <span id="char-count">0</span> / 2000 characters
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send-fill me-2"></i>Post Reply
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="preview-btn">
+                        <i class="bi bi-eye me-2"></i>Preview
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye me-2"></i>Reply Preview
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="preview-content" class="border rounded p-3 bg-light"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="$('#newReplyForm').submit(); $('#previewModal').modal('hide');">
+                    <i class="bi bi-send-fill me-2"></i>Post Reply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    const postId = "{{ post.id }}";
+    const $postContent = $('#post-content');
+    const $repliesContainer = $('#replies-container');
+    const $repliesCount = $('#replies-count');
+    const $newReplyForm = $('#newReplyForm');
+    const $pageMessage = $('#pageMessage');
+    const $replyContent = $('#replyContent');
+    const $charCount = $('#char-count');
+    const previewModal = new bootstrap.Modal($('#previewModal')[0]);
+
+    // Character counter
+    $replyContent.on('input', function() {
+        const length = $(this).val().length;
+        $charCount.text(length);
+        
+        const $counter = $('.character-count');
+        $counter.removeClass('warning danger');
+        
+        if (length > 1500) {
+            $counter.addClass('warning');
+        }
+        if (length > 1800) {
+            $counter.addClass('danger');
+        }
+    });
+
+    // Preview functionality
+    $('#preview-btn').on('click', function() {
+        const content = $replyContent.val().trim();
+        if (!content) {
+            window.showToast('Please write something to preview', 'warning');
+            return;
+        }
+        
+        $('#preview-content').html(nl2br(escapeHtml(content)));
+        previewModal.show();
+    });
+
+    function getAuthorInitials(name) {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffMinutes = Math.ceil(diffTime / (1000 * 60));
+        const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffMinutes < 60) {
+            return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+        } else if (diffHours < 24) {
+            return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+        } else if (diffDays < 7) {
+            return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+        } else {
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    }
+
+    const renderPost = (post) => {
+        const createdAt = post.created_at ? formatDate(post.created_at) : '';
+        const postHtml = `
+            <div class="post-card">
+                <div class="post-meta">
+                    <div class="author-info">
+                        <div class="author-avatar">${getAuthorInitials(post.author_name || 'Unknown')}</div>
+                        <div class="author-details">
+                            <h6>${escapeHtml(post.author_name || 'Unknown')}</h6>
+                            <small>${createdAt}</small>
+                        </div>
+                    </div>
+                    ${post.organization_name ? `<span class="org-badge">${escapeHtml(post.organization_name)}</span>` : ''}
+                </div>
+                <div class="post-content">
+                    <h1 class="post-title">${escapeHtml(post.title || '')}</h1>
+                </div>
+                <div class="post-body">
+                    ${nl2br(escapeHtml(post.content || ''))}
+                </div>
+                <div class="post-actions">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="navigator.share ? navigator.share({title: '${escapeHtml(post.title)}', url: window.location.href}) : navigator.clipboard.writeText(window.location.href)">
+                        <i class="bi bi-share me-1"></i>Share
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('replyContent').focus()">
+                        <i class="bi bi-reply me-1"></i>Reply
+                    </button>
+                </div>
+            </div>
+        `;
+        $postContent.html(postHtml);
+
+        // Render replies
+        renderReplies(post.replies || []);
+    };
+
+    const renderReplies = (replies) => {
+        $repliesCount.text(replies.length);
+        
+        if (replies.length === 0) {
+            $repliesContainer.html(`
+                <div class="empty-state">
+                    <i class="bi bi-chat-dots"></i>
+                    <h4>No replies yet</h4>
+                    <p class="text-muted">Be the first to share your thoughts on this discussion!</p>
+                </div>
+            `);
+            return;
+        }
+
+        let repliesHtml = '';
+        replies.forEach((reply, index) => {
+            const replyDate = reply.created_at ? formatDate(reply.created_at) : '';
+            repliesHtml += `
+                <div class="reply-card" style="animation: fadeIn 0.3s ease ${index * 0.1}s both;">
+                    <div class="reply-header">
+                        <div class="reply-author">
+                            <div class="reply-avatar">${getAuthorInitials(reply.author_name || 'Unknown')}</div>
+                            <div>
+                                <strong>${escapeHtml(reply.author_name || 'Unknown')}</strong>
+                                <small class="text-muted ms-2">${replyDate}</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="reply-content">
+                        ${nl2br(escapeHtml(reply.content || ''))}
+                    </div>
+                </div>
+            `;
+        });
+        $repliesContainer.html(repliesHtml);
+
+        // Add CSS for animation
+        if (!$('#fadeInStyle').length) {
+            $('<style id="fadeInStyle">@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }</style>').appendTo('head');
+        }
+    };
+
+    // Helper functions
+    function escapeHtml(unsafe) {
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function nl2br(str) {
+        return String(str).replace(/\n/g, '<br>');
+    }
+
+    async function loadPostAndReplies() {
+        $pageMessage.empty();
+        try {
+            const res = await window.authenticatedFetch(`/api/community/posts/${postId}`);
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const message = data && data.message ? data.message : `Failed to load post (status ${res.status})`;
+                throw new Error(message);
+            }
+            renderPost(data);
+        } catch (err) {
+            const msg = escapeHtml(err.message || 'Unexpected error');
+            $postContent.html(`
+                <div class="post-card">
+                    <div class="post-content text-center p-5">
+                        <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3rem;"></i>
+                        <h3 class="mt-3">Unable to Load Discussion</h3>
+                        <p class="text-muted">${msg}</p>
+                        <button class="btn btn-primary" onclick="location.reload()">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Try Again
+                        </button>
+                    </div>
+                </div>
+            `);
+            $repliesContainer.html('');
+            $pageMessage.html(`<div class="alert alert-danger alert-dismissible fade show">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ${msg}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>`);
+        }
+    }
+
+    // Reply form submit handler
+    $newReplyForm.on('submit', async function(e) {
+        e.preventDefault();
+        const content = $replyContent.val().trim();
+        if (!content) {
+            window.showToast('Please write a reply before posting', 'warning');
+            $replyContent.focus();
+            return;
+        }
+
+        if (content.length > 2000) {
+            window.showToast('Reply is too long. Please keep it under 2000 characters.', 'warning');
+            return;
+        }
+
+        const $submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnHtml = $submitBtn.html();
+        $submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" role="status"></span>Posting...');
+
+        try {
+            const res = await window.authenticatedFetch(`/api/community/posts/${postId}/replies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const message = data && data.message ? data.message : `Failed to post reply (status ${res.status})`;
+                throw new Error(message);
+            }
+
+            // Success: notify user, reset form, reload replies
+            window.showToast('Reply posted successfully!', 'success');
+            $newReplyForm[0].reset();
+            $charCount.text('0');
+            $('.character-count').removeClass('warning danger');
+            
+            await loadPostAndReplies();
+            
+            // Smooth scroll to replies section
+            $('html, body').animate({
+                scrollTop: $('#replies-container').offset().top - 100
+            }, 500);
+            
+        } catch (err) {
+            const msg = err && err.message ? err.message : 'Unexpected error posting reply';
+            window.showToast(msg, 'danger');
+        } finally {
+            $submitBtn.prop('disabled', false).html(originalBtnHtml);
+        }
+    });
+
+    // Auto-save draft (optional feature)
+    let draftTimer;
+    $replyContent.on('input', function() {
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => {
+            const content = $(this).val();
+            if (content.trim()) {
+                sessionStorage.setItem(`draft_reply_${postId}`, content);
+            } else {
+                sessionStorage.removeItem(`draft_reply_${postId}`);
+            }
+        }, 1000);
+    });
+
+    // Load draft on page load
+    const savedDraft = sessionStorage.getItem(`draft_reply_${postId}`);
+    if (savedDraft) {
+        $replyContent.val(savedDraft);
+        $charCount.text(savedDraft.length);
+        window.showToast('Draft restored', 'info');
+    }
+
+    // Clear draft on successful post
+    $newReplyForm.on('submit', function() {
+        sessionStorage.removeItem(`draft_reply_${postId}`);
+    });
+
+    // Initialize
+    loadPostAndReplies();
+};
+</script>
+{% endblock %}

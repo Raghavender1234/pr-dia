@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}DIA - Exam Prep{% endblock %}</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jquery.dataTables.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* Navigation Styles */
+        .navbar { backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
+        .navbar-brand { font-weight: 700; letter-spacing: -0.5px; transition: transform 0.2s ease; }
+        .navbar-brand:hover { transform: scale(1.05); }
+        .nav-link { font-weight: 500; position: relative; transition: all 0.3s ease; border-radius: 6px; margin: 0 2px; padding: 0.5rem 0.75rem !important; }
+        .nav-link:hover { background-color: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+        .nav-link.fw-bold.text-warning { background: linear-gradient(45deg, #ffc107, #ffeb3b); color: #000 !important; border-radius: 20px; padding: 0.5rem 1rem !important; font-weight: 600; box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3); }
+        .nav-link.fw-bold.text-warning:hover { background: linear-gradient(45deg, #ffb300, #ffc107); box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4); transform: translateY(-2px); }
+        .nav-link.text-white.fs-5 { background: linear-gradient(45deg, #6c757d, #495057); border-radius: 20px; padding: 0.5rem 1rem !important; margin: 0 0.5rem; box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3); }
+        .nav-link.text-white.fs-5:hover { background: linear-gradient(45deg, #5a6268, #343a40); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4); }
+        .nav-link .bi-person-circle { transition: all 0.3s ease; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)); }
+        .nav-link:hover .bi-person-circle { transform: scale(1.05); filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3)); }
+
+        /* Navigation Brand Elements */
+        .nav-icon-gradient { background: linear-gradient(45deg, #a1c4fd 0%, #c2e9fb 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-fill-color: transparent; }
+        .nav-brand-text { font-weight: 800; letter-spacing: -0.5px; }
+
+        /* Organization Avatar and Name */
+        .org-avatar-badge { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; min-width: 36px; min-height: 36px; font-size: 0.875rem; font-weight: 700; border-radius: 50%; background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1)); color: white; border: 2px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); transition: all 0.3s ease; aspect-ratio: 1; flex-shrink: 0; }
+        .org-avatar-badge:hover { transform: scale(1.1); border-color: rgba(255, 255, 255, 0.4); }
+        .org-name-container { margin-left: 0.75rem; min-width: 0; flex: 1; }
+        .org-name-primary { font-size: 1.25rem; font-weight: 700; line-height: 1.2; color: inherit; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .org-name-secondary { font-size: 0.875rem; font-weight: 500; line-height: 1.1; color: rgba(255, 255, 255, 0.85); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* Notification Bell Styles */
+        .notification-bell {
+            position: relative;
+            cursor: pointer;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            color: rgba(255, 255, 255, 0.8);
+            margin: 0 0.5rem;
+        }
+        
+        .notification-bell:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-1px);
+            color: white;
+        }
+
+        .notification-dot {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            background: linear-gradient(45deg, #ff4757, #ff6b7a);
+            border-radius: 50%;
+            border: 2px solid white;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .notification-panel {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 350px;
+            max-height: 400px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+            z-index: 1050;
+            margin-top: 0.5rem;
+            overflow: hidden;
+            animation: notificationSlideIn 0.3s ease-out;
+        }
+
+        @keyframes notificationSlideIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .notification-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+            font-size: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notification-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            pointer-events: none;
+        }
+
+        .notification-item {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+            transition: width 0.3s ease;
+            z-index: 0;
+        }
+
+        .notification-item:hover::before {
+            width: 100%;
+        }
+
+        .notification-item:hover {
+            transform: translateX(4px);
+        }
+
+        .notification-item.unread {
+            background-color: rgba(102, 126, 234, 0.05);
+            border-left: 3px solid #667eea;
+        }
+
+        .notification-item strong,
+        .notification-item p,
+        .notification-item small {
+            position: relative;
+            z-index: 1;
+        }
+
+        .notification-item strong {
+            color: #2d3748;
+            font-size: 0.9rem;
+            line-height: 1.3;
+        }
+
+        .notification-item p {
+            color: #4a5568;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin: 0.25rem 0 0.5rem 0;
+        }
+
+        .notification-item small {
+            color: #718096;
+            font-size: 0.75rem;
+        }
+
+        /* Profile Dropdown */
+        .profile-dropdown { border: none; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); border-radius: 16px; padding: 0; min-width: 320px; margin-top: 0.75rem; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.2); overflow: hidden; animation: profileDropdownIn 0.3s ease-out; }
+        .profile-dropdown .dropdown-header { padding: 1.5rem 1.5rem 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; position: relative; overflow: hidden; }
+        .profile-dropdown .dropdown-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%); pointer-events: none; }
+        .profile-dropdown .dropdown-header h6 { margin: 0; font-size: 1.1rem; font-weight: 600; letter-spacing: -0.3px; position: relative; z-index: 1; }
+        .profile-dropdown .dropdown-header .text-muted { opacity: 0.9; font-size: 0.875rem; margin-top: 0.25rem; position: relative; z-index: 1; }
+        .profile-dropdown .dropdown-item { display: flex; align-items: center; padding: 0.875rem 1.5rem; border-radius: 0; margin: 0; transition: all 0.2s ease; font-size: 0.95rem; font-weight: 500; color: #495057; position: relative; overflow: hidden; }
+        .profile-dropdown .dropdown-item::before { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 100%; background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); transition: width 0.3s ease; z-index: 0; }
+        .profile-dropdown .dropdown-item:hover::before { width: 100%; }
+        .profile-dropdown .dropdown-item:hover { background: transparent; color: #495057; transform: translateX(4px); }
+        .profile-dropdown .dropdown-item i { margin-right: 0.875rem; font-size: 1.1rem; width: 20px; text-align: center; position: relative; z-index: 1; }
+        .profile-dropdown .dropdown-item span { position: relative; z-index: 1; }
+        .profile-dropdown .dropdown-item.text-danger { color: #dc3545 !important; }
+        .profile-dropdown .dropdown-item.text-danger::before { background: linear-gradient(90deg, rgba(220, 53, 69, 0.1) 0%, rgba(220, 53, 69, 0.05) 100%); }
+        .profile-dropdown .dropdown-item.text-danger:hover { background: transparent; color: #dc3545 !important; }
+        .profile-dropdown .dropdown-divider { margin: 0.5rem 0; border-color: rgba(0, 0, 0, 0.08); }
+        .profile-dropdown .badge { position: relative; z-index: 1; font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 8px; font-weight: 600; }
+        .profile-dropdown .badge.bg-warning { background: linear-gradient(45deg, #ffc107, #ffeb3b) !important; color: #000 !important; box-shadow: 0 2px 4px rgba(255, 193, 7, 0.3); }
+
+        /* Profile Dropdown Icon Colors */
+        .profile-dropdown .dropdown-item i.text-info { color: #17a2b8 !important; }
+        .profile-dropdown .dropdown-item i.text-secondary { color: #6c757d !important; }
+        .profile-dropdown .dropdown-item i.text-warning { color: #ffc107 !important; }
+        .profile-dropdown .dropdown-item i.text-success { color: #28a745 !important; }
+
+        /* Alerts and Toasts */
+        .alert { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); margin-bottom: 1rem; }
+        .alert-dismissible .btn-close { padding: 1rem; }
+        .toast { border: none; border-radius: 12px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); backdrop-filter: blur(10px); }
+        .toast-body { padding: 1rem; font-weight: 500; }
+
+        /* Footer */
+        .footer-enhanced { background: linear-gradient(135deg, #212529 0%, #495057 100%); border-top: 1px solid #495057; }
+        .footer-enhanced h5, .footer-enhanced h6 { color: #fff !important; font-weight: 600; margin-bottom: 1rem; }
+        .footer-enhanced .text-white-50 { transition: all 0.3s ease; }
+        .footer-enhanced .text-white-50:hover { color: #fff !important; transform: translateX(4px); }
+        .social-icons a { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; transition: all 0.3s ease; background: rgba(255, 255, 255, 0.1); }
+        .social-icons a:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+
+        /* Floating Shapes Animation */
+        .floating-shapes { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
+        .floating-shapes::before, .floating-shapes::after { content: ''; position: absolute; border-radius: 50%; background: rgba(255, 255, 255, 0.1); animation: floatShapes 15s ease-in-out infinite; }
+        .floating-shapes::before { width: 100px; height: 100px; top: 20%; left: 10%; animation-delay: 0s; }
+        .floating-shapes::after { width: 150px; height: 150px; bottom: 20%; right: 10%; animation-delay: 7s; }
+
+        /* Buttons */
+        .btn-outline-light { border-width: 2px; font-weight: 600; border-radius: 25px; padding: 0.5rem 1.25rem; transition: all 0.3s ease; }
+        .btn-outline-light:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3); }
+
+        /* Layout and Utilities */
+        .page-fade-in { animation: fadeInUp 0.6s ease-out; }
+        main { min-height: calc(100vh - 200px); }
+        .container { max-width: 1200px; }
+        .spinner-border { animation: spin 1s linear infinite; }
+
+        .toast-container .toast, .alert-dismissible {
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .fade-out {
+            opacity: 0 !important;
+            transform: translateY(-20px);
+        }
+
+        /* Tooltips */
+        .navbar-brand:hover .org-name-container::after { content: attr(data-full-name); position: absolute; top: 100%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; white-space: nowrap; z-index: 1000; margin-top: 0.5rem; opacity: 0; animation: tooltipFadeIn 0.3s ease-out forwards; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); pointer-events: none; } 
+        .navbar-brand:hover .org-name-container::before { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 6px solid rgba(0, 0, 0, 0.9); z-index: 1001; margin-top: 0.25rem; opacity: 0; animation: tooltipFadeIn 0.3s ease-out forwards; pointer-events: none; }
+
+        /* Animations */
+        @keyframes profileDropdownIn { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes floatShapes { 0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; } 50% { transform: translateY(-30px) rotate(180deg); opacity: 0.8; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes tooltipFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Responsive Design */
+        @media (min-width: 1400px) { .org-name-container { max-width: 300px; } }
+        @media (min-width: 1200px) and (max-width: 1399px) { .org-name-container { max-width: 250px; } }
+        @media (min-width: 992px) and (max-width: 1199px) { .org-name-container { max-width: 200px; } }
+        @media (min-width: 768px) and (max-width: 991px) { .org-name-container { max-width: 180px; } .org-name-primary { font-size: 1.1rem; } .org-name-secondary { font-size: 0.8rem; } }
+        @media (max-width: 991.98px) { 
+            .navbar-nav .nav-link { margin: 0.25rem 0; } 
+            .org-avatar-badge { width: 32px; height: 32px; font-size: 0.75rem; } 
+            .profile-dropdown { min-width: 280px; margin-top: 0.5rem; } 
+            .profile-dropdown .dropdown-header { padding: 1.25rem 1.25rem 0.875rem; } 
+            .profile-dropdown .dropdown-item { padding: 0.75rem 1.25rem; font-size: 0.9rem; }
+            .notification-panel { width: 300px; right: -50px; }
+        }
+        @media (max-width: 767px) { 
+            .org-name-container { max-width: 150px; } 
+            .org-name-primary { font-size: 1rem; } 
+            .org-name-secondary { font-size: 0.75rem; } 
+            .org-avatar-badge { width: 32px; height: 32px; min-width: 32px; min-height: 32px; font-size: 0.75rem; }
+            .notification-panel { width: 280px; right: -100px; }
+        }
+        
+    .navbar .dropdown-menu {
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 0.5rem 0;
+    min-width: 220px;
+    backdrop-filter: blur(10px);
+}
+
+.navbar .dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.navbar .dropdown-menu .dropdown-item i {
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.navbar .dropdown-menu .dropdown-item:hover {
+    background: linear-gradient(90deg, rgba(102,126,234,0.1), rgba(118,75,162,0.1));
+    color: #343a40;
+    transform: translateX(4px);
+}
+
+.navbar .dropdown-menu .dropdown-item:hover i {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.navbar .dropdown-menu .dropdown-divider {
+    margin: 0.25rem 0;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+</style>
+<script>
+// JavaScript function to intelligently split organization names
+function splitOrganizationName(fullName) {
+    if (!fullName || fullName.length <= 20) {
+        return { primary: fullName, secondary: '' };
+    }
+    
+    // Common educational institution suffixes that should go in secondary line
+    const institutionSuffixes = [
+        'college', 'academy', 'institute', 'university', 'school', 'center', 'centre',
+        'coaching', 'classes', 'tutorial', 'education', 'educational', 'foundation',
+        'campus', 'institution', 'academy', 'vidyalaya', 'mandir', 'ashram',
+        'junior', 'senior', 'high', 'higher', 'secondary', 'primary', 'elementary',
+        'technical', 'engineering', 'medical', 'dental', 'nursing', 'pharmacy',
+        'management', 'business', 'commerce', 'arts', 'science', 'technology',
+        'polytechnic', 'diploma', 'degree', 'postgraduate', 'undergraduate'
+    ];
+    
+    const words = fullName.split(' ');
+    const wordCount = words.length;
+    
+    // If 2-3 words, keep as is
+    if (wordCount <= 3) {
+        return { primary: fullName, secondary: '' };
+    }
+    
+    // For 4+ words, find the best split point
+    let primaryWords = [];
+    let secondaryWords = [];
+    
+    // Strategy 1: Look for institutional suffixes
+    for (let i = 0; i < words.length; i++) {
+        const word = words[i].toLowerCase();
+        
+        // If we find an institutional suffix, this and everything after goes to secondary
+        if (institutionSuffixes.includes(word)) {
+            primaryWords = words.slice(0, i);
+            secondaryWords = words.slice(i);
+            break;
+        }
+    }
+    
+    // Strategy 2: If no institutional suffix found, use intelligent splitting
+    if (primaryWords.length === 0) {
+        if (wordCount === 4) {
+            primaryWords = words.slice(0, 2);
+            secondaryWords = words.slice(2);
+        } else if (wordCount === 5) {
+            primaryWords = words.slice(0, 3);
+            secondaryWords = words.slice(3);
+        } else {
+            primaryWords = words.slice(0, 3);
+            secondaryWords = words.slice(3);
+        }
+    }
+    
+    // Strategy 3: Ensure primary is not too long (max 25 characters)
+    let primaryText = primaryWords.join(' ');
+    if (primaryText.length > 25 && primaryWords.length > 2) {
+        const lastWord = primaryWords.pop();
+        secondaryWords.unshift(lastWord);
+        primaryText = primaryWords.join(' ');
+    }
+    
+    // Strategy 4: Ensure primary has at least 2 words if possible
+    if (primaryWords.length === 1 && words.length > 1) {
+        primaryWords.push(secondaryWords.shift());
+    }
+    
+    // Final cleanup - ensure we don't have empty primary
+    if (primaryWords.length === 0) {
+        primaryWords = words.slice(0, Math.min(2, words.length));
+        secondaryWords = words.slice(primaryWords.length);
+    }
+    
+    return {
+        primary: primaryWords.join(' '),
+        secondary: secondaryWords.join(' ')
+    };
+}
+
+// Initialize organization name splitting when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Find all organization name elements
+    const orgPrimaryElements = document.querySelectorAll('[id^="org-primary-"]');
+    
+    orgPrimaryElements.forEach(function(primaryElement) {
+        const orgName = primaryElement.textContent.trim();
+        const subdomain = primaryElement.id.replace('org-primary-', '');
+        const secondaryElement = document.getElementById('org-secondary-' + subdomain);
+        
+        if (orgName && secondaryElement) {
+            const splitName = splitOrganizationName(orgName);
+            primaryElement.textContent = splitName.primary;
+            secondaryElement.textContent = splitName.secondary;
+            
+            // Hide secondary element if no secondary text
+            if (!splitName.secondary) {
+                secondaryElement.style.display = 'none';
+            } else {
+                secondaryElement.style.display = 'block';
+            }
+        }
+    });
+});
+</script>
+
+<script>
+window.APP_CONTEXT = {
+    isLoggedIn: {{ g.user_context.is_logged_in|tojson }},
+    userType: {{ g.user_context.user_type|tojson }},
+    accessToken: {{ g.user_context.access_token|tojson }},
+    orgSubdomain: {{ g.current_organization.subdomain|tojson if g.current_organization else 'null' }}
+};
+</script>
+
+{% block head_extra %}{% endblock %}
+
+<script>
+window.MathJax = {
+    tex: {
+        inlineMath: [['$$','$$'], ['\(','\)']],
+        displayMath: [['$$','$$'], ['\[','\]']]
+    },
+    options: {
+        ignoreHtmlClass: 'mathjax-ignore',
+        processHtmlClass: 'mathjax-process'
+    },
+    svg: {
+        fontCache: 'global'
+    }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">
+</script>
+</head>
+
+<body class="d-flex flex-column min-vh-100" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+<header>
+    {% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+    {% if show_navbar is not defined or show_navbar %}
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-sm py-3 
+        {% if g.user_context.user_type == 'super_admin' %}bg-dark
+        {% elif g.user_context.user_type == 'main_co_admin' %}bg-primary
+        {% elif g.user_context.user_type == 'co_admin' %}bg-primary
+        {% elif g.user_context.user_type == 'student' %}bg-secondary
+        {% else %}bg-dark{% endif %} ">
+
+        <div class="container-fluid">
+            <!-- Org Logo + Name -->
+            <a class="navbar-brand fs-4 fw-bold me-auto d-flex align-items-center" 
+            href="{{ url_for('frontend.index', org=g.current_organization.subdomain if g.current_organization else None) }}">
+
+                {% if g.current_organization and g.current_organization.logo_url %}
+                    <img src="{{ g.current_organization.logo_url }}" alt="Logo" class="me-2" style="height: 36px; border-radius: 6px;">
+                    <div class="org-name-container">
+                        <div class="org-name-primary" id="org-primary-{{ g.current_organization.subdomain }}">{{ g.current_organization.name }}</div>
+                        <div class="org-name-secondary" id="org-secondary-{{ g.current_organization.subdomain }}"></div>
+                    </div>
+
+                {% elif g.current_organization %}
+                    <span class="org-avatar-badge me-2">{{ g.current_organization.name[:2] | upper }}</span>
+                    <div class="org-name-container">
+                        <div class="org-name-primary" id="org-primary-{{ g.current_organization.subdomain }}">{{ g.current_organization.name }}</div>
+                        <div class="org-name-secondary" id="org-secondary-{{ g.current_organization.subdomain }}"></div>
+                    </div>
+
+                {% else %}
+                    <i class="bi bi-shield-check-fill fs-3 me-2 nav-icon-gradient"></i>
+                    <span class="nav-brand-text">DIA</span>
+                {% endif %}
+            </a>
+
+            <!-- Mobile toggle -->
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <!-- Main Nav -->
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+
+                    {% if not g.user_context.is_logged_in %}
+                        <!-- Guest Links -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('frontend.browse_all_exams', **org_param) }}">
+                                <i class="bi bi-search me-1"></i>Browse Exams
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('frontend.login', **org_param) }}">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-outline-light ms-2" href="{{ url_for('frontend.register', **org_param) }}">
+                                <i class="bi bi-person-plus me-1"></i>Register
+                            </a>
+                        </li>
+
+                    {% else %}
+                        <!-- Logged-In Users -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for(dashboard_url_endpoint, **org_param) }}">
+                                <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        {% if g.user_context.user_type == 'student' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.student_my_exams', **org_param) }}">
+                                    <i class="bi bi-journal-text me-1"></i>My Exams
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.student_mock_test_browse', **org_param) }}">
+                                    <i class="bi bi-clipboard-data me-1"></i>Mock Tests
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link fw-bold text-warning" href="{{ url_for('frontend.browse_all_exams', **org_param) }}">
+                                    <i class="bi bi-search-heart me-1"></i>Find More Exams
+                                </a>
+                            </li>
+
+                        {% elif g.user_context.user_type in ['main_co_admin', 'co_admin'] %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="academicsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-journal-bookmark-fill me-1"></i>Academics
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="academicsDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.exam_management', **org_param) }}">
+                                        <i class="bi bi-journal-check text-primary"></i> Exam & Content Mgt
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.view_class_calendar', **org_param) }}">
+                                        <i class="bi bi-camera-video-fill text-danger"></i> Live Class Schedule
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="mockTestDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-clipboard-data me-1"></i>Mock Tests
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="mockTestDropdown">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.mock_test_management', **org_param) }}">
+                                        <i class="bi bi-pencil-square text-primary"></i> Manage Tests
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.grade_submissions_page', **org_param) }}">
+                                        <i class="bi bi-check2-circle text-success"></i> Grade Submissions
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                        <a class="dropdown-item" href="{{ url_for('frontend.archived_content', **org_param) }}">
+                            <i class="fas fa-flag me-2"></i> Reported Content
+                        </a>
+                                </li>
+                                {% if g.user_context.user_type == 'main_co_admin' %}
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.view_locked_attempts', **org_param) }}">
+                                        <i class="bi bi-lock-fill text-danger"></i>
+                                        Locked Attempts
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </li>
+
+                        {% if g.user_context.user_type == 'main_co_admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('frontend.org_users_management', **org_param) }}">
+                                <i class="bi bi-people me-1"></i>Manage Users
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% elif g.user_context.user_type == 'super_admin' %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.org_user_global_management') }}">Organizations</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.plan_management') }}">Plans</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.archived_content') }}">
+                                    <i class="bi bi-archive-fill me-1"></i>Archive
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        <!-- Notification Bell (Only for logged-in users) -->
+                        <li class="nav-item position-relative">
+                            <div id="notificationBell" class="notification-bell">
+                                <i class="bi bi-bell"></i>
+                                <span id="notificationDot" class="notification-dot"></span>
+                            </div>
+                            <div id="notificationPanel" class="notification-panel">
+                                <div class="notification-header">
+                                    <i class="bi bi-bell me-2"></i>Notifications
+                                </div>
+                                <div id="notificationList" style="max-height: 300px; overflow-y: auto;">
+                                    <!-- Notifications will be dynamically loaded here -->
+                                </div>
+                                <div class="notification-footer p-2 border-top">
+                                    <a href="{{ url_for('frontend.all_notifications_page') }}" class="btn btn-sm btn-outline-secondary w-100 mb-2">
+                                        <i class="bi bi-list-ul me-1"></i> See All Notifications
+                                    </a>
+                                    <button class="btn btn-sm btn-primary w-100" id="composeNotificationBtn">
+                                        <i class="bi bi-pencil-square me-1"></i> Compose New Message
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                        <!-- Profile Dropdown -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userProfileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle fs-3 me-2"></i>
+                                <span class="d-none d-lg-inline">{{ g.user_context.user_name }}</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 profile-dropdown" aria-labelledby="userProfileDropdown">
+                                <li class="dropdown-header">
+                                    <h6 class="mb-1 fw-bold">{{ g.user_context.user_name }}</h6>
+                                    <small class="text-muted">{{ g.user_context.user_email }}</small>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.profile', **org_param) }}">
+                                        <i class="bi bi-person-badge text-info"></i>
+                                        <span>My Profile</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.forum_home', **org_param) }}">
+                                        <i class="bi bi-chat-left-dots-fill text-primary"></i>
+                                        <span>Community Forum</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.student_transactions', **org_param) }}">
+                                        <i class="bi bi-receipt text-success"></i>
+                                        <span>My Transactions</span>
+                                    </a>
+                                </li>
+                                {% if g.user_context.user_type in ['main_co_admin', 'co_admin'] %}
+                                    <li>
+                                        <a class="dropdown-item" href="#" id="statusToggle">
+                                            <i class="bi bi-circle-fill text-success"></i> <span>Set Status to Busy</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+
+                                {% if g.user_context.user_type == 'student' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('frontend.student_my_organizations', **org_param) }}">
+                                            <i class="bi bi-building text-secondary"></i>
+                                            <span>My Organizations</span>
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('frontend.student_review_list', **org_param) }}">
+                                            <i class="bi bi-bookmark-star-fill text-warning"></i>
+                                            <span>Review List</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+
+                                {% if g.user_context.user_type == 'main_co_admin' %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('frontend.organization_settings_page', **org_param) }}">
+                                            <i class="bi bi-gear-fill text-secondary"></i>
+                                            <span>Org Settings</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
+
+                                {% if g.user_context.is_premium or g.user_context.user_type == 'super_admin' %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('frontend.student_learn_with_ai', **org_param) }}">
+                                            <i class="bi bi-stars text-success"></i>
+                                            <span>{% if g.user_context.user_type == 'student' %}AI Tutor{% else %}AI Assistant{% endif %}</span>
+                                        </a>
+                                    </li>
+                                {% elif g.user_context.user_type != 'super_admin' %}
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.student_learn_with_ai', **org_param) }}">
+                                        <i class="bi bi-stars text-success"></i>
+                                        <span>{% if g.user_context.user_type == 'student' %}AI Tutor{% else %}AI Assistant{% endif %}</span>
+                                        {% if not g.user_context.is_premium %}
+                                            <span class="badge bg-warning text-dark ms-auto">Upgrade</span>
+                                        {% endif %}
+                                    </a>
+                                    </li>
+                                {% endif %}
+
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item text-danger" href="#" id="logoutButton">
+                                        <i class="bi bi-box-arrow-right"></i>
+                                        <span>Logout</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+</header>
+
+<main class="flex-grow-1">
+    <div class="page-fade-in">
+        <div class="container mt-4" id="pageMessageContainer">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            <i class="bi bi-{% if category == 'success' %}check-circle-fill{% elif category == 'danger' or category == 'warning' %}exclamation-triangle-fill{% else %}info-circle-fill{% endif %} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+<footer class="footer-enhanced text-white-50 py-5 mt-auto">
+    <div class="container text-center text-md-start">
+        <div class="row g-4">
+            
+            <div class="col-lg-4 col-md-12 mb-4 mb-lg-0">
+                {% if g.current_organization %}
+                    <h5 class="text-white mb-3">
+                        <i class="bi bi-mortarboard-fill me-2"></i>{{ g.current_organization.name }}
+                    </h5>
+                    <p class="small opacity-75 mb-0">
+                        {{ g.current_organization.footer_text or 'Your dedicated portal for exam success.' }}
+                    </p>
+                {% else %}
+                    <h5 class="text-white mb-3">
+                        <i class="bi bi-mortarboard-fill me-2"></i>DIA Exam Prep
+                    </h5>
+                    <p class="small mb-3">
+                        Your ultimate partner in exam preparation. Empowering success through smart learning.
+                    </p>
+                    <p class="small mb-0 opacity-75">
+                        &copy; {{ current_year }} DIA. All Rights Reserved.
+                    </p>
+                {% endif %}
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <h6 class="text-white mb-3">Product</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.browse_all_exams') }}">
+                            <i class="bi bi-search me-1"></i>Browse Exams
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.pricing_page') }}">
+                            <i class="bi bi-tag me-1"></i>Pricing
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <h6 class="text-white mb-3">Company</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.public_page', page_slug='about') }}">
+                            <i class="bi bi-info-circle me-1"></i>About Us
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.public_page', page_slug='contact') }}">
+                            <i class="bi bi-envelope me-1"></i>Contact
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.public_page', page_slug='faq') }}">
+                            <i class="bi bi-question-circle me-1"></i>FAQs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+                <h6 class="text-white mb-3">Legal</h6>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.public_page', page_slug='terms') }}">
+                            <i class="bi bi-file-text me-1"></i>Terms of Service
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a class="text-white-50 small text-decoration-none" href="{{ url_for('frontend.public_page', page_slug='privacy') }}">
+                            <i class="bi bi-shield-check me-1"></i>Privacy Policy
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="col-lg-2 col-md-12 text-center text-lg-end">
+                <h6 class="text-white mb-3">Connect With Us</h6>
+                <div class="d-flex justify-content-center justify-content-lg-end gap-2 social-icons">
+                    {% if g.current_organization and g.current_organization.social_links %}
+                        {% for platform, url in g.current_organization.social_links.items() if url %}
+                            <a href="{{ url }}" class="text-white-50" title="{{ platform | capitalize }}"><i class="bi bi-{{ platform }}"></i></a>
+                        {% endfor %}
+                    {% else %}
+                        <a href="#" class="text-white-50" title="Twitter"><i class="bi bi-twitter"></i></a>
+                        <a href="#" class="text-white-50" title="LinkedIn"><i class="bi bi-linkedin"></i></a>
+                        <a href="#" class="text-white-50" title="Facebook"><i class="bi bi-facebook"></i></a>
+                        <a href="#" class="text-white-50" title="Instagram"><i class="bi bi-instagram"></i></a>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</footer>
+
+<div class="floating-shapes"></div>
+<div class="toast-container position-fixed top-0 end-0 p-3" id="toast-container"></div>
+
+<!-- Core JS -->
+<script src="{{ url_for('static', filename='js/jquery-3.7.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<!-- CKEditor Super Build -->
+<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/super-build/ckeditor.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@wiris/mathtype-ckeditor5@latest/dist/plugin.min.js"></script>
+
+<script>
+window.initEditor = async function (element) {
+    try {
+        const editor = await CKEDITOR.ClassicEditor.create(element, {
+            removePlugins: [
+                'RealTimeCollaborativeComments', 'RealTimeCollaborativeTrackChanges',
+                'RealTimeCollaborativeRevisionHistory', 'PresenceList', 'Comments',
+                'TrackChanges', 'TrackChangesData', 'RevisionHistory', 'Pagination',
+                'WProofreader', 'SlashCommand', 'Template',
+                'DocumentOutline', 'FormatPainter', 'CaseChange', 'MultiLevelList',
+                'AIAssistant', 'PasteFromOfficeEnhanced', 'TableOfContents'
+            ],
+            toolbar: {
+                items: [
+                    'heading', '|',
+                    'fontFamily', 'fontSize', '|',
+                    'fontColor', 'fontBackgroundColor', '|',
+                    'alignment', '|',
+                    'bold', 'italic', 'underline', '|',
+                    'subscript', 'superscript', '|',
+                    'strikethrough', 'code', '|',
+                    'outdent', 'indent', '|',
+                    'blockQuote', 'insertTable', '|',
+                    'bulletedList', 'numberedList', '|',
+                    'link', 'imageUpload', '|',
+                    'undo', 'redo', 'specialCharacters'
+                ]
+            },
+            simpleUpload: {
+                uploadUrl: '/api/main-co-admin/ckeditor-image-upload',
+                withCredentials: true 
+            }
+        });
+        element.ckeditorInstance = editor;
+        return editor;
+    } catch (error) {
+        console.error(`CKEditor init error for #${element?.id}:`, error);
+        return null;
+    }
+};
+
+window.destroyEditor = async function (instance) {
+    if (instance?.destroy) await instance.destroy().catch(() => {});
+};
+
+window.typesetMath = function (root) {
+    if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise(root ? [root] : undefined)
+               .catch(err => console.error("MathJax error:", err));
+    }
+};
+
+function validateForm(formSelector) {
+    let isValid = true;
+    const $form = $(formSelector);
+    
+    $form.find('.is-invalid').removeClass('is-invalid');
+    $form.find('.invalid-feedback').remove();
+
+    $form.find('[required]').each(function() {
+        if (!$(this).val()) {
+            isValid = false;
+            $(this).addClass('is-invalid');
+            $(this).after('<div class="invalid-feedback">This field is required.</div>');
+        }
+    });
+    return isValid;
+}
+</script>
+
+<script>
+const tokenProvider = (function() {
+    let tokenPromise = null;
+
+    async function fetchAndStoreToken() {
+        try {
+            const response = await fetch("{{ url_for('frontend.get_jwt_for_client') }}");
+            if (!response.ok) {
+                sessionStorage.removeItem('dia_access_token');
+                return null;
+            }
+            const data = await response.json();
+            if (data.access_token) {
+                sessionStorage.setItem('dia_access_token', data.access_token);
+                return data.access_token;
+            }
+            return null;
+        } catch (e) {
+            console.error("Could not fetch JWT from session:", e);
+            return null;
+        }
+    }
+
+    return {
+        getToken: async function() {
+            let token = sessionStorage.getItem('dia_access_token');
+            if (token) {
+                return token;
+            }
+            
+            if (!tokenPromise) {
+                tokenPromise = fetchAndStoreToken();
+            }
+            const resolvedToken = await tokenPromise;
+            tokenPromise = null;
+            return resolvedToken;
+        }
+    };
+})();
+
+// Global authenticated fetch function
+async function authenticatedFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    
+    const token = await tokenProvider.getToken();
+    if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+    }
+
+    // Automatically set content type for objects, but not for FormData
+    if (options.body && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        if (typeof options.body === 'object') {
+            options.body = JSON.stringify(options.body);
+        }
+    }
+    return fetch(url, { ...options, headers });
+}
+
+// Global toast function
+function showToast(message, type = 'success') {
+    const iconMap = {
+        success: 'check-circle-fill',
+        danger: 'exclamation-triangle-fill',
+        warning: 'exclamation-triangle-fill',
+        info: 'info-circle-fill'
+    };
+    const bgMap = {
+        success: 'bg-success',
+        danger: 'bg-danger',
+        warning: 'bg-warning',
+        info: 'bg-info'
+    };
+    const icon = iconMap[type] || 'info-circle-fill';
+    const bgClass = bgMap[type] || 'bg-secondary';
+
+    const toastHtml = `
+        <div class="toast align-items-center text-white ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="bi ${icon} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>`;
+    
+    const $toast = $(toastHtml);
+    $('#toast-container').append($toast);
+    const toast = new bootstrap.Toast($toast[0], { autohide: true, delay: 1200 });
+    toast.show();
+    $toast.on('hidden.bs.toast', () => $toast.remove());
+}
+
+// Make helper functions globally available
+window.authenticatedFetch = authenticatedFetch;
+window.showToast = showToast;
+window.validateForm = validateForm;
+
+// Notification system
+document.addEventListener('DOMContentLoaded', function() {
+    // Only run notification code for authenticated users
+    if (!window.APP_CONTEXT.isLoggedIn) return;
+    
+    const bell = document.getElementById('notificationBell');
+    const panel = document.getElementById('notificationPanel');
+    const dot = document.getElementById('notificationDot');
+    const list = document.getElementById('notificationList');
+    let isPanelOpen = false;
+    
+    if (!bell || !panel || !dot || !list) return;
+    
+    async function fetchNotifications() {
+        try {
+        const response = await authenticatedFetch('/api/notifications/?unread_only=true');
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+            const data = await response.json();
+            
+            // Show/hide notification dot
+            if (data.unread_count > 0) {
+                dot.style.display = 'block';
+            } else {
+                dot.style.display = 'none';
+            }
+            
+            // Populate notification list
+            list.innerHTML = '';
+            if (data.notifications.length === 0) {
+                list.innerHTML = '<div class="notification-item text-center text-muted">No new notifications</div>';
+            } else {
+                data.notifications.forEach(n => {
+                    const item = document.createElement('a');
+                    item.href = `{{ url_for('frontend.all_notifications_page') }}`;
+                    item.dataset.notificationId = n.id; 
+                    item.className = 'notification-item d-block text-decoration-none text-dark';
+                    if (!n.is_read) {
+                        item.classList.add('unread');
+                    }
+                    item.innerHTML = `
+                        <strong>${n.title}</strong>
+                        <p class="mb-0 small">${n.message}</p>
+                        <small class="text-muted">${new Date(n.timestamp).toLocaleString()}</small>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+        } catch (error) {
+            console.error("Failed to fetch notifications:", error);
+            list.innerHTML = '<div class="notification-item text-center text-danger">Could not load notifications</div>';
+        }
+    }
+    window.fetchNotifications = fetchNotifications; // Expose to global scope
+    
+    list.addEventListener('click', async (event) => {
+        const item = event.target.closest('.notification-item');
+        if (!item) return;
+
+        const notificationId = item.dataset.notificationId;
+        if (!notificationId) return;
+
+        // Mark ALL related notifications in this thread as read
+        try {
+            const response = await authenticatedFetch(`/api/notifications/${notificationId}/mark-thread-read`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                fetchNotifications(); 
+            }
+        } catch (err) {
+            console.error("Failed to mark thread as read:", err);
+        }
+    });
+
+// Initial fetch and interval remain the same
+fetchNotifications();
+setInterval(fetchNotifications, 30000);
+    // Bell click handler
+    bell.addEventListener('click', function(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        isPanelOpen = !isPanelOpen;
+        panel.style.display = isPanelOpen ? 'block' : 'none';
+        
+        if (isPanelOpen) {
+            fetchNotifications();
+        }
+    });
+    
+    // Close panel when clicking elsewhere
+    document.addEventListener('click', function(event) {
+        if (!panel.contains(event.target) && !bell.contains(event.target)) {
+            isPanelOpen = false;
+            panel.style.display = 'none';
+        }
+    });
+    
+    // Initial fetch
+    fetchNotifications();
+    
+    // Refresh every 30 seconds
+    setInterval(fetchNotifications, 30000);
+
+    // Listen for the custom event to update notifications
+    document.addEventListener('notifications-updated', function() {
+        console.log('notifications-updated event received in base.html');
+        fetchNotifications();
+    });
+});
+
+// Compose notification modal setup
+$(document).ready(function() {
+
+    // --- GLOBAL VARIABLES & HELPERS ---
+    const userType = window.APP_CONTEXT.userType;
+    const isLoggedIn = window.APP_CONTEXT.isLoggedIn;
+    
+    // --- NOTIFICATION & STATUS LOGIC ---
+    if (isLoggedIn) {
+        // 1. Initialize Variables
+        const composeModalElement = document.getElementById('composeNotificationModal');
+        if (!composeModalElement) return; // Exit if the modal isn't on the page
+
+        const composeModal = new bootstrap.Modal(composeModalElement);
+        const $composeForm = $('#composeNotificationForm');
+
+        // 2. Event Handler for clicking the 'Compose' button
+        $('#composeNotificationBtn').on('click', async function() {
+            $composeForm[0].reset();
+
+            if (userType === 'student') {
+                $('#composeModalTitle').text('Send a Direct Message');
+                $('#message-type-group').hide();
+                $('#recipient-group').show();
+
+            } else if (userType === 'main_co_admin' || userType === 'co_admin') {
+                $('#composeModalTitle').text('Compose a Message');
+                $('#message-type-group').show();
+                $('#typeBroadcast').prop('checked', true); // Default to broadcast
+                $('#recipient-group').hide();
+            }
+
+            composeModal.show();
+        });
+
+        // 3. Event Handler for the Admin's Broadcast/Direct radio buttons
+        $('input[name="messageType"]').on('change', function() {
+            if (this.value === 'direct') {
+                $('#recipient-group').slideDown();
+            } else {
+                $('#recipient-group').slideUp();
+            }
+        });
+
+        // 4. Event Handler for the form submission
+        $composeForm.on('submit', async function(e) {
+            e.preventDefault();
+            const $submitBtn = $(this).find('button[type="submit"]');
+            $submitBtn.prop('disabled', true).find('.btn-text').addClass('d-none');
+            $submitBtn.find('.btn-loading').removeClass('d-none');
+
+            let url, payload;
+            const messageType = $('input[name="messageType"]:checked').val();
+
+            if (userType === 'student') {
+                url = '/api/notifications/send-direct';
+                payload = {
+                    recipient_ids: $('#recipientTags').val(),
+                    title: $('#notificationTitle').val(),
+                    message: $('#notificationMessage').val()
+                };
+            } else { // For Admins
+                if (messageType === 'direct') {
+                url = '/api/notifications/admin/send-direct'; 
+                    payload = {
+                        recipient_ids: $('#recipientTags').val(),
+                        title: $('#notificationTitle').val(),
+                        message: $('#notificationMessage').val()
+                    };
+                } else { // Default to broadcast
+                    url = '/api/notifications/broadcast';
+                    payload = {
+                        title: $('#notificationTitle').val(),
+                        message: $('#notificationMessage').val()
+                    };
+                }
+            }
+
+            try {
+                const res = await authenticatedFetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+                showToast(data.message, 'success');
+                composeModal.hide();
+            } catch (err) {
+                showToast(`Error: ${err.message}`, 'danger');
+            } finally {
+                $submitBtn.prop('disabled', false).find('.btn-text').removeClass('d-none');
+                $submitBtn.find('.btn-loading').addClass('d-none');
+            }
+        });
+
+        // 5. Event Handler for the Admin Status Toggle
+        if (userType === 'main_co_admin' || userType === 'co_admin') {
+            const $statusToggle = $('#statusToggle');
+            if($statusToggle.length) { // Make sure the element exists
+                const $statusIcon = $statusToggle.find('i');
+                const $statusText = $statusToggle.find('span');
+
+                const updateStatusUI = (status) => {
+                    if (status === 'busy') {
+                        $statusIcon.removeClass('text-success').addClass('text-danger');
+                        $statusText.text('Set Status to Available');
+                    } else {
+                        $statusIcon.removeClass('text-danger').addClass('text-success');
+                        $statusText.text('Set Status to Busy');
+                    }
+                };
+                
+                // You would fetch the user's current status on page load here
+                // For now, it will default to the HTML's initial state
+                
+                $statusToggle.on('click', async function(e) {
+                    e.preventDefault();
+
+                    try {
+                        const res = await authenticatedFetch('/api/auth/toggle-availability', {
+                            method: 'POST'
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.message || 'Failed to update status');
+                        
+                        updateStatusUI(data.new_status);
+                        showToast(data.message, 'success');
+                    } catch (err) {
+                        showToast(err.message || 'Could not update your status.', 'danger');
+                    }
+                });
+            }
+        }
+    }
+
+    // --- GENERAL PAGE LOGIC ---
+
+    // Logout handler
+    $('#logoutButton').on('click', function(e) {
+        e.preventDefault();
+        sessionStorage.removeItem('dia_access_token');
+        window.location.href = "{{ url_for('frontend.logout') }}";
+    });
+
+    function formatToLocalTime(utcIsoString) {
+        if (!utcIsoString) return 'N/A';
+        try {
+            const date = new Date(utcIsoString);
+            // This format gives a nice, readable local time, e.g., "Sep 27, 2025, 3:50 PM"
+            return date.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: 'numeric', minute: '2-digit', hour12: true
+            });
+        } catch (e) {
+            console.error("Invalid date format for conversion:", utcIsoString);
+            return 'Invalid Date';
+        }
+    }
+
+    $(document).ready(function() {
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(function() {
+            const alerts = $('#pageMessageContainer .alert-dismissible');
+            if (alerts.length) {
+                // Add a class to trigger the fade out animation from your CSS
+                alerts.addClass('fade-out');
+                
+                // After the transition (500ms), close the alert
+                setTimeout(function() {
+                    alerts.each(function() {
+                        const alertInstance = new bootstrap.Alert(this);
+                        alertInstance.close();
+                    });
+                }, 500);
+            }
+        }, 5000);
+
+        // --- (Your existing notification, compose message, and logout logic is correct) ---
+
+        // --- NEW: Auto-Converter for All Dates on the Page ---
+        // This code runs on every page load. It finds any element with the
+        // 'data-utc-timestamp' attribute and automatically converts its content
+        // to the user's local time.
+        $('[data-utc-timestamp]').each(function() {
+            const utcTime = $(this).data('utc-timestamp');
+            const localTime = formatToLocalTime(utcTime);
+            $(this).text(localTime);
+        });
+
+        // --- (Your existing pageInit() call is correct) ---
+        if (window.pageInit && typeof window.pageInit === 'function') {
+            window.pageInit();
+        }
+    });
+});
+</script>
+
+{% block body_extra %}{% endblock %}
+<!-- Delete Mock Test Confirmation Modal -->
+<div class="modal fade" id="deleteMockTestConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirm Archival</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to archive the mock test: <strong id="deleteMockTestName"></strong>?</p>
+                <p class="small text-muted">This will hide the test but preserve student records.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteMockTestBtn">Yes, Archive</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Compose Notification Modal -->
+<div class="modal fade" id="composeNotificationModal" tabindex="-1" aria-labelledby="composeModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <!-- Modal Header with Gradient Background -->
+            <div class="modal-header position-relative overflow-hidden" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 2rem 2rem 1.5rem;">
+                <!-- Background Pattern -->
+                <div class="position-absolute top-0 start-0 w-100 h-100 opacity-10">
+                    <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <circle cx="2" cy="2" r="1" fill="white" opacity="0.3"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#grid)"/>
+                    </svg>
+                </div>
+                
+                <!-- Header Content -->
+                <div class="d-flex align-items-center w-100 position-relative">
+                    <div class="me-3">
+                        <div class="bg-white bg-opacity-20 rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="bi bi-envelope-fill text-white fs-4"></i>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="modal-title text-white mb-1 fw-bold fs-4" id="composeModalTitle">
+                            Compose Message
+                        </h5>
+                        <p class="text-white-50 mb-0 small">Send notifications to your community</p>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white opacity-75 position-relative" data-bs-dismiss="modal" aria-label="Close" style="font-size: 1.2rem;"></button>
+                </div>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="modal-body p-0">
+                <div class="p-4">
+                    <form id="composeNotificationForm">
+                        <!-- Message Type Selection (For Admins Only) -->
+                        <div id="message-type-group" class="mb-4 text-center" style="display: none;">
+                            <label class="form-label fw-semibold text-dark mb-3 d-flex align-items-center justify-content-center">
+                                <i class="bi bi-gear-fill me-2 text-info"></i>
+                                Message Type
+                            </label>
+                            <div class="btn-group shadow-sm" role="group" aria-label="Message type selection">
+                                <input type="radio" class="btn-check" name="messageType" id="typeBroadcast" value="broadcast" checked>
+                                <label class="btn btn-outline-primary px-4 py-2" for="typeBroadcast">
+                                    <i class="bi bi-broadcast me-2"></i>Broadcast to All
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="messageType" id="typeDirect" value="direct">
+                                <label class="btn btn-outline-primary px-4 py-2" for="typeDirect">
+                                    <i class="bi bi-person-fill me-2"></i>Direct Message
+                                </label>
+                            </div>
+                            <div class="form-text text-muted small mt-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Choose between sending to everyone or specific users
+                            </div>
+                        </div>
+                        
+                        <!-- Recipient Selection -->
+                        <div id="recipient-group" class="mb-4" style="display: none;">
+                            <label for="recipient-input" class="form-label fw-semibold text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-people-fill me-2 text-primary"></i>
+                                Select Recipients
+                            </label>
+                            <input type="text" id="recipient-input" class="form-control" placeholder="Type to search...">
+                            <div id="recipient-suggestions" class="list-group mt-2"></div>
+                            <div id="selected-recipients" class="mt-2"></div>
+                            <input type="hidden" id="recipientTags" name="recipient_ids">
+                        </div>
+                        
+                        <!-- Title Input -->
+                        <div class="mb-4">
+                            <label for="notificationTitle" class="form-label fw-semibold text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-tag-fill me-2 text-warning"></i>
+                                Message Title
+                            </label>
+                            <input type="text" class="form-control border-0 bg-light rounded-3 py-3 px-3 shadow-sm" id="notificationTitle" placeholder="Enter a catchy title for your message..." required>
+                        </div>
+                        
+                        <!-- Message Content -->
+                        <div class="mb-4">
+                            <label for="notificationMessage" class="form-label fw-semibold text-dark mb-2 d-flex align-items-center">
+                                <i class="bi bi-chat-text-fill me-2 text-success"></i>
+                                Message Content
+                            </label>
+                            <textarea class="form-control border-0 bg-light rounded-3 py-3 px-3 shadow-sm" id="notificationMessage" rows="6" placeholder="Write your message here... Be clear and engaging to get your point across effectively." required style="resize: vertical; min-height: 150px;"></textarea>
+                            <div class="form-text text-muted small mt-2 d-flex justify-content-between align-items-center">
+                                <span>
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    Tip: Keep it concise and actionable
+                                </span>
+                                <span id="charCount" class="text-secondary">0/500</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-3 pt-3">
+                            <button type="button" class="btn btn-light border rounded-3 px-4 py-2 flex-shrink-0" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </button>
+                            <button type="submit" class="btn btn-primary rounded-3 px-4 py-2 flex-grow-1 position-relative overflow-hidden" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                                <span class="btn-text">
+                                    <i class="bi bi-send-fill me-2"></i>Send Message
+                                </span>
+                                <span class="btn-loading d-none">
+                                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    Sending...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        let selectedRecipients = [];
+
+        function updateRecipientInput() {
+            const recipientIds = selectedRecipients.map(r => r.id);
+            $('#recipientTags').val(JSON.stringify(recipientIds));
+            const $selectedRecipientsContainer = $('#selected-recipients');
+            $selectedRecipientsContainer.empty();
+            selectedRecipients.forEach(recipient => {
+                $selectedRecipientsContainer.append(`<span class="badge bg-primary me-1">${recipient.name} <a href="#" class="text-white" data-id="${recipient.id}">&times;</a></span>`);
+            });
+        }
+
+        $('#recipient-input').on('keyup', async function() {
+            const query = $(this).val();
+            if (query.length < 2) {
+                $('#recipient-suggestions').empty();
+                return;
+            }
+
+            const res = await authenticatedFetch(`/api/notifications/users-for-tagging?query=${query}`);
+            const users = await res.json();
+            const $suggestions = $('#recipient-suggestions');
+            $suggestions.empty();
+            users.forEach(user => {
+                $suggestions.append(`<a href="#" class="list-group-item list-group-item-action" data-id="${user.id}" data-name="${user.name}">${user.name} (${user.role})</a>`);
+            });
+        });
+
+        $('#recipient-suggestions').on('click', 'a', function(e) {
+            e.preventDefault();
+            const userId = $(this).data('id');
+            const userName = $(this).data('name');
+            if (!selectedRecipients.find(r => r.id === userId)) {
+                selectedRecipients.push({ id: userId, name: userName });
+                updateRecipientInput();
+            }
+            $('#recipient-input').val('');
+            $('#recipient-suggestions').empty();
+        });
+
+        $('#selected-recipients').on('click', 'a', function(e) {
+            e.preventDefault();
+            const userId = $(this).data('id');
+            selectedRecipients = selectedRecipients.filter(r => r.id !== userId);
+            updateRecipientInput();
+        });
+    });
+</script>
+
+</body>
+</html>

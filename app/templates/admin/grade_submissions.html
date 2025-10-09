@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Grade Submissions{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-2">Grade Open-Ended Submissions</h2>
+    <p class="text-muted mb-4">Review student answers, get AI suggestions, and finalize scores.</p>
+    
+    <div id="grading-message" class="mb-3"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="gradingTable" class="table table-hover" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function() {
+    const showMessage = (msg, type = 'success') => {
+        $('#grading-message').html(`<div class="alert alert-${type}">${msg}</div>`);
+    };
+
+    const table = $('#gradingTable').DataTable({
+        ajax: function (data, callback, settings) {
+            window.authenticatedFetch("{{ url_for('main_co_admin_api.get_grading_queue') }}")
+                .then(response => response.json().then(json => {
+                    if (!response.ok) throw new Error(json.message || 'Failed to fetch grading queue.');
+                    callback(json);
+                }))
+                .catch(error => {
+                    console.error("DataTables AJAX error:", error);
+                    showMessage(error.message, 'danger');
+                    callback({ data: [] });
+                });
+        },
+        columns: [
+            { data: 'student_email', title: 'Student' },
+            { data: 'question_text', title: 'Question' },
+            { data: 'student_answer', title: 'Student Answer' },
+            {
+                data: null,
+                title: 'Grading Actions',
+                orderable: false,
+                render: function(data, type, row) {
+                    return `
+                        <div class="grading-form" data-response-id="${row.response_id}">
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text">Score</span>
+                                <input type="number" class="form-control score-input" placeholder="e.g., 5" step="0.5">
+                            </div>
+                            <textarea class="form-control form-control-sm feedback-input" rows="2" placeholder="Enter feedback..."></textarea>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-primary get-ai-btn">Get AI Suggestion</button>
+                                <button class="btn btn-sm btn-success submit-grade-btn">Submit Grade</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        ]
+    });
+
+    // Get AI suggestion
+    $('#gradingTable').on('click', '.get-ai-btn', function() {
+        const $btn = $(this);
+        const $form = $btn.closest('.grading-form');
+        const responseId = $form.data('response-id');
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Getting...');
+
+        window.authenticatedFetch(`/api/main-co-admin/grade-submission/${responseId}/ai-grade`, { method: 'POST' })
+            .then(res => res.json().then(data => {
+                if (!res.ok) throw new Error(data.message || 'AI grading failed.');
+                $form.find('.score-input').val(data.score);
+                $form.find('.feedback-input').val(data.feedback);
+            }))
+            .catch(err => showMessage(`AI Grade Error: ${err.message}`, 'danger'))
+            .finally(() => $btn.prop('disabled', false).html('Get AI Suggestion'));
+    });
+
+    // Submit final grade
+    $('#gradingTable').on('click', '.submit-grade-btn', function() {
+        const $btn = $(this);
+        const $form = $btn.closest('.grading-form');
+        const responseId = $form.data('response-id');
+
+        const payload = {
+            score: parseFloat($form.find('.score-input').val()),
+            feedback: $form.find('.feedback-input').val()
+        };
+
+        if (isNaN(payload.score)) {
+            alert('Please enter a valid number for the score.');
+            return;
+        }
+
+        $btn.prop('disabled', true).text('Saving...');
+
+        window.authenticatedFetch(`/api/main-co-admin/grade-submission/${responseId}/confirm`, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json().then(data => {
+            if (!res.ok) throw new Error(data.message || 'Failed to submit grade.');
+            showMessage('Grade submitted successfully!', 'success');
+            table.ajax.reload();
+        }))
+        .catch(err => {
+            showMessage(`Error: ${err.message}`, 'danger');
+            $btn.prop('disabled', false).text('Submit Grade');
+        });
+    });
+});
+</script>
+{% endblock %}

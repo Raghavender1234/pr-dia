@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Privacy Policy - {{ super() }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="display-5 text-primary mb-4">Privacy Policy</h1>
+            <p class="text-muted">Last updated: June 15, 2025</p>
+
+            <p>DIA ("us", "we", or "our") operates the DIA Exam Prep web application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service and the choices you have associated with that data.</p>
+
+            <h3 class="mt-5">1. Information Collection and Use</h3>
+            <p>We collect several different types of information for various purposes to provide and improve our Service to you.</p>
+            <h6>Types of Data Collected:</h6>
+            <ul>
+                <li><strong>Personal Data:</strong> While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you ("Personal Data"). This includes, but is not limited to: email address, first name and last name, and organization details.</li>
+                <li><strong>Usage Data:</strong> We may collect information on how the Service is accessed and used ("Usage Data"). This may include your computer's IP address, browser type, pages visited, and time and date of your visit.</li>
+                <li><strong>Tracking & Cookies Data:</strong> We use cookies and similar tracking technologies to track the activity on our Service and hold certain information.</li>
+            </ul>
+
+            <h3 class="mt-5">2. Use of Data</h3>
+            <p>DIA uses the collected data for various purposes:</p>
+            <ul>
+                <li>To provide and maintain our Service</li>
+                <li>To notify you about changes to our Service</li>
+                <li>To allow you to participate in interactive features of our Service when you choose to do so</li>
+                <li>To provide customer support</li>
+                <li>To process payments for subscriptions and purchases</li>
+                <li>To monitor the usage of our Service to detect, prevent and address technical issues</li>
+            </ul>
+
+            <h3 class="mt-5">3. Data Security</h3>
+            <p>The security of your data is important to us, but remember that no method of transmission over the Internet or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.</p>
+            
+            <h3 class="mt-5">4. Your Data Protection Rights</h3>
+            <p>DIA aims to take reasonable steps to allow you to correct, amend, delete, or limit the use of your Personal Data. You can update your profile information directly within your account settings section.</p>
+
+            <h3 class="mt-5">5. Changes to This Privacy Policy</h3>
+            <p>We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.</p>
+
+            <h3 class="mt-5">6. Contact Us</h3>
+            <p>
+                If you have any questions about this Privacy Policy, please contact us by email:
+                {% if g.current_organization and g.current_organization.contact_email %}
+                    <a href="mailto:{{ g.current_organization.contact_email }}">{{ g.current_organization.contact_email }}</a>
+                {% else %}
+                    <a href="mailto:info@dia.com">info@dia.com</a>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

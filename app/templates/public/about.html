@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}About Us - {{ super() }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="display-5 text-primary mb-4">About Dia</h1>
+            
+            <p class="lead">DIA was founded with a simple mission: to provide the most effective and accessible exam preparation tools for students and organizations worldwide.</p>
+
+            <h3 class="mt-5">Our Philosophy</h3>
+            <p>We believe that success in high-stakes exams comes from a combination of deep understanding, targeted practice, and smart strategy. Our platform is built on these three pillars. We provide high-quality learning content to build a strong foundation, AI-powered tools for limitless and adaptive practice, and detailed analytics to help students refine their test-taking strategy.</p>
+            
+            <h3 class="mt-5">For Organizations</h3>
+            <p>We empower educational institutions and businesses by providing a powerful, customizable platform to create and administer their own exams. With flexible tools for content creation, user management, and monetization, DIA is the perfect partner for any organization looking to offer top-tier exam preparation.</p>
+
+            <h3 class="mt-5">Our Commitment</h3>
+            <p>We are committed to continuous innovation and to the success of our users. We are constantly evolving our platform, incorporating the latest in educational technology and artificial intelligence to ensure that DIA remains the most effective exam prep tool on the market.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

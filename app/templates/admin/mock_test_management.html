@@ -1,0 +1,1011 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Mock Tests - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="mock-test-management-page py-4">
+    <div class="text-center mb-4">
+        <h1 class="h2 mb-2 text-primary">{{ heading or "Mock Test Management" }}</h1>
+        <p class="lead text-muted mb-4">{{ subtext or "Create and manage mock tests with questions from your question bank." }}</p>
+    </div>
+
+    <div id="mockTestPageMessage" class="mb-4"></div>
+
+    {% if g.user_context.user_type in ['main_co_admin', 'super_admin'] %}
+    <div class="card shadow-lg mb-5 border-0 rounded-3">
+        <div class="card-header bg-primary text-white fw-bold py-3">
+            <h5 class="mb-0" id="mockTestFormTitle">Create New Mock Test</h5>
+        </div>
+        <div class="card-body p-4">
+            <form id="mockTestForm" novalidate>
+                <input type="hidden" id="mockTestId" value="">
+                
+                <div class="row g-3">
+                    <div class="col-md-6 mb-3">
+                        <label for="examIdSelect" class="form-label">Associated Exam <span class="text-danger">*</span></label>
+                        <select class="form-select" id="examIdSelect" required>
+                            <option value="" disabled selected>-- Loading... --</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="mockTestTitle" class="form-label">Mock Test Title <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="mockTestTitle" required>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="mockTestDescription" class="form-label">Description</label>
+                    <textarea class="form-control" id="mockTestDescription" rows="2"></textarea>
+                </div>
+                
+                <div class="row g-3">
+                    <div class="col-md-3 mb-3">
+                        <label for="durationMinutes" class="form-label">Duration (min) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="durationMinutes" min="1" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="defaultMarks" class="form-label">Default Marks/Ques</label>
+                        <input type="number" class="form-control" id="defaultMarks" value="1.00" min="0" step="0.25">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="passingMarks" class="form-label">Passing Marks <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="passingMarks" min="0" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="mockTestStatus" class="form-label fw-bold">Status</label>
+                        <select class="form-select" id="mockTestStatus" required>
+                            <option value="draft">Draft (Hidden from students)</option>
+                            <option value="active">Active (Visible to students)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 align-items-center mb-3">
+                    <div class="col-md-auto">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="negativeMarkingEnabled">
+                            <label class="form-check-label" for="negativeMarkingEnabled">Enable Negative Marking</label>
+                        </div>
+                    </div>
+                    <div class="col-md-4" id="negativeMarkingRatioField" style="display: none;">
+                        <label for="negativeMarkingRatio" class="form-label mb-0">Ratio:</label>
+                        <input type="number" class="form-control form-control-sm" id="negativeMarkingRatio" min="0.01" step="0.01" value="0.25">
+                    </div>
+                </div>
+                
+                <hr class="my-4">
+                
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="isLiveTest">
+                    <label class="form-check-label" for="isLiveTest"><strong>Set as Live Test</strong></label>
+                </div>
+                <div class="row" id="liveTestFields" style="display: none;">
+                    <div class="col-md-6 mb-3">
+                        <label for="liveStartTime" class="form-label">Start Time:</label>
+                        <input type="datetime-local" class="form-control" id="liveStartTime">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="liveEndTime" class="form-label">End Time:</label>
+                        <input type="datetime-local" class="form-control" id="liveEndTime">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary me-2 mt-3" id="mockTestSubmitBtn">
+                    <span class="spinner-border spinner-border-sm d-none"></span>
+                    <span class="button-text">Create Mock Test</span>
+                </button>
+                <button type="button" class="btn btn-secondary d-none mt-3" id="cancelEditMockTestBtn">Cancel Edit</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0">
+                <i class="bi bi-list-ul me-2 text-success"></i>Available Mock Tests
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="no-data-state" class="text-center py-5 d-none">
+                <i class="bi bi-journal-x display-4 text-muted"></i>
+                <h5 class="mt-3">No Mock Tests Created Yet</h5>
+                <p class="text-muted">Once a Main Co-Admin creates a mock test, it will appear here.</p>
+            </div>
+            <div id="mockTestsTableLoading" class="text-center py-3">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover" id="mockTestsTable" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Questions Modal -->
+<div class="modal fade" id="manageQuestionsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Manage Questions for: <span id="currentTestTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <div id="manageQuestionsMessage" class="mb-3"></div>
+
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="bi bi-bank me-2"></i>Question Bank
+                            </div>
+                            <div class="card-body">
+                                <p class="text-muted small">Filter and add questions to your test.</p>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-12">
+                                        <label for="bankExamSelect" class="form-label small fw-bold">1. Select Exam</label>
+                                        <select class="form-select form-select-sm" id="bankExamSelect">
+                                            <option value="">-- Select an Exam --</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <label for="bankSubjectSelect" class="form-label small fw-bold">2. Select Subject</label>
+                                        <select class="form-select form-select-sm" id="bankSubjectSelect" disabled>
+                                            <option value="">-- Select an Exam First --</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-12">
+                                        <label for="bankTopicSelect" class="form-label small fw-bold">3. Select Topic</label>
+                                        <select class="form-select form-select-sm" id="bankTopicSelect" disabled>
+                                            <option value="">-- Select a Subject First --</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div id="bankQuestionsContainer" style="max-height: 350px; overflow-y: auto;">
+                                    <div class="list-group">
+                                        <div class="list-group-item text-muted">Please select a topic to view questions.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-card-checklist me-2"></i>Questions in This Test</span>
+                                <span class="badge bg-primary rounded-pill" id="testQuestionCount">0</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span></span> 
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-outline-primary ms-2" data-bs-toggle="modal" data-bs-target="#imageUploadModal">
+                                            <i class="bi bi-image"></i> Upload Image
+                                        </button>
+                                        <button id="importQuestionsBtn" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-upload"></i> Import Questions
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <p class="text-muted small">Set marks and drag <i class="bi bi-grip-vertical"></i> to reorder questions.</p>
+
+                                <div id="bulkActionContainerTest" class="mb-2 d-none">
+                                    <div class="card border-primary">
+                                        <div class="card-body py-2">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="selectAllTestQuestions">
+                                                    <label class="form-check-label small" for="selectAllTestQuestions">
+                                                        <strong id="selectionCountTest">0 selected</strong>
+                                                    </label>
+                                                </div>
+                                                <button id="bulkDeleteTestQuestionsBtn" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i> Remove Selected
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div id="testQuestionsContainer" style="max-height: 400px; overflow-y: auto;">
+                                    <ul class="list-group" id="testQuestionsList">
+                                        <li class="list-group-item text-muted">No questions added yet.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'admin/_image_upload_modal.html' %}
+{% include 'admin/_question_management_modals.html' %} 
+
+<!-- Delete confirmation modal -->
+<div class="modal fade" id="deleteMockTestConfirmModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the mock test <strong><span id="deleteMockTestName"></span></strong>?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteMockTestBtn">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+window.pageInit = function () {
+    // --- GLOBAL VARIABLES & STATE ---
+    const userType = "{{ g.user_context.user_type }}";
+    const canFullyManageTests = ['main_co_admin', 'super_admin'].includes(userType);
+    const canManageQuestionsAndExport = ['main_co_admin', 'super_admin', 'co_admin'].includes(userType);
+    let mockTestsDataTable, testQuestionsSortable;
+    let currentTestIdToDelete = null;
+    let currentManagingTestId = null;
+    let currentSubjectId = null;
+    let currentTopicId = null;
+
+    // --- ELEMENT REFERENCES & MODAL INITIALIZATION ---
+    const $table = $('#mockTestsTable');
+    const $noDataState = $('#no-data-state');
+    const $pageMessage = $('#mockTestPageMessage');
+    const $modalMessage = $('#manageQuestionsMessage');
+    const $currentTestTitle = $('#currentTestTitle');
+    const $bankExamSelect = $('#bankExamSelect');
+    const $bankSubjectSelect = $('#bankSubjectSelect');
+    const $bankTopicSelect = $('#bankTopicSelect');
+    const $bankQuestionsContainer = $('#bankQuestionsContainer .list-group');
+    const $testQuestionsList = $('#testQuestionsContainer ul.list-group');
+    const $testQuestionCount = $('#testQuestionCount');
+    const $importQuestionsBtn = $('#importQuestionsBtn');
+
+    const mockTestForm = $('#mockTestForm');
+    const mockTestIdInput = $('#mockTestId');
+    const examIdSelect = $('#examIdSelect');
+    const mockTestTitleInput = $('#mockTestTitle');
+    const mockTestDescriptionTextarea = $('#mockTestDescription');
+    const durationMinutesInput = $('#durationMinutes');
+    const passingMarksInput = $('#passingMarks');
+    const mockTestStatusSelect = $('#mockTestStatus');
+    const negativeMarkingCheckbox = document.getElementById('negativeMarkingEnabled');
+    const negativeMarkingRatioInput = $('#negativeMarkingRatio');
+    const negativeMarkingRatioFieldDiv = document.getElementById('negativeMarkingRatioField');
+    const isLiveTestCheckbox = document.getElementById('isLiveTest');
+    const liveTestFieldsDiv = document.getElementById('liveTestFields');
+    const liveStartTimeInput = document.getElementById('liveStartTime');
+    const liveEndTimeInput = document.getElementById('liveEndTime');
+    const mockTestSubmitBtn = document.getElementById('mockTestSubmitBtn');
+    const cancelEditBtn = $('#cancelEditMockTestBtn');
+
+    const manageQuestionsModal = new bootstrap.Modal($('#manageQuestionsModal')[0]);
+    const deleteMockTestConfirmModal = new bootstrap.Modal(document.getElementById('deleteMockTestConfirmModal'));
+    const importModal = new bootstrap.Modal($('#importQuestionsModal')[0]);
+
+    // --- HELPER FUNCTIONS ---
+    const showMessage = (msg, type = 'danger', isModal = false) => {
+        const $target = isModal ? $modalMessage : $pageMessage;
+        $target.html(`
+            <div class="alert alert-${type} alert-dismissible fade show">
+                ${msg}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+    };
+
+    const toggleButtonSpinner = ($btn, show, originalText = null) => {
+        $btn.prop('disabled', show);
+        const spinner = $btn.find('.spinner-border');
+        const textSpan = $btn.find('.button-text');
+        
+        if (show) {
+            if (!$btn.data('original-text') && originalText) {
+                $btn.data('original-text', originalText);
+            }
+            textSpan.text('Loading...');
+            spinner.removeClass('d-none');
+        } else {
+            const storedOriginalText = $btn.data('original-text');
+            if (storedOriginalText) {
+                textSpan.text(storedOriginalText);
+            }
+            spinner.addClass('d-none');
+        }
+    };
+
+    function resetMockTestForm() {
+        if (!mockTestForm.length) return;
+        mockTestForm[0].reset();
+        mockTestIdInput.val('');
+        $('#mockTestFormTitle').text('Create New Mock Test');
+        $('#mockTestSubmitBtn .button-text').text('Create Mock Test');
+        $(mockTestSubmitBtn).removeData('original-text'); // Clear stored text
+        cancelEditBtn.addClass('d-none');
+        if (isLiveTestCheckbox) isLiveTestCheckbox.checked = false;
+        if (negativeMarkingCheckbox) negativeMarkingCheckbox.checked = false;
+        $(isLiveTestCheckbox).trigger('change');
+        $(negativeMarkingCheckbox).trigger('change');
+    }
+
+    // --- DATATABLE INITIALIZATION ---
+    const initMockTestsTable = () => {
+        mockTestsDataTable = $table.DataTable({
+            responsive: true,
+            processing: true,
+            ajax: (data, callback, settings) => {
+                $('#mockTestsTableLoading').show();
+                (async () => {
+                    try {
+                        const res = await window.authenticatedFetch('/api/main-co-admin/mock-tests');
+                        const json = await res.json();
+                        if (!res.ok) throw new Error(json.message);
+                        
+                        $noDataState.toggleClass('d-none', json.length > 0);
+                        callback({ data: json });
+                    } catch (error) {
+                        showMessage(`Could not load mock tests: ${error.message}`, 'danger');
+                        callback({ data: [] });
+                    } finally {
+                        $('#mockTestsTableLoading').hide();
+                    }
+                })();
+                return { abort: () => {} };
+            },
+            columns: [
+                { data: 'title', title: 'Title' },
+                { data: 'exam_name', title: 'Exam', defaultContent: 'N/A' },
+                { 
+                    data: 'is_live_test', 
+                    title: 'Type', 
+                    render: (isLive, type, row) => {
+                        // Debug logging - remove after fixing
+                        console.log('Live test value:', isLive, typeof isLive, row);
+                        
+                        // Handle different possible values
+                        const isLiveTest = isLive === true || isLive === 1 || isLive === '1' || isLive === 'true';
+                        return isLiveTest ? '<span class="badge bg-danger">Live</span>' : '<span class="badge bg-info">On-Demand</span>';
+                    }
+                },
+                { data: 'duration_minutes', title: 'Duration', render: (d) => `${d} min` },
+                { data: 'question_count', title: 'Questions', defaultContent: 0 },
+                { 
+                    data: 'status', 
+                    title: 'Status', 
+                    render: (s) => `<span class="badge bg-${s === 'active' ? 'success' : 'secondary'} text-capitalize">${s}</span>` 
+                },
+                {
+                    data: 'id', 
+                    title: 'Actions', 
+                    orderable: false,
+                    render: (id, type, row) => {
+                        let buttons = '';
+
+                        if (canManageQuestionsAndExport) {
+                            buttons += `
+                                <button class="btn btn-sm btn-success manage-questions-btn" data-id="${id}" data-exam-id="${row.exam_id}" data-title="${row.title}">
+                                    <i class="bi bi-list-task"></i> Questions (${row.question_count || 0})
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning export-zip-btn" data-testid="${id}" data-testname="${row.title}" title="Export as ZIP">
+                                    <i class="bi bi-file-earmark-zip-fill"></i>
+                                </button>
+                            `;
+                        }
+
+                        if (canFullyManageTests) {
+                            buttons += `
+                                <button class="btn btn-sm btn-outline-primary edit-test-btn" data-testid="${id}" title="Edit Test">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-test-btn" data-testid="${id}" data-testname="${row.title}" title="Delete Test">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            `;
+                        }
+
+                        if (buttons === '') {
+                            return 'View Only';
+                        }
+
+                        return `<div class="btn-group" role="group">${buttons}</div>`;
+                    }
+                }
+            ],
+            order: [[0, 'asc']]
+        });
+    };
+
+    // --- EXAM DROPDOWN FUNCTIONS ---
+    async function populateExamsDropdown() {
+        if (!canFullyManageTests) return;
+        try {
+            const response = await window.authenticatedFetch('/api/main-co-admin/exams');
+            const exams = await response.json();
+            if (!response.ok) throw new Error(exams.message);
+            examIdSelect.html('<option value="" disabled selected>-- Select an Exam --</option>');
+            exams.forEach(exam => examIdSelect.append(new Option(exam.name, exam.id)));
+        } catch (error) {
+            examIdSelect.html('<option value="">-- Error loading exams --</option>');
+        }
+    }
+
+    async function populateBankExamSelect() {
+        try {
+            const response = await window.authenticatedFetch('/api/main-co-admin/exams');
+            const exams = await response.json();
+            $bankExamSelect.html('<option value="" selected>-- Select an Exam --</option>');
+            exams.forEach(exam => $bankExamSelect.append(new Option(exam.name, exam.id)));
+            $bankExamSelect.prop('disabled', false);
+        } catch (error) {
+            $bankExamSelect.html('<option value="">Error loading exams</option>');
+        }
+    }
+
+    async function populateSubjectDropdown(examId) {
+        $bankSubjectSelect.prop('disabled', true).html('<option>Loading Subjects…</option>');
+        $bankTopicSelect.prop('disabled', true).html('<option>-- Select Subject --</option>');
+        try {
+            const resp = await window.authenticatedFetch(`/api/main-co-admin/exams/${examId}/subjects`);
+            const subs = await resp.json();
+            if (!resp.ok) throw new Error(subs.message);
+            $bankSubjectSelect.prop('disabled', false).html('<option value="">-- Select Subject --</option>');
+            subs.forEach(s => $bankSubjectSelect.append(new Option(s.name, s.id)));
+        } catch (err) {
+            showMessage(err.message, 'danger', true);
+        }
+    }
+
+    async function populateTopicDropdown(subjectId) {
+        $bankTopicSelect.prop('disabled', true).html('<option>Loading Topics…</option>');
+        try {
+            const resp = await window.authenticatedFetch(`/api/main-co-admin/subjects/${subjectId}/topics`);
+            const tops = await resp.json();
+            if (!resp.ok) throw new Error(tops.message);
+            $bankTopicSelect.prop('disabled', false).html('<option value="">-- Select Topic --</option>');
+            tops.forEach(t => $bankTopicSelect.append(new Option(t.name, t.id)));
+        } catch (err) {
+            showMessage(err.message, 'danger', true);
+        }
+    }
+
+    // --- QUESTION MANAGEMENT FUNCTIONS ---
+    async function fetchBankQuestions(topicId) {
+        $bankQuestionsContainer.html('<div class="list-group-item text-center"><div class="spinner-border spinner-border-sm"></div></div>');
+        if (!topicId) {
+            $bankQuestionsContainer.html('<div class="list-group-item text-muted">Select a topic to find questions.</div>');
+            return;
+        }
+        try {
+            const resp = await window.authenticatedFetch(`/api/main-co-admin/topics/${topicId}/questions`);
+            const list = await resp.json();
+            if (!resp.ok) throw new Error(list.message);
+            renderBankQuestions(list);
+        } catch (err) {
+            showMessage(`Could not load bank: ${err.message}`, 'danger', true);
+        }
+    }
+
+    function renderBankQuestions(questions) {
+        const addedQuestionIds = new Set();
+        $('#testQuestionsList li').each(function() {
+            addedQuestionIds.add($(this).data('question-id'));
+        });
+
+        $bankQuestionsContainer.empty();
+        if (!questions.length) {
+            $bankQuestionsContainer.html('<div class="list-group-item text-muted">No questions in this topic.</div>');
+            return;
+        }
+        questions.forEach(q => {
+            const isAdded = addedQuestionIds.has(q.id);
+            const buttonHtml = isAdded
+                ? `<button class="btn btn-sm btn-success" disabled><i class="bi bi-check-lg"></i> Added</button>`
+                : `<button class="btn btn-sm btn-outline-primary add-question-btn" data-question-id="${q.id}">
+                       <span class="spinner-border spinner-border-sm d-none"></span>
+                       <i class="bi bi-plus-circle"></i>
+                   </button>`;
+
+            $bankQuestionsContainer.append(`
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span>${q.question_text}</span>
+                    ${buttonHtml}
+                </div>`);
+        });
+    }
+
+    async function fetchTestQuestions() {
+        $testQuestionsList.html('<li class="list-group-item text-center"><div class="spinner-border spinner-border-sm"></div></li>');
+        try {
+            const resp = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${currentManagingTestId}/questions`);
+            const list = await resp.json();
+            if (!resp.ok) throw new Error(list.message);
+            renderTestQuestions(list);
+        } catch (err) {
+            $testQuestionsList.html('<li class="list-group-item text-danger">Failed to load test questions.</li>');
+        }
+    }
+
+    function renderTestQuestions(questions) {
+        $testQuestionsList.empty();
+        if (!questions.length) {
+            $testQuestionsList.html('<li class="list-group-item text-muted">No questions have been added yet.</li>');
+        } else {
+            questions.forEach((q, index) => {
+                $testQuestionsList.append(`
+                    <li class="list-group-item" data-mtq-id="${q.mock_test_question_id}" data-question-id="${q.question_id}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input row-checkbox" type="checkbox">
+                                <label class="form-check-label">
+                                    <i class="bi bi-grip-vertical me-2" style="cursor: move;"></i>
+                                    <small class="text-muted">#${index + 1}</small> ${q.question_text.substring(0, 50)}...
+                                </label>
+                            </div>
+                            <div class="input-group input-group-sm" style="width: 150px;">
+                                <span class="input-group-text">Marks</span>
+                                <input type="number" class="form-control form-control-sm marks-input" value="${parseFloat(q.marks || 1).toFixed(2)}" step="0.25" min="0">
+                                <button class="btn btn-sm btn-outline-danger remove-question-btn" title="Remove">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </li>`);
+            });
+        }
+        $testQuestionCount.text(questions.length);
+        updateBulkUIForTest();
+
+        if (testQuestionsSortable) testQuestionsSortable.destroy();
+        testQuestionsSortable = Sortable.create($testQuestionsList[0], {
+            animation: 150,
+            handle: '.bi-grip-vertical',
+            onEnd: handleReorder
+        });
+    }
+
+    function updateBulkUIForTest() {
+        const $checkboxes = $('#testQuestionsList .row-checkbox');
+        const $checked = $checkboxes.filter(':checked');
+        const selectedCount = $checked.length;
+
+        $('#selectionCountTest').text(`${selectedCount} selected`);
+        $('#bulkActionContainerTest').toggleClass('d-none', selectedCount === 0);
+
+        const allChecked = $checkboxes.length > 0 && selectedCount === $checkboxes.length;
+        $('#selectAllTestQuestions').prop('checked', allChecked);
+    }
+
+    async function addQuestion(questionId, $btn) {
+        toggleButtonSpinner($btn, true);
+        try {
+            const resp = await window.authenticatedFetch(
+                `/api/main-co-admin/mock-tests/${currentManagingTestId}/questions`,
+                { method: 'POST', body: JSON.stringify({ question_id: questionId }) }
+            );
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.message);
+            await fetchTestQuestions();
+            
+            // Change button state
+            $btn.removeClass('btn-outline-primary add-question-btn')
+               .addClass('btn-success')
+               .prop('disabled', true)
+               .html('<i class="bi bi-check-lg"></i> Added');
+
+            showMessage('Question added successfully!', 'success', true);
+        } catch (err) {
+            showMessage(`Add failed: ${err.message}`, 'danger', true);
+            toggleButtonSpinner($btn, false);
+        }
+    }
+
+    async function removeQuestion(mtqId) {
+        if (!confirm('Remove this question from the test?')) return;
+        try {
+            const resp = await window.authenticatedFetch(
+                `/api/main-co-admin/mock-tests/${currentManagingTestId}/questions/${mtqId}`,
+                { method: 'DELETE' }
+            );
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.message);
+            }
+            await fetchTestQuestions();
+            showMessage('Question removed successfully!', 'success', true);
+        } catch (err) {
+            showMessage(`Remove failed: ${err.message}`, 'danger', true);
+        }
+    }
+
+    async function handleReorder() {
+        const orderedIds = $testQuestionsList.find('li').map((_, li) => $(li).data('mtq-id')).get();
+        try {
+            await window.authenticatedFetch(
+                `/api/main-co-admin/mock-tests/${currentManagingTestId}/questions/reorder`,
+                { method: 'PUT', body: JSON.stringify({ ordered_ids: orderedIds }) }
+            );
+            showMessage('Question order saved!', 'success', true);
+        } catch (err) {
+            showMessage('Failed to save new order.', 'danger', true);
+            fetchTestQuestions();
+        }
+    }
+
+    // --- FORM SUBMISSION ---
+    if (canFullyManageTests) {
+        mockTestForm.on('submit', async function(event) {
+            event.preventDefault();
+            const $btn = $(mockTestSubmitBtn);
+            const mockTestId = mockTestIdInput.val();
+            const isEditMode = !!mockTestId;
+            
+            // Validate checkbox elements exist
+            if (!isLiveTestCheckbox) {
+                console.error('isLiveTestCheckbox element not found!');
+                showMessage('Form initialization error. Please refresh the page.', 'danger');
+                return;
+            }
+            
+            // Store the current button text before starting
+            const currentButtonText = $btn.find('.button-text').text();
+            toggleButtonSpinner($btn, true, currentButtonText);
+            
+            const liveStartTimeVal = $('#liveStartTime').val();
+            const liveEndTimeVal = $('#liveEndTime').val();
+
+            // Additional validation for live tests
+            if (isLiveTestCheckbox.checked) {
+                if (!liveStartTimeVal || !liveEndTimeVal) {
+                    showMessage('Please set both start and end times for live tests.', 'warning');
+                    toggleButtonSpinner($btn, false);
+                    return;
+                }
+                
+                const startTime = new Date(liveStartTimeVal);
+                const endTime = new Date(liveEndTimeVal);
+                
+                if (startTime >= endTime) {
+                    showMessage('End time must be after start time.', 'warning');
+                    toggleButtonSpinner($btn, false);
+                    return;
+                }
+            }
+
+            const payload = {
+                title: mockTestTitleInput.val(), 
+                description: mockTestDescriptionTextarea.val(),
+                exam_id: parseInt(examIdSelect.val()), 
+                duration_minutes: parseInt(durationMinutesInput.val()),
+                passing_marks: parseFloat(passingMarksInput.val()),
+                negative_marking_enabled: negativeMarkingCheckbox ? negativeMarkingCheckbox.checked : false,
+                negative_marking_ratio: parseFloat(negativeMarkingRatioInput.val()),
+                is_live_test: isLiveTestCheckbox.checked,
+                live_start_time: liveStartTimeVal ? new Date(liveStartTimeVal).toISOString() : null,
+                live_end_time: liveEndTimeVal ? new Date(liveEndTimeVal).toISOString() : null,
+                status: mockTestStatusSelect.val()
+            };
+
+            // Debug logging - remove after fixing
+            console.log('Payload being sent:', payload);
+            console.log('is_live_test value:', payload.is_live_test, 'type:', typeof payload.is_live_test);
+            console.log('Checkbox checked state:', isLiveTestCheckbox.checked);
+            console.log('Live start time:', payload.live_start_time);
+            console.log('Live end time:', payload.live_end_time);
+
+            const method = isEditMode ? 'PUT' : 'POST';
+            const url = isEditMode ? `/api/main-co-admin/mock-tests/${mockTestId}` : '/api/main-co-admin/mock-tests';
+
+            try {
+                const response = await window.authenticatedFetch(url, { method, body: JSON.stringify(payload) });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                showMessage(data.message, 'success');
+                mockTestsDataTable.ajax.reload();
+                resetMockTestForm();
+            } catch (error) {
+                showMessage(error.message, 'danger');
+            } finally {
+                toggleButtonSpinner($btn, false);
+            }
+        });
+
+        // Live test checkbox change handler
+        if (isLiveTestCheckbox) {
+            isLiveTestCheckbox.addEventListener('change', () => { 
+                liveTestFieldsDiv.style.display = isLiveTestCheckbox.checked ? 'flex' : 'none'; 
+            });
+        }
+
+        // Negative marking checkbox change handler
+        if (negativeMarkingCheckbox) {
+            negativeMarkingCheckbox.addEventListener('change', () => { 
+                negativeMarkingRatioFieldDiv.style.display = negativeMarkingCheckbox.checked ? 'block' : 'none'; 
+            });
+        }
+
+        cancelEditBtn.on('click', resetMockTestForm);
+    }
+
+    // --- TABLE EVENT HANDLERS ---
+    if (canManageQuestionsAndExport) {
+        $table.on('click', '.manage-questions-btn', function () {
+            currentManagingTestId = $(this).data('id');
+            const examId = $(this).data('exam-id');
+            $currentTestTitle.text($(this).data('title'));
+
+            currentSubjectId = null;
+            currentTopicId = null;
+
+            $bankExamSelect.val('').prop('disabled', false);
+            $bankSubjectSelect.val('').prop('disabled', true);
+            $bankTopicSelect.val('').prop('disabled', true);
+            $bankQuestionsContainer.html('<div class="list-group-item text-muted">Select an exam to find questions.</div>');
+            $testQuestionsList.html('<li class="list-group-item text-muted">Loading questions…</li>');
+            $testQuestionCount.text('0');
+
+            populateBankExamSelect();
+            fetchTestQuestions();
+            manageQuestionsModal.show();
+        });
+
+        $table.on('click', '.export-zip-btn', async function() {
+            const $btn = $(this);
+            const testId = $btn.data('testid');
+            const testName = $btn.data('testname');
+            const url = `/api/main-co-admin/mock-tests/${testId}/export-zip`;
+
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+            try {
+                const response = await window.authenticatedFetch(url, { method: 'GET' });
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.message || 'Failed to generate ZIP');
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `${testName}_Practice_Paper.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(downloadUrl);
+                a.remove();
+
+            } catch (error) {
+                showMessage(`Export failed: ${error.message}`, 'danger');
+            } finally {
+                $btn.prop('disabled', false).html('<i class="bi bi-file-earmark-zip-fill"></i>');
+            }
+        });
+    }
+
+    if (canFullyManageTests) {
+        $table.on('click', '.edit-test-btn', async function() {
+            const testId = $(this).data('testid');
+            try {
+                const response = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${testId}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                
+                mockTestIdInput.val(data.id); 
+                mockTestTitleInput.val(data.title);
+                mockTestDescriptionTextarea.val(data.description || ''); 
+                examIdSelect.val(data.exam_id);
+                durationMinutesInput.val(data.duration_minutes);
+                passingMarksInput.val(data.passing_marks); 
+                mockTestStatusSelect.val(data.status);
+                if (negativeMarkingCheckbox) negativeMarkingCheckbox.checked = data.negative_marking_enabled;
+                negativeMarkingRatioInput.val(data.negative_marking_ratio);
+                if (isLiveTestCheckbox) isLiveTestCheckbox.checked = data.is_live_test;
+                $(isLiveTestCheckbox).trigger('change'); 
+                $(negativeMarkingCheckbox).trigger('change');
+                if(data.is_live_test) {
+                    liveStartTimeInput.value = data.live_start_time ? data.live_start_time.slice(0, 16) : '';
+                    liveEndTimeInput.value = data.live_end_time ? data.live_end_time.slice(0, 16) : '';
+                }
+                
+                $('#mockTestFormTitle').text('Edit Mock Test');
+                $('#mockTestSubmitBtn .button-text').text('Update Test');
+                cancelEditBtn.removeClass('d-none');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (error) {
+                showMessage(error.message, 'danger');
+            }
+        });
+
+        $table.on('click', '.delete-test-btn', function() {
+            currentTestIdToDelete = $(this).data('testid');
+            $('#deleteMockTestName').text($(this).data('testname'));
+            deleteMockTestConfirmModal.show();
+        });
+
+        $('#confirmDeleteMockTestBtn').on('click', async function() {
+            if (!currentTestIdToDelete) return;
+            try {
+                const response = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${currentTestIdToDelete}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message);
+                showMessage(data.message, 'success');
+                mockTestsDataTable.ajax.reload();
+            } catch(error) {
+                showMessage('An error occurred while deleting.', 'danger');
+            } finally {
+                deleteMockTestConfirmModal.hide();
+            }
+        });
+    }
+
+    // --- QUESTION BANK EVENT HANDLERS ---
+    $bankExamSelect.on('change', function () {
+        const examId = $(this).val();
+        currentSubjectId = null;
+        currentTopicId = null;
+        $bankTopicSelect.val('').prop('disabled', true);
+        $bankQuestionsContainer.html('<div class="list-group-item text-muted">Select a subject.</div>');
+        if (examId) populateSubjectDropdown(examId);
+    });
+
+    $bankSubjectSelect.on('change', function () {
+        currentSubjectId = $(this).val();
+        currentTopicId = null;
+        $bankTopicSelect.val('').prop('disabled', true);
+        $bankQuestionsContainer.html('<div class="list-group-item text-muted">Select a topic.</div>');
+        if (currentSubjectId) populateTopicDropdown(currentSubjectId);
+    });
+
+    $bankTopicSelect.on('change', function () {
+        currentTopicId = $(this).val();
+        fetchBankQuestions(currentTopicId);
+    });
+
+    // --- QUESTION ACTIONS ---
+    $('#manageQuestionsModal')
+        .on('click', '.add-question-btn', function () { 
+            addQuestion($(this).data('question-id'), $(this)); 
+        })
+        .on('click', '.remove-question-btn', function () { 
+            removeQuestion($(this).closest('li').data('mtq-id')); 
+        })
+        .on('change', '.marks-input', async function () {
+            const mtqId = $(this).closest('li').data('mtq-id');
+            const newMarks = parseFloat($(this).val());
+
+            if (isNaN(newMarks) || newMarks < 0) {
+                showMessage('Please enter a valid marks value.', 'danger', true);
+                return;
+            }
+
+            try {
+                const response = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${currentManagingTestId}/questions/${mtqId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ marks: newMarks })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Failed to update marks');
+                }
+
+                showMessage('Marks updated successfully!', 'success', true);
+            } catch (error) {
+                showMessage(error.message, 'danger', true);
+            }
+        });
+
+    // --- BULK ACTIONS ---
+    $('#selectAllTestQuestions').on('change', function () {
+        const isChecked = $(this).is(':checked');
+        $('#testQuestionsList .row-checkbox').prop('checked', isChecked);
+        updateBulkUIForTest();
+    });
+
+    $('#testQuestionsList').on('change', '.row-checkbox', updateBulkUIForTest);
+
+    $('#bulkDeleteTestQuestionsBtn').on('click', async function () { 
+        const $checked = $('#testQuestionsList .row-checkbox:checked');
+        if ($checked.length === 0) return;
+        
+        if (!confirm(`Are you sure you want to remove ${$checked.length} selected question(s)?`)) return;
+
+        const promises = [];
+        $checked.each(function() {
+            const mtqId = $(this).closest('li').data('mtq-id');
+            promises.push(
+                window.authenticatedFetch(`/api/main-co-admin/mock-tests/${currentManagingTestId}/questions/${mtqId}`, { 
+                    method: 'DELETE' 
+                })
+            );
+        });
+        
+        try {
+            await Promise.all(promises);
+            await fetchTestQuestions();
+            const currentTopicId = $bankTopicSelect.val();
+            if (currentTopicId) {
+                $bankTopicSelect.trigger('change');
+            }
+            showMessage('Selected questions removed successfully!', 'success', true);
+        } catch (error) {
+            showMessage('Failed to remove some questions.', 'danger', true);
+        }
+    });
+
+    // --- IMPORT FUNCTIONALITY ---
+    $('#manageQuestionsModal').on('click', '#importQuestionsBtn', () => {
+        $('#importAlertContainer').empty();
+        $('#questionCsvFile').val('');
+        importModal.show();
+    });
+
+    $('#processImportBtn').off('click').on('click', async function () {
+        const $btn = $(this);
+        const file = $('#questionCsvFile')[0].files[0];
+        if (!file) {
+            $('#importAlertContainer').html('<div class="alert alert-warning">Please select a file.</div>');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('question_file', file);
+        
+        if (!currentManagingTestId) { 
+            $('#importAlertContainer').html('<div class="alert alert-danger">Error: No active mock test selected.</div>');
+            return;
+        }
+
+        toggleButtonSpinner($btn, true);
+        
+        try {
+            const res = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${currentManagingTestId}/questions/import`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            $('#importAlertContainer').html(`<div class="alert alert-success">${data.message}</div>`);
+            await fetchTestQuestions();
+            $('#questionCsvFile').val(''); // Reset file input
+
+        } catch (err) {
+            const msg = err.message || 'Import failed.';
+            $('#importAlertContainer').html(`<div class="alert alert-danger">${msg}</div>`);
+        } finally {
+            toggleButtonSpinner($btn, false);
+
+        }
+    });
+
+    // --- MODAL EVENT HANDLERS ---
+    $('#manageQuestionsModal').on('hide.bs.modal', function () {
+        mockTestsDataTable.ajax.reload();
+    });
+
+    // --- INITIALIZATION ---
+    if (canFullyManageTests) {
+        populateExamsDropdown();
+    }
+    initMockTestsTable();
+};
+</script>
+{% endblock %}

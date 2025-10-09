@@ -1,0 +1,1027 @@
+{% extends "base.html" %}
+
+{% block title %}Practice: {{ topic.name }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="practice-page py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh;">
+    <div class="container">
+        <!-- Enhanced Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb bg-white/10 backdrop-blur-sm rounded-pill px-3 py-2 border border-white/20">
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('frontend.student_dashboard', **org_param) }}" class="text-white text-decoration-none">
+                        <i class="bi bi-house-door me-1"></i>Dashboard
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('frontend.student_my_exams', **org_param) }}" class="text-white text-decoration-none">
+                        <i class="bi bi-journal-text me-1"></i>Exams
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('frontend.student_subject_browse', exam_id=topic.subject.exam_id, **org_param) }}" class="text-white text-decoration-none">
+                        {{ topic.subject.exam.name }}
+                    </a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{{ url_for('frontend.student_topic_browse', subject_id=topic.subject.id, **org_param) }}" class="text-white text-decoration-none">
+                        {{ topic.subject.name }}
+                    </a>
+                </li>
+                <li class="breadcrumb-item active text-white opacity-75" aria-current="page">{{ topic.name }}</li>
+            </ol>
+        </nav>
+
+        <!-- Loading State -->
+        <div id="practice-loading" class="text-center py-4">
+            <div class="card bg-white/10 backdrop-blur-md border-0 shadow-lg rounded-3 p-4 mx-auto" style="max-width: 350px;">
+                <div class="card-body text-center">
+                    <div class="position-relative mb-3">
+                        <div class="spinner-border text-light" style="width: 3rem; height: 3rem;"></div>
+                        <div class="position-absolute top-50 start-50 translate-middle">
+                            <i class="bi bi-brain text-white fs-5"></i>
+                        </div>
+                    </div>
+                    <h6 class="text-white mb-2">Preparing Your Practice Session</h6>
+                    <p class="text-white/75 mb-0 small">Getting questions ready for {{ topic.name }}...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Practice Content -->
+        <div id="practice-content" class="d-none">
+            <!-- Header Section -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="card bg-white/10 backdrop-blur-md border-0 shadow-lg rounded-3">
+                        <div class="card-body p-3">
+                            <div class="row align-items-center">
+                                <div class="col-md-8">
+                                    <h5 class="text-white mb-1 fw-bold">
+                                        <i class="bi bi-lightbulb me-2 text-warning"></i>
+                                        Practicing: <span class="text-warning">{{ topic.name }}</span>
+                                    </h5>
+                                    <p class="text-white/75 mb-0" id="questionCounter">Question ... of ...</p>
+                                </div>
+                                <div class="col-md-4 text-md-end">
+                                    <div class="d-flex flex-column align-items-md-end">
+                                        <span class="text-white/75 small mb-1">Progress</span>
+                                        <div class="progress bg-white/20 rounded-pill" style="height: 6px; width: 180px;">
+                                            <div id="progressBar" class="progress-bar bg-gradient bg-warning rounded-pill" 
+                                                 role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Question Display Card -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="card bg-white border-0 shadow-lg rounded-3 overflow-hidden">
+                        <div class="card-header bg-gradient py-2" style="background: linear-gradient(45deg, #4f46e5, #7c3aed);">
+                            <h6 class="text-white mb-0 fw-semibold">
+                                <i class="bi bi-question-circle me-2"></i>
+                                Question Details
+                            </h6>
+                        </div>
+                        <div class="card-body p-3" id="questionDisplayContainer">
+                            <!-- Question content will be injected here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback Container -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div id="feedbackContainer"></div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card bg-white/10 backdrop-blur-md border-0 shadow-lg rounded-3">
+                        <div class="card-body p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <!-- Left Actions -->
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-light rounded-pill px-3" id="prevQuestionBtn" disabled>
+                                        <i class="bi bi-arrow-left me-1"></i>Previous
+                                    </button>
+                                </div>
+                                
+                                <!-- Right Actions -->
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button class="btn btn-warning rounded-pill px-3 shadow-sm" id="markForReviewBtn">
+                                        <i class="bi bi-bookmark me-1"></i>
+                                        <span id="mark-text-span">Mark for Review</span>
+                                    </button>
+                                        <button class="btn btn-outline-danger btn-sm" id="reportQuestionBtn" title="Report an issue with this question">
+                                            <i class="bi bi-flag-fill"></i> Report
+                                        </button>
+                                    <button class="btn btn-info rounded-pill px-3 shadow-sm d-none" id="generateAIBtn">
+                                        <i class="bi bi-magic me-1"></i>Generate Similar
+                                    </button>
+                                    <button class="btn btn-success rounded-pill px-3 shadow-sm" id="nextQuestionBtn">
+                                        Next<i class="bi bi-arrow-right ms-1"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error States -->
+        <div id="practice-error" class="d-none mt-3">
+            <div class="card bg-danger/10 border-danger/20 backdrop-blur-md rounded-3">
+                <div class="card-body p-3 text-center">
+                    <i class="bi bi-exclamation-triangle text-danger fs-2 mb-2"></i>
+                    <h6 class="text-danger mb-1">Oops! Something went wrong</h6>
+                    <p class="text-danger/75 mb-0 small">We encountered an error loading your practice session.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="practice-no-data" class="d-none mt-3">
+            <div class="card bg-info/10 border-info/20 backdrop-blur-md rounded-3">
+                <div class="card-body p-4 text-center">
+                    <i class="bi bi-journal-x text-info fs-2 mb-2"></i>
+                    <h6 class="text-info mb-1">No Questions Available</h6>
+                    <p class="text-info/75 mb-2 small">We couldn't find any questions for this topic yet.</p>
+                    <a href="{{ url_for('frontend.student_topic_browse', subject_id=topic.subject.id, **org_param) }}" 
+                       class="btn btn-info rounded-pill px-3">
+                        <i class="bi bi-arrow-left me-1"></i>Back to Topics
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced AI Generated Modal -->
+<div class="modal fade" id="aiGeneratedModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-3 overflow-hidden">
+            <div class="modal-header bg-gradient text-white border-0 p-3" style="background: linear-gradient(45deg, #06b6d4, #3b82f6);">
+                <h6 class="modal-title fw-bold">
+                    <i class="bi bi-magic me-2"></i>AI-Generated Similar Questions
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div id="ai-loading" class="text-center py-4">
+                    <div class="position-relative mb-3">
+                        <div class="spinner-border text-info" style="width: 2.5rem; height: 2.5rem;"></div>
+                        <div class="position-absolute top-50 start-50 translate-middle">
+                            <i class="bi bi-robot text-info fs-6"></i>
+                        </div>
+                    </div>
+                    <h6 class="text-muted mb-1">AI is crafting questions for you...</h6>
+                    <p class="text-muted small mb-0">This may take a few moments</p>
+                </div>
+                <div id="ai-content" class="bg-light rounded-3 p-3" style="white-space: pre-wrap; font-family: 'Segoe UI', system-ui, sans-serif;"></div>
+            </div>
+            <div class="modal-footer border-0 p-3">
+                <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% include 'student/_report_modal.html' %}
+<style>
+/* Global Font & Shadow - More Compact */
+.practice-page {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+}
+
+.shadow-lg {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+/* Backdrop & Transparent Utilities */
+.backdrop-blur-sm {
+    backdrop-filter: blur(4px);
+}
+
+.backdrop-blur-md {
+    backdrop-filter: blur(12px);
+}
+
+.bg-white\/10 { background-color: rgba(255, 255, 255, 0.1); }
+.bg-white\/20 { background-color: rgba(255, 255, 255, 0.2); }
+
+.border-white\/20 { border-color: rgba(255, 255, 255, 0.2); }
+.text-white\/75 { color: rgba(255, 255, 255, 0.75); }
+
+/* Semantic Backgrounds */
+.bg-danger\/10 { background-color: rgba(220, 53, 69, 0.1); }
+.border-danger\/20 { border-color: rgba(220, 53, 69, 0.2); }
+.text-danger\/75 { color: rgba(220, 53, 69, 0.75); }
+
+.bg-info\/10 { background-color: rgba(13, 202, 240, 0.1); }
+.border-info\/20 { border-color: rgba(13, 202, 240, 0.2); }
+.text-info\/75 { color: rgba(13, 202, 240, 0.75); }
+
+/* Transitions and Animations */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.btn, .card, .progress-bar {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn {
+    font-weight: 500;
+    font-size: 14px;
+    padding: 0.5rem 1rem;
+}
+.btn:hover {
+    transform: translateY(-1px);
+}
+.btn:active {
+    transform: translateY(0);
+}
+.progress-bar {
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Question UI - More Compact */
+#questionDisplayContainer .form-check {
+    background: rgba(108, 117, 125, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    margin-bottom: 6px;
+}
+
+#questionDisplayContainer .form-check:hover {
+    background: rgba(108, 117, 125, 0.1);
+    border-color: rgba(108, 117, 125, 0.2);
+    transform: translateY(-1px);
+}
+
+#questionDisplayContainer .form-check-input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+#questionDisplayContainer .form-check-label {
+    cursor: pointer;
+    display: block;
+    width: 100%;
+    padding-left: 25px;
+    position: relative;
+    font-weight: 500;
+    line-height: 1.4;
+    font-size: 14px;
+}
+
+#questionDisplayContainer .form-check-label:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 18px;
+    height: 18px;
+    border: 2px solid #dee2e6;
+    border-radius: 50%;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+#questionDisplayContainer .form-check-label:after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 6px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #198754;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.3s ease;
+}
+
+#questionDisplayContainer .form-check-input:checked + .form-check-label {
+    font-weight: 600;
+    color: #198754;
+}
+
+#questionDisplayContainer .form-check-input:checked + .form-check-label:before {
+    border-color: #198754;
+    background: white;
+}
+
+#questionDisplayContainer .form-check-input:checked + .form-check-label:after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+#questionDisplayContainer .form-check:has(.form-check-input:checked) {
+    background: rgba(25, 135, 84, 0.1);
+    border-color: rgba(25, 135, 84, 0.3);
+}
+
+#questionDisplayContainer .passage-text {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-left: 4px solid #198754;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 6px;
+}
+
+/* Question Text Sizing */
+#questionDisplayContainer h5 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+#questionDisplayContainer h6 {
+    font-size: 15px;
+    margin-bottom: 10px;
+}
+
+/* Form Elements */
+#questionDisplayContainer .form-control {
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+#questionDisplayContainer .form-label {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+/* Alert Boxes */
+.alert {
+    font-size: 14px;
+    padding: 12px;
+    margin-bottom: 10px;
+}
+
+.alert h6 {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+/* Smooth Scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .card-body {
+        padding: 1rem !important;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 13px;
+    }
+
+    .d-flex.gap-2 {
+        gap: 0.5rem !important;
+    }
+
+    .practice-page {
+        font-size: 13px;
+    }
+
+    #questionDisplayContainer h5 {
+        font-size: 15px;
+    }
+}
+
+</style>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+let openEndedEditor = null;
+
+$(document).ready(function () {
+    // --- 1. STATE MANAGEMENT ---
+    const currentTopicId = "{{ topic.id }}";
+    let allQuestions = [];
+    let currentQuestionIndex = 0;
+    let currentAttemptId = null;
+    const aiGeneratedModal = new bootstrap.Modal($('#aiGeneratedModal')[0]);
+
+    // --- 2. ELEMENT REFERENCES ---
+    const $loading = $('#practice-loading');
+    const $content = $('#practice-content');
+    const $error = $('#practice-error');
+    const $noData = $('#practice-no-data');
+    const $counter = $('#questionCounter');
+    const $container = $('#questionDisplayContainer');
+    const $feedback = $('#feedbackContainer');
+    const $prevBtn = $('#prevQuestionBtn');
+    const $nextBtn = $('#nextQuestionBtn');
+    const $reviewBtn = $('#markForReviewBtn');
+    const $generateAIBtn = $('#generateAIBtn');
+    const $aiLoading = $('#ai-loading');
+    const $aiContent = $('#ai-content');
+
+    // --- 3. HELPER FUNCTIONS ---
+    function scrollToTop() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function formatExplanation(expl) {
+        if (!expl || !expl.trim() || ['n/a', 'null'].includes(expl.toLowerCase())) {
+            return 'N/A';
+        }
+        return expl;
+    }
+
+    function updateReviewButtonState(isMarked) {
+        if (!$reviewBtn.length) return;
+        if (isMarked) {
+            $reviewBtn
+                .removeClass('btn-warning')
+                .addClass('btn-secondary')
+                .html('<i class="bi bi-bookmark-check-fill me-1"></i>Unmark Review');
+        } else {
+            $reviewBtn
+                .removeClass('btn-secondary')
+                .addClass('btn-warning')
+                .html('<i class="bi bi-bookmark me-1"></i>Mark for Review');
+        }
+    }
+
+    // NEW: Fisher–Yates shuffle for option randomization
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function renderMCQForm(q, prefix = '', isSub = false) {
+        const opts = (q.mcq_options || []).map(opt => `
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="radio"
+                       name="mcqOption_${prefix}${q.id}"
+                       id="option_${opt.id}"
+                       value="${opt.id}">
+                <label class="form-check-label" for="option_${opt.id}">
+                    ${opt.option_text}
+                </label>
+            </div>`).join('');
+        const openTag = isSub ? '' : `<form class="answer-form" data-question-id="${q.id}" data-question-type="MCQ">`;
+        const closeTag = isSub ? '' : `<button type="submit" class="btn btn-primary mt-2 rounded-pill px-3">Submit Answer</button></form>`;
+        return `
+            <div class="mcq-container mb-3" data-sub-question-id="${q.id}">
+              <h6 class="d-flex justify-content-between align-items-center">
+                <span>${q.question_text}</span>
+                <span class="feedback-icon"></span>
+              </h6>
+              ${openTag}${opts}${closeTag}
+            </div>`;
+    }
+
+    // --- 4. RENDERING LOGIC ---
+    function renderCurrentQuestion() {
+        if (!allQuestions.length) {
+            $content.hide();
+            $noData.removeClass('d-none');
+            return;
+        }
+
+        const q = allQuestions[currentQuestionIndex];
+
+        // --- THIS IS THE NEW LOGIC ---
+        // Shuffle options for MCQs and their sub-questions before rendering
+        if (q.question_type === 'MCQ' && Array.isArray(q.mcq_options)) {
+            shuffleArray(q.mcq_options);
+        }
+        if (q.question_type === 'Comprehension' && Array.isArray(q.sub_questions)) {
+            q.sub_questions.forEach(subQ => {
+                if (Array.isArray(subQ.mcq_options)) {
+                    shuffleArray(subQ.mcq_options);
+                }
+            });
+        }
+        // --- END OF NEW LOGIC ---
+
+        $counter.text(`Question ${currentQuestionIndex + 1} of ${allQuestions.length}`);
+        updateProgressBar();
+        $feedback.empty();
+
+        let html = '';
+        if (q.question_type === 'Comprehension') {
+            html += `<h5 class="mb-3 text-dark fw-semibold">${q.question_text}</h5>`;
+            if (q.comprehension_passage) {
+                html += `<div class="passage-text mb-3">${q.comprehension_passage.passage_text}</div>`;
+            }
+            html += `<form id="comprehension-form" data-parent-id="${q.id}"><h6 class="text-primary mb-2"><i class="bi bi-question-circle me-1"></i>Questions</h6>`;
+            (q.sub_questions || []).forEach((subQ, i) => {
+                html += renderMCQForm(subQ, `sub${i}_`, true);
+            });
+            html += `<button type="submit" class="btn btn-primary mt-2 rounded-pill px-3">Check All Answers</button></form>`;
+        } else if (q.question_type === 'MCQ') {
+            html += renderMCQForm(q);
+        } else if (q.question_type === 'OpenEnded') {
+            html += `<h5 class="mb-3 text-dark fw-semibold">${q.question_text}</h5>
+                     <form class="answer-form" data-question-id="${q.id}" data-question-type="OpenEnded">
+                         <div class="mb-3"><label for="openEndedAnswer" class="form-label fw-semibold">Your Answer:</label><textarea class="form-control" id="openEndedAnswer" rows="6"></textarea></div>
+                         <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-primary rounded-pill px-3">Submit Answer</button>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" id="validateBtn" data-question-id="${q.id}">
+                                <i class="bi bi-shield-check me-1"></i>Validate
+                            </button>
+                         </div>
+                     </form>`;
+        }
+            $container.html(html).addClass('fade-in');
+            window.typesetMath($container[0]);  
+        if (q.question_type === 'OpenEnded') {
+            if (openEndedEditor) openEndedEditor.destroy().catch(()=>{});
+            initEditor(document.querySelector('#openEndedAnswer')).then(e => openEndedEditor = e);
+        }
+
+        updateReviewButtonState(q.is_marked_for_review);
+        $prevBtn.prop('disabled', currentQuestionIndex === 0);
+        $nextBtn.prop('disabled', currentQuestionIndex === allQuestions.length - 1);
+        $generateAIBtn.toggleClass('d-none', q.question_type !== 'MCQ' && q.question_type !== 'Comprehension');
+    }
+
+    function updateProgressBar() {
+        const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
+        $('#progressBar').css('width', `${progress}%`).attr('aria-valuenow', progress);
+    }
+
+    // --- 5. DATA FETCHING & SESSION START ---
+    async function startPracticeSession() {
+        try {
+            const atkRes = await window.authenticatedFetch(
+                `/api/student/topics/${currentTopicId}/start-practice`,
+                { method: 'POST' }
+            );
+            const atkData = await atkRes.json();
+            if (!atkRes.ok) throw new Error(atkData.message);
+            currentAttemptId = atkData.attempt_id;
+
+            const qsRes = await window.authenticatedFetch(
+                `/api/student/topics/${currentTopicId}/questions`
+            );
+            const qsData = await qsRes.json();
+            if (!qsRes.ok) throw new Error(qsData.message);
+            allQuestions = qsData;
+
+            // URL-jump logic
+            const params = new URLSearchParams(window.location.search);
+            const startQ = params.get('question');
+            if (startQ) {
+                const idx = allQuestions.findIndex(q => q.id == parseInt(startQ));
+                if (idx !== -1) currentQuestionIndex = idx;
+            }
+
+            renderCurrentQuestion();
+            console.log("Sub questions loaded:", allQuestions[currentQuestionIndex].sub_questions);
+        } catch (e) {
+            console.error("Error starting session:", e);
+            $error.text(`Error: ${e.message}`).removeClass('d-none');
+        } finally {
+            $loading.addClass('d-none');
+            $content.removeClass('d-none');
+        }
+    }
+
+    // --- 6. EVENT HANDLERS ---
+    $prevBtn.on('click', () => {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--;
+            renderCurrentQuestion();
+            scrollToTop();
+        }
+    });
+
+    $nextBtn.on('click', () => {
+        if (currentQuestionIndex < allQuestions.length - 1) {
+            currentQuestionIndex++;
+            renderCurrentQuestion();
+            scrollToTop();
+        }
+    });
+
+    // Make entire form-check div clickable
+    $(document).on('click', '.form-check', function(e) {
+        if (e.target.type === 'radio' || e.target.tagName === 'LABEL') return;
+        const $radio = $(this).find('input[type="radio"]');
+        if ($radio.length) {
+            $radio.prop('checked', true).trigger('change');
+        }
+    });
+
+    $(document).on('click', '#validateBtn', async function () {
+        const $btn = $(this);
+        const qid = $btn.data('question-id');
+        const $textarea = $('#openEndedAnswer');
+        const answer = $textarea.val();
+
+        if (!answer || !answer.trim()) {
+            $feedback.html('<div class="alert alert-warning">Please enter your answer before validating.</div>');
+            return;
+        }
+
+        const questionText = allQuestions.find(q => q.id == qid)?.question_text || '';
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Validating...');
+
+        try {
+            const res = await window.authenticatedFetch('/api/ai/validate_answer', {
+                method: 'POST',
+                body: JSON.stringify({ question: questionText, answer: answer })
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Validation failed');
+
+            $feedback.html(`
+                <div class="alert alert-info mt-3">
+                    <h6 class="mb-1"><i class="bi bi-chat-text me-1"></i>AI Feedback:</h6>
+                    <p class="mb-0">${data.feedback}</p>
+                </div>
+            `);
+        } catch (err) {
+            $feedback.html(`<div class="alert alert-danger mt-3">Error: ${err.message}</div>`);
+        } finally {
+            $btn.prop('disabled', false).html('<i class="bi bi-shield-check me-1"></i>Validate');
+        }
+    });
+
+    // MCQ & OpenEnded submissions
+    $(document).on('submit', '.answer-form', async function (e) {
+        e.preventDefault();
+        const $form = $(this);
+        const qid = $form.data('question-id');
+        const type = $form.data('question-type');
+        const $btn = $form.find('button[type="submit"]');
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Checking...');
+
+        const ans = (type === 'MCQ')
+            ? $form.find('input[type="radio"]:checked').val()
+            : $form.find('textarea').val();
+
+        if (!ans) {
+            $feedback.html('<div class="alert alert-warning">Please select or enter an answer.</div>');
+            return $btn.prop('disabled', false).text('Submit Answer');
+        }
+
+        try {
+            const res = await window.authenticatedFetch(
+                `/api/student/questions/${qid}/submit-answer`,
+                { method: 'POST', body: JSON.stringify({ answer: ans, attempt_id: currentAttemptId }) }
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            const correct = data.is_correct;
+            const cls = correct ? 'alert-success' : 'alert-danger';
+            let html = `<div class="alert ${cls} mt-3">`;
+
+            if (type === 'MCQ') {
+                html += correct
+                    ? '<strong>Correct!</strong>'
+                    : `<strong>Incorrect.</strong>
+                       <div class="mt-2">
+                         Correct answer: <strong>${
+                           data.question_details?.mcq_options?.find(o => o.is_correct)?.option_text || 'N/A'
+                       }</strong>
+                       </div>`;
+            } else if (type === 'OpenEnded') {
+                html += correct
+                    ? '<strong>Good answer!</strong>'
+                    : '<strong>Answer submitted for review.</strong>';
+
+                if (data.question_details?.model_answer || data.question_details?.correct_answer) {
+                    html += `<div class="mt-2">
+                        <strong>Model Answer:</strong><br>
+                        ${data.question_details.model_answer || data.question_details.correct_answer}
+                    </div>`;
+                }
+            }
+
+            const expl = formatExplanation(data.question_details?.explanation_text);
+            html += `<hr><h6 class="mt-2">Explanation:</h6><div>${expl}</div>`;
+
+            // Add the "Explain Differently" button here
+            html += `
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary explain-differently-btn"
+                            data-question-text="${data.question_details?.question_text}"
+                            data-explanation-text="${expl}">
+                        <i class="bi bi-magic"></i> Explain Differently
+                    </button>
+                    <div class="ai-explanation-loading spinner-border spinner-border-sm text-primary ms-2" style="display: none;"></div>
+                    <div class="ai-explanation-container mt-2"></div>
+                </div>
+            `;
+
+            html += `</div>`; // Close the alert div
+            $feedback.html(html);
+            window.typesetMath($feedback[0]);
+            
+            $form.find('input,textarea,button[type="submit"]').prop('disabled', true);
+            if (type === 'OpenEnded') {
+                $form.find('#validateBtn').removeClass('d-none');
+            }
+        } catch (err) {
+            $feedback.html(`<div class="alert alert-danger">Error: ${err.message}</div>`);
+        } finally {
+            $btn.prop('disabled', false).text('Submit Answer');
+        }
+    });
+
+    // Comprehension bulk-check
+    $(document).on('submit', '#comprehension-form', async function (e) {
+        e.preventDefault();
+        const $form = $(this);
+        const parentId = $form.data('parent-id');
+        const $btn = $form.find('button[type="submit"]');
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Checking...');
+        $feedback.empty();
+        $form.find('.feedback-icon').empty();
+
+        let allAnswered = true;
+        const payload = [];
+        $form.find('.mcq-container').each(function () {
+            const $c = $(this);
+            const qid = $c.data('sub-question-id');
+            const sel = $c.find('input[type="radio"]:checked').val();
+            if (!sel) allAnswered = false;
+            payload.push({ question_id: qid, answer: sel });
+        });
+
+        if (!allAnswered) {
+            $feedback.html('<div class="alert alert-warning">Please answer all sub-questions.</div>');
+            $btn.prop('disabled', false).text('Check All Answers');
+            return;
+        }
+
+        try {
+            const res = await window.authenticatedFetch(
+                `/api/student/comprehensions/${parentId}/submit-answers`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        answers: payload,
+                        attempt_id: currentAttemptId
+                    })
+                }
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            data.results.forEach(r => {
+                const $c = $form.find(`.mcq-container[data-sub-question-id="${r.question_id}"]`);
+                const iconHtml = r.is_correct
+                    ? '<span class="ms-2 text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Correct</span>'
+                    : `<span class="ms-2 text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> Incorrect. Correct: <strong>${
+                        (r.question_details.mcq_options.find(o => o.is_correct) || {}).option_text || 'N/A'
+                    }</strong></span>`;
+                $c.find('.feedback-icon').html(iconHtml);
+            });
+
+            const explanationText = formatExplanation(
+                data.overall_explanation ||
+                data.explanation ||
+                data.comprehension_explanation ||
+                allQuestions[currentQuestionIndex].explanation_text
+            );
+
+            $feedback.html(`
+                <div class="alert alert-secondary mt-3">
+                    <h6>Explanation:</h6>
+                    <div>${explanationText}</div>
+                </div>
+            `);
+
+            $form.find('input[type="radio"]').prop('disabled', true);
+            $btn.text('Answers Checked');
+        } catch (err) {
+            $feedback.html(`<div class="alert alert-danger mt-3">Error: ${err.message}</div>`);
+            $btn.prop('disabled', false).text('Check All Answers');
+        }
+    });
+
+const reportModal = new bootstrap.Modal($('#reportModal')[0]);
+const $reportForm = $('#reportForm');
+let reportingQuestionId = null;
+
+// Open modal
+$(document).on('click', '#reportQuestionBtn', function () {
+  reportingQuestionId = allQuestions?.[currentQuestionIndex]?.id || null;  // <-- use allQuestions
+  $reportForm[0].reset();
+  reportModal.show();
+});
+
+// Submit report
+$reportForm.on('submit', async function (e) {
+  e.preventDefault();
+
+  const qid = reportingQuestionId ?? allQuestions?.[currentQuestionIndex]?.id;
+  if (!qid) {
+    console.error('No current question id to report.');
+    window.showToast?.('No question to report right now.', 'danger');
+    return;
+  }
+
+  const payload = {
+    reason: $('#reportReason').val(),
+    comments: $('#reportComments').val()
+  };
+
+  if (!payload.reason) {
+    alert('Please select a reason for the report.');
+    return;
+  }
+
+  // UX: disable submit while sending
+  const $btn = $(this).find('button[type="submit"]');
+  const oldText = $btn.text();
+  $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Submitting...');
+
+  try {
+    const res = await window.authenticatedFetch(`/api/student/questions/${qid}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+
+    // Success
+    window.showToast?.(data.message || 'Report submitted. Thank you!', 'success');
+    reportModal.hide();
+    $reportForm[0].reset();
+  } catch (err) {
+    console.error(err);
+    window.showToast?.(`Error: ${err.message}`, 'danger') || alert(`Error: ${err.message}`);
+  } finally {
+    $btn.prop('disabled', false).text(oldText);
+  }
+});
+
+    // --- NEW: Generate Similar Questions (AI) ---
+$generateAIBtn.on('click', async function (e) {
+  e.preventDefault();
+
+  const btn = this;
+  if (btn.disabled) return; // prevent duplicate clicks
+
+  const currentQuestion = allQuestions?.[currentQuestionIndex];
+  if (!currentQuestion) {
+    alert('No active question to generate from.');
+    return;
+  }
+
+  // Open modal + show loading
+  aiGeneratedModal.show();
+  $aiContent.hide().text('');
+  $aiLoading.show();
+  btn.disabled = true;
+  btn.setAttribute('aria-busy', 'true');
+
+  // Build detailed payload (safe fallbacks)
+  const payload = {
+    // send the type (e.g., 'Comprehension' or 'MCQ')
+    question_type: currentQuestion.question_type || currentQuestion.type || null,
+
+    // main question text
+    question_text: currentQuestion.question_text || currentQuestion.text || '',
+
+    // comprehension passage if present
+    passage_text:
+      (currentQuestion.comprehension_passage && currentQuestion.comprehension_passage.passage_text) ||
+      currentQuestion.passage_text ||
+      null,
+
+    // difficulty level
+    difficulty: currentQuestion.difficulty_level || currentQuestion.difficulty || null,
+
+    // context from Jinja
+    topic_name: "{{ topic.name }}",
+    subject_name: "{{ topic.subject.name }}",
+    exam_name: "{{ topic.subject.exam.name }}"
+  };
+
+  // helper: if server returns bare LaTeX without delimiters, wrap it so MathJax will render
+  const needsTeXDelims = s => !/\$\$|\\\[|\\\(|\$/.test(s) && /\\[a-zA-Z]+|\\frac|\\sum|\\sqrt|\\int|\\lim|\\alpha|\\beta/.test(s);
+  const ensureTeXDelims = s => needsTeXDelims(s) ? `$${s}$` : s;
+
+  try {
+    const res = await window.authenticatedFetch('/api/ai/generate_questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error('Invalid server response (not JSON).');
+    }
+
+    if (!res.ok) {
+      throw new Error(data.message || `Failed to generate questions (HTTP ${res.status}).`);
+    }
+
+    const out = data.generated || data.text || 'No content returned.';
+
+    // Safely inject text
+    const finalText = ensureTeXDelims(out);
+    $aiContent.text(finalText);
+
+    // Ask MathJax to typeset just this container
+    const root = document.getElementById('ai-content');
+    if (window.MathJax?.typesetPromise) {
+      await MathJax.typesetPromise([root]);
+    } else if (typeof window.typesetMath === 'function') {
+      // fallback to your helper if available in base.html
+      window.typesetMath(root);
+    }
+  } catch (err) {
+    console.error(err);
+    $aiContent.text(`An error occurred: ${err.message}`);
+  } finally {
+    $aiLoading.hide();
+    $aiContent.show();
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+  }
+});
+
+    // --- NEW: Explain Differently (AI) ---
+    $(document).on('click', '.explain-differently-btn', async function() {
+        const $btn = $(this);
+        const $container = $btn.siblings('.ai-explanation-container');
+        const $loading = $btn.siblings('.ai-explanation-loading');
+        const questionText = $btn.data('question-text');
+        const explanationText = $btn.data('explanation-text');
+
+        $btn.hide();
+        $loading.show();
+        $container.hide();
+
+        try {
+            const response = await window.authenticatedFetch('/api/ai/explain-question', {
+                method: 'POST',
+                body: JSON.stringify({
+                    question_text: questionText,
+                    explanation_text: explanationText
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            $container.html(data.explanation).show();
+        } catch (error) {
+            $container.html(`<div class="alert alert-danger">${error.message}</div>`).show();
+            $btn.show();
+        } finally {
+            $loading.hide();
+        }
+    });
+
+    // --- 7. INIT ---
+    startPracticeSession();
+});
+</script>
+{% endblock %}

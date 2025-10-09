@@ -1,0 +1,686 @@
+{% extends "base.html" %}
+{% block title %}Community Forum{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --accent-color: #3b82f6;
+        --light-bg: #f8fafc;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --border-color: #e2e8f0;
+        --text-muted: #64748b;
+        --success-color: #059669;
+    }
+
+    .forum-header {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 0 0 1rem 1rem;
+    }
+
+    .forum-stats {
+        display: flex;
+        gap: 2rem;
+        margin-top: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: bold;
+        display: block;
+    }
+
+    .post-card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: var(--card-shadow);
+    }
+
+    .post-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.15);
+        border-color: var(--accent-color);
+    }
+
+    .post-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .post-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin: 0;
+        line-height: 1.4;
+    }
+
+    .post-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .author-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .author-avatar {
+        width: 24px;
+        height: 24px;
+        background: var(--accent-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .org-badge {
+        background: #e0f2fe;
+        color: #0369a1;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .post-content-preview {
+        color: #475569;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+
+    .post-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn-reply {
+        background: #f1f5f9;
+        color: var(--text-muted);
+        border: 1px solid var(--border-color);
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .btn-reply:hover {
+        background: var(--accent-color);
+        color: white;
+        border-color: var(--accent-color);
+    }
+
+    .reply-count {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .replies-section {
+        background: var(--light-bg);
+        border-radius: 8px;
+        margin-top: 1rem;
+        overflow: hidden;
+    }
+
+    .reply-item {
+        background: white;
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem;
+    }
+
+    .reply-item:last-child {
+        border-bottom: none;
+    }
+
+    .reply-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .new-post-btn {
+        background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.25);
+    }
+
+    .new-post-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px 0 rgba(37, 99, 235, 0.35);
+    }
+
+    .modal-content {
+        border-radius: 1rem;
+        border: none;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-header {
+        background: var(--light-bg);
+        border-bottom: 1px solid var(--border-color);
+        border-radius: 1rem 1rem 0 0;
+        padding: 1.5rem;
+    }
+
+    .form-control {
+        border: 2px solid var(--border-color);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        background: white;
+        border-radius: 1rem;
+        border: 2px dashed var(--border-color);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: var(--text-muted);
+        margin-bottom: 1rem;
+    }
+
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 3rem;
+    }
+
+    @media (max-width: 768px) {
+        .forum-stats {
+            gap: 1rem;
+        }
+        
+        .post-header {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .post-actions {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: stretch;
+        }
+        
+        .action-buttons {
+            justify-content: center;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="forum-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h2 mb-2">
+                    <i class="bi bi-chat-square-text me-2"></i>
+                    Community Forum
+                </h1>
+                <p class="mb-0 opacity-90">
+                    {% if g.current_organization %}
+                        Connect and collaborate with <strong>{{ g.current_organization.name }}</strong> community
+                    {% else %}
+                        Join the global discussion with educators and learners
+                    {% endif %}
+                </p>
+                <div class="forum-stats">
+                    <div class="stat-item">
+                        <span class="stat-number" id="total-posts">0</span>
+                        <small>Discussions</small>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="total-replies">0</span>
+                        <small>Replies</small>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="active-today">0</span>
+                        <small>Active Today</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end">
+                <button class="btn btn-light new-post-btn" data-bs-toggle="modal" data-bs-target="#newPostModal">
+                    <i class="bi bi-plus-circle me-2"></i>Start Discussion
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div id="pageMessage"></div>
+    
+    <div id="posts-loading" class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading discussions...</span>
+        </div>
+    </div>
+    
+    <div id="posts-container"></div>
+</div>
+
+<!-- New Post Modal -->
+<div class="modal fade" id="newPostModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square me-2"></i>
+                    Start a New Discussion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="newPostForm">
+                    <div class="mb-4">
+                        <label for="postTitle" class="form-label fw-semibold">Discussion Title</label>
+                        <input type="text" class="form-control" id="postTitle" 
+                               placeholder="What would you like to discuss?" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="postContent" class="form-label fw-semibold">Content</label>
+                        <textarea class="form-control" id="postContent" rows="6" 
+                                  placeholder="Share your thoughts, questions, or ideas..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">
+                        <i class="bi bi-send me-2"></i>Start Discussion
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reply Modal -->
+<div class="modal fade" id="replyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-reply me-2"></i>
+                    Reply to Discussion
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="replyForm">
+                    <input type="hidden" id="replyPostId">
+                    <div class="mb-3">
+                        <label for="replyContent" class="form-label fw-semibold">Your Reply</label>
+                        <textarea class="form-control" id="replyContent" rows="4" 
+                                  placeholder="Share your thoughts..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-send me-2"></i>Post Reply
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    const $postsContainer = $('#posts-container');
+    const $loading = $('#posts-loading');
+    const $newPostForm = $('#newPostForm');
+    const $replyForm = $('#replyForm');
+    const newPostModal = new bootstrap.Modal($('#newPostModal')[0]);
+    const replyModal = new bootstrap.Modal($('#replyModal')[0]);
+
+    // Sample data for demonstration - replace with your API calls
+    let forumStats = { posts: 0, replies: 0, activeToday: 0 };
+
+    function updateStats(stats) {
+        $('#total-posts').text(stats.posts);
+        $('#total-replies').text(stats.replies);
+        $('#active-today').text(stats.activeToday);
+    }
+
+    function getAuthorInitials(name) {
+        return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now - date);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) return 'Today';
+        if (diffDays === 2) return 'Yesterday';
+        if (diffDays <= 7) return `${diffDays} days ago`;
+        return date.toLocaleDateString();
+    }
+
+    function truncateText(text, maxLength = 150) {
+        if (text.length <= maxLength) return text;
+        return text.substr(0, maxLength) + '...';
+    }
+
+    async function loadReplies(postId) {
+        try {
+            // Replace with your API endpoint
+            const res = await window.authenticatedFetch(`/api/community/posts/${postId}/replies`);
+            if (res.status === 405) {
+                // Endpoint not implemented yet
+                console.warn('Replies endpoint not implemented yet');
+                return [];
+            }
+            const replies = await res.json();
+            if (!res.ok) throw new Error(replies.message || 'Failed to load replies');
+            
+            return replies;
+        } catch (err) {
+            console.error('Error loading replies:', err);
+            return [];
+        }
+    }
+
+    function createReplyHTML(reply) {
+        return `
+            <div class="reply-item">
+                <div class="reply-header">
+                    <div class="author-info">
+                        <div class="author-avatar">${getAuthorInitials(reply.author_name)}</div>
+                        <strong>${reply.author_name}</strong>
+                        <span class="text-muted">•</span>
+                        <span>${formatDate(reply.created_at)}</span>
+                    </div>
+                </div>
+                <div class="reply-content">${reply.content}</div>
+            </div>
+        `;
+    }
+
+    function createPostHTML(post, index) {
+        const hasReplies = post.reply_count > 0;
+        const repliesId = `replies-${post.id}`;
+        
+        return `
+            <div class="post-card" data-post-id="${post.id}">
+                <div class="post-header">
+                    <h3 class="post-title">${post.title}</h3>
+                    <small class="text-muted">${formatDate(post.created_at)}</small>
+                </div>
+                
+                <div class="post-meta">
+                    <div class="author-info">
+                        <div class="author-avatar">${getAuthorInitials(post.author_name)}</div>
+                        <span><strong>${post.author_name}</strong></span>
+                    </div>
+                    <span class="org-badge">${post.organization_name}</span>
+                </div>
+                
+                <div class="post-content-preview">
+                    ${truncateText(post.content || 'Click to view full discussion...')}
+                </div>
+                
+                <div class="post-actions">
+                    <div class="action-buttons">
+                        <button class="btn btn-reply btn-view-post" data-post-id="${post.id}">
+                            <i class="bi bi-eye me-1"></i>View Discussion
+                        </button>
+                        <button class="btn btn-reply btn-add-reply" data-post-id="${post.id}">
+                            <i class="bi bi-reply me-1"></i>Reply
+                        </button>
+                        ${hasReplies ? `
+                            <button class="btn btn-reply btn-toggle-replies" data-bs-toggle="collapse" 
+                                    data-bs-target="#${repliesId}" data-post-id="${post.id}">
+                                <i class="bi bi-chat-dots me-1"></i>
+                                <span class="replies-toggle-text">Show</span> Replies
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="reply-count">
+                        <i class="bi bi-chat-left-text"></i>
+                        <span>${post.reply_count} replies</span>
+                    </div>
+                </div>
+                
+                ${hasReplies ? `
+                    <div class="collapse replies-section" id="${repliesId}">
+                        <div class="replies-loading text-center p-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading replies...</span>
+                            </div>
+                        </div>
+                        <div class="replies-container" style="display: none;"></div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    async function loadPosts() {
+        try {
+            const res = await window.authenticatedFetch('/api/community/posts');
+            const posts = await res.json();
+            if (!res.ok) throw new Error(posts.message);
+
+            $postsContainer.empty();
+            
+            if (posts.length === 0) {
+                $postsContainer.html(`
+                    <div class="empty-state">
+                        <i class="bi bi-chat-square-text"></i>
+                        <h4>No discussions yet</h4>
+                        <p class="text-muted">Be the first to start a conversation in your community!</p>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPostModal">
+                            <i class="bi bi-plus-circle me-2"></i>Start First Discussion
+                        </button>
+                    </div>
+                `);
+            } else {
+                posts.forEach((post, index) => {
+                    $postsContainer.append(createPostHTML(post, index));
+                });
+                
+                // Update stats
+                const totalReplies = posts.reduce((sum, post) => sum + post.reply_count, 0);
+                updateStats({
+                    posts: posts.length,
+                    replies: totalReplies,
+                    activeToday: posts.filter(post => {
+                        const today = new Date().toDateString();
+                        return new Date(post.created_at).toDateString() === today;
+                    }).length
+                });
+            }
+        } catch (err) {
+            $('#pageMessage').html(`<div class="alert alert-danger alert-dismissible fade show">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                ${err.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>`);
+        } finally {
+            $loading.hide();
+        }
+    }
+
+    // Handle post submission
+    $newPostForm.on('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        
+        submitBtn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-2"></i>Publishing...');
+
+        try {
+            const payload = {
+                title: $('#postTitle').val(),
+                content: $('#postContent').val()
+            };
+
+            const res = await window.authenticatedFetch('/api/community/posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast('Discussion started successfully!', 'success');
+            newPostModal.hide();
+            $('#newPostForm')[0].reset();
+            loadPosts();
+        } catch (err) {
+            window.showToast(`Error: ${err.message}`, 'error');
+        } finally {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+
+    // Handle reply submission
+    $replyForm.on('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalText = submitBtn.html();
+        const postId = $('#replyPostId').val();
+        
+        submitBtn.prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-2"></i>Posting...');
+
+        try {
+            const payload = {
+                content: $('#replyContent').val()
+            };
+
+            const res = await window.authenticatedFetch(`/api/community/posts/${postId}/replies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast('Reply posted successfully!', 'success');
+            replyModal.hide();
+            $('#replyForm')[0].reset();
+            loadPosts(); // Refresh to show updated reply count
+        } catch (err) {
+            window.showToast(`Error: ${err.message}`, 'error');
+        } finally {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+
+    // Handle reply button clicks
+    $(document).on('click', '.btn-add-reply', function() {
+        const postId = $(this).data('post-id');
+        $('#replyPostId').val(postId);
+        replyModal.show();
+    });
+
+    // Handle view post clicks
+    $(document).on('click', '.btn-view-post', function() {
+        const postId = $(this).data('post-id');
+        window.location.href = `/forum/post/${postId}`;
+    });
+
+    // Handle replies toggle
+    $(document).on('click', '.btn-toggle-replies', async function() {
+        const postId = $(this).data('post-id');
+        const repliesContainer = $(`#replies-${postId} .replies-container`);
+        const repliesLoading = $(`#replies-${postId} .replies-loading`);
+        const toggleText = $(this).find('.replies-toggle-text');
+        
+        if (repliesContainer.is(':empty')) {
+            repliesLoading.show();
+            
+            try {
+                const replies = await loadReplies(postId);
+                repliesContainer.empty();
+                
+                if (replies.length > 0) {
+                    replies.forEach(reply => {
+                        repliesContainer.append(createReplyHTML(reply));
+                    });
+                } else {
+                    repliesContainer.html('<div class="text-center p-3 text-muted">No replies yet</div>');
+                }
+            } catch (err) {
+                repliesContainer.html('<div class="text-center p-3 text-danger">Failed to load replies</div>');
+            } finally {
+                repliesLoading.hide();
+                repliesContainer.show();
+            }
+        }
+        
+        // Toggle button text
+        const isExpanded = $(`#replies-${postId}`).hasClass('show');
+        toggleText.text(isExpanded ? 'Hide' : 'Show');
+    });
+
+    // Handle collapse events to update button text
+    $(document).on('hidden.bs.collapse shown.bs.collapse', '.replies-section', function() {
+        const postId = $(this).attr('id').replace('replies-', '');
+        const toggleBtn = $(`.btn-toggle-replies[data-post-id="${postId}"] .replies-toggle-text`);
+        const isExpanded = $(this).hasClass('show');
+        toggleBtn.text(isExpanded ? 'Hide' : 'Show');
+    });
+
+    // Initialize
+    loadPosts();
+};
+</script>
+{% endblock %}

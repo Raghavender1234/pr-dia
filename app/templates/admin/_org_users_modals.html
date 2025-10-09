@@ -1,0 +1,41 @@
+<div class="modal fade" id="changeUserStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Change User Status</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Change status for: <strong id="statusChangeUserName"></strong></p>
+                <label for="newUserStatus" class="form-label">New Status:</label>
+                <select class="form-select" id="newUserStatus">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="confirmChangeUserStatusBtn">Update Status</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteUserConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Confirm User Removal</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <strong id="deleteUserName"></strong> (<span id="deleteUserEmail"></span>) from your organization?</p>
+                <p class="small text-muted">This will set their membership to inactive. They will no longer be able to access your organization's content. It does not delete their global user account.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUserBtn">Remove User</button>
+            </div>
+        </div>
+    </div>
+</div>

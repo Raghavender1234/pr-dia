@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{# The title is now passed in dynamically from the route #}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            {# 
+              This is the most important part.
+              The 'content' variable is passed from your new 'public_page' route.
+              The '|safe' filter tells the browser to render the HTML saved in your database.
+            #}
+            {{ content|safe }}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

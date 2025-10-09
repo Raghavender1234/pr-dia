@@ -1,0 +1,30 @@
+<div class="modal fade" id="reportModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Report an Issue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Help us improve by reporting any issues with this question.</p>
+        <form id="reportForm">
+          <div class="mb-3">
+            <label for="reportReason" class="form-label">Reason for Report</label>
+            <select class="form-select" id="reportReason" required>
+              <option value="" disabled selected>-- Select a reason --</option>
+              <option value="incorrect_answer">The correct answer is wrong</option>
+              <option value="typo_or_grammar">Typo or grammar error</option>
+              <option value="inappropriate_content">Inappropriate or offensive content</option>
+              <option value="other">Other (please specify below)</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="reportComments" class="form-label">Additional Comments (Optional)</label>
+            <textarea class="form-control" id="reportComments" rows="3"></textarea>
+          </div>
+          <button type="submit" class="btn btn-danger w-100">Submit Report</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

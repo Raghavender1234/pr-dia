@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Archived Content - DIA{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h2 mb-2">Archived Content (Recycle Bin)</h1>
+            <p class="text-muted">Restore or permanently delete items that have been archived by organization admins.</p>
+        </div>
+        <a href="{{ url_for('frontend.super_admin_dashboard') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+    <hr class="my-4">
+    <div id="pageMessage"></div>
+
+    <ul class="nav nav-tabs" id="archiveTabs" role="tablist">
+        {% for tab in ['exams', 'subjects', 'topics', 'questions', 'mock_tests'] %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if loop.first %}active{% endif %}" id="{{ tab }}-tab"
+                data-bs-toggle="tab" data-bs-target="#{{ tab }}-panel" type="button">{{ tab.replace('_', ' ')|title }}</button>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="tab-content mt-3" id="archiveTabsContent">
+        {% for tab_id in ['exams', 'subjects', 'topics', 'questions', 'mock_tests'] %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="{{ tab_id }}-panel">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="bulk-action-container mb-3 d-none">
+                        <span class="selection-count me-3"></span>
+                        <button class="btn btn-sm btn-danger bulk-delete-btn" data-type="{{ 'mock_test' if tab_id == 'mock_tests' else tab_id[:-1] }}">
+                            <i class="bi bi-trash3-fill"></i> Delete Selected
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table id="{{ tab_id }}Table" class="table table-hover" width="100%"></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.addEventListener('load', function () {
+    const tables = {};
+    const showMessage = (msg, type = 'success') => {
+        $('#pageMessage').html(`<div class="alert alert-${type}">${msg}</div>`);
+        setTimeout(() => $('#pageMessage').empty(), 4000);
+    };
+
+    const updateBulkUI = ($panel) => {
+        const $container = $panel.find('.bulk-action-container');
+        const count = $panel.find('.row-checkbox:checked').length;
+        $container.find('.selection-count').text(`${count} selected`);
+        $container.toggleClass('d-none', count === 0);
+    };
+
+    function initTable(tableId, data, itemType) {
+        if (tables[tableId]) {
+            tables[tableId].clear().rows.add(data).draw();
+            return;
+        }
+
+        tables[tableId] = $(`#${tableId}`).DataTable({
+            responsive: true,
+            data: data,
+            order: [[2, 'desc']],
+            columns: [
+                { data: 'id', title: `<input type="checkbox" class="select-all-checkbox" data-table-id="${tableId}">`, orderable: false,
+                  render: id => `<input type="checkbox" class="row-checkbox" data-id="${id}" data-type="${itemType}">` },
+                { data: 'name', title: 'Name / Text' },
+                { data: 'deleted_at', title: 'Archived On', render: d => new Date(d).toLocaleString() },
+                { data: 'id', title: 'Actions', orderable: false, render: (id, _, row) => `
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-success restore-btn" data-id="${id}" data-type="${itemType}">
+                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                        </button>
+                    </div>` }
+            ]
+        });
+    }
+
+    async function loadArchivedContent() {
+        try {
+            const response = await authenticatedFetch('/api/super-admin/archived-content');
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to load archived content');
+
+            ['exams', 'subjects', 'topics', 'questions', 'mock_tests'].forEach(type => {
+                const itemType = type === 'mock_tests' ? 'mock_test' : type.slice(0, -1);
+                initTable(`${type}Table`, data[type] || [], itemType);
+            });
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        }
+    }
+
+    async function handleBulkDelete(itemType, $btn) {
+        const tableId = `${itemType}sTable`;
+        const selectedIds = $(`#${tableId} .row-checkbox:checked`).map((_, el) => $(el).data('id')).get();
+        if (!selectedIds.length) return showMessage('No items selected.', 'warning');
+        if (!confirm(`Delete ${selectedIds.length} ${itemType}(s) permanently?`)) return;
+
+        const payload = selectedIds.map(id => ({ item_type: itemType, item_id: id }));
+
+        $btn.prop('disabled', true);
+        try {
+            const res = await authenticatedFetch('/api/super-admin/archived-content/bulk-permanent-delete', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            showMessage(data.message);
+            loadArchivedContent();
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        } finally {
+            $btn.prop('disabled', false);
+        }
+    }
+
+    $('.tab-content').on('change', '.select-all-checkbox', function () {
+        const $panel = $(this).closest('.tab-pane');
+        $panel.find('.row-checkbox').prop('checked', this.checked);
+        updateBulkUI($panel);
+    });
+
+    $('.tab-content').on('change', '.row-checkbox', function () {
+        updateBulkUI($(this).closest('.tab-pane'));
+    });
+
+    $('.tab-content').on('click', '.bulk-delete-btn', function () {
+        handleBulkDelete($(this).data('type'), $(this));
+    });
+
+    $('.tab-content').on('click', '.restore-btn', function () {
+        const id = $(this).data('id');
+        const type = $(this).data('type');
+        if (!confirm(`Restore this ${type}?`)) return;
+        authenticatedFetch(`/api/super-admin/archived-content/restore`, {
+            method: 'POST',
+            body: { item_type: type, item_id: id }
+        }).then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            showMessage('Item restored successfully.', 'success');
+            loadArchivedContent();
+        }).catch(err => {
+            showMessage(err.message, 'danger');
+        });
+    });
+
+    loadArchivedContent();
+});
+</script>
+{% endblock %}

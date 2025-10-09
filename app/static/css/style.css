@@ -1,0 +1,458 @@
+body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #343a40;
+    background-color: #f0f2f5;
+}
+
+/* Navbar styling for custom look */
+.navbar-brand {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-weight: 700 !important;
+}
+.navbar-nav .nav-link {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9) !important;
+    transition: all 0.2s ease-in-out;
+}
+.navbar-nav .nav-link:hover {
+    color: rgba(255, 255, 255, 1) !important;
+}
+.navbar-nav .nav-link.router-link-exact-active {
+    color: #fff !important;
+    border-bottom: 2px solid #fff;
+    padding-bottom: 0.25rem;
+}
+
+/* Button styles in Navbar for logged-out state */
+.navbar-nav .btn.nav-link {
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+}
+.navbar-nav .btn.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+.navbar-nav .btn-success.nav-link {
+    border-color: #28a745;
+}
+.navbar-nav .btn-success.nav-link:hover {
+    background-color: #218838;
+}
+
+.dropdown-header {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Footer specific styles */
+footer {
+  font-size: 0.85rem; 
+  background-color: #212529 !important;
+  border-top: 1px solid #343a40 !important;
+}
+footer h5 {
+  font-size: 1.2rem;
+  color: #f8f9fa !important;
+}
+footer .list-unstyled li {
+  margin-bottom: 0.5rem;
+}
+footer .list-unstyled a {
+  transition: color 0.2s ease-in-out;
+}
+footer .list-unstyled a:hover {
+  color: #fff !important;
+}
+footer .fs-4 {
+  font-size: 1.5rem !important;
+}
+footer .fs-4:hover {
+  color: #fff !important;
+}
+
+/* General layout adjustments */
+.min-vh-100 {
+    min-height: 100vh;
+}
+.flex-grow-1 {
+    flex-grow: 1;
+}
+
+/* Auth Layout specific styles */
+.auth-layout {
+    background-color: #f0f2f5; 
+}
+.auth-card {
+    max-width: 900px;
+    margin: auto;
+    border-radius: 1rem;
+    min-height: 550px;
+    overflow: hidden;
+}
+.auth-image-section {
+    background-image: url('../images/login-image.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    position: relative;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+.auth-image-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+}
+.auth-image-section > div {
+    z-index: 2;
+    position: relative;
+}
+
+/* Inner form container for auth pages */
+.inner-form-container {
+  max-width: 500px;
+  margin: auto;
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 1px solid rgba(0,0,0,.125);
+}
+
+/* Responsive adjustments for auth layout */
+@media (max-width: 991.98px) {
+    .auth-card {
+        max-width: 500px;
+    }
+    .auth-image-section {
+        padding: 2rem !important;
+    }
+}
+
+.bg-register-image {
+    background-image: url("/static/images/register-image.jpg");
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+/* Fix password eye icon alignment */
+.password-field {
+    position: relative;
+}
+
+.password-field input.form-control {
+    padding-right: 2.5rem;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    font-size: 1.2rem;
+    color: #6c757d;
+    z-index: 10;
+    cursor: pointer;
+    line-height: 1;
+    pointer-events: auto;
+}
+
+/* Default Light Theme */
+:root {
+    --bs-body-bg: #f8f9fa;
+    --bs-body-color: #212529;
+    --bs-card-bg: #fff;
+    --bs-card-border-color: #dee2e6;
+    --bs-list-group-bg: #fff;
+    --bs-list-group-border-color: rgba(0, 0, 0, 0.125);
+    --bs-modal-bg: #fff;
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(0, 0, 0, 0.05);
+}
+
+/* --- PAGE FADE-IN ANIMATION --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.page-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Dropdown fix for z-index and overlap */
+.profile-dropdown {
+    z-index: 1080 !important;
+    position: absolute !important;
+    top: 100% !important;
+    left: auto !important;
+    right: 0 !important;
+    margin-top: 0.5rem;
+}
+
+.navbar,
+.navbar .container-fluid {
+    overflow: visible !important;
+    position: relative;
+    z-index: 1040; /* Ensure it layers above page content */
+}
+
+/* --- FLASH MESSAGES STYLING --- */
+.flash-messages {
+    position: fixed;
+    top: 80px; /* Below navbar */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1090;
+    width: 90%;
+    max-width: 500px;
+    pointer-events: none; /* Allow clicks to pass through container */
+}
+
+.flash-message {
+    pointer-events: auto; /* Re-enable clicks on individual messages */
+    margin-bottom: 10px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    opacity: 1;
+    transform: translateY(0);
+    transition: all 0.4s ease-in-out;
+    position: relative;
+    border-left: 4px solid transparent;
+}
+
+/* Flash message types */
+.flash-message.alert-success {
+    background-color: #d1eddd;
+    color: #0a3622;
+    border-color: #28a745;
+    border-left-color: #28a745;
+}
+
+.flash-message.alert-danger {
+    background-color: #f8d7da;
+    color: #721c24;
+    border-color: #dc3545;
+    border-left-color: #dc3545;
+}
+
+.flash-message.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border-color: #ffc107;
+    border-left-color: #ffc107;
+}
+
+.flash-message.alert-info {
+    background-color: #cce7f0;
+    color: #055160;
+    border-color: #0dcaf0;
+    border-left-color: #0dcaf0;
+}
+
+/* Flash message fade-out animation */
+.flash-message.fade-out {
+    opacity: 0;
+    transform: translateY(-20px);
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    max-height: 0;
+}
+
+/* Auto-dismiss animation for flash messages */
+@keyframes flash-auto-dismiss {
+    0% {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    10% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    85% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+        margin-bottom: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        max-height: 0;
+    }
+}
+
+.flash-message.auto-dismiss {
+    animation: flash-auto-dismiss 2s ease-in-out forwards;
+}
+
+/* Close button for flash messages */
+.flash-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flash-close:hover {
+    opacity: 1;
+}
+
+/* --- ENHANCED TOAST MESSAGES --- */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1090;
+    width: 300px;
+}
+
+/* Base style for each toast message */
+.toast-message {
+    background-color: #333;
+    color: #fff;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    opacity: 1;
+    transform: translateX(0);
+    transition: all 0.4s ease-in-out;
+    position: relative;
+    cursor: pointer;
+}
+
+/* Different colors for different toast message types */
+.toast-message.success {
+    background-color: #28a745;
+}
+
+.toast-message.danger,
+.toast-message.error {
+    background-color: #dc3545;
+}
+
+.toast-message.warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.toast-message.info {
+    background-color: #0d6efd;
+}
+
+/* Toast message fade-out */
+.toast-message.fade-out {
+    opacity: 0;
+    transform: translateX(100%);
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    max-height: 0;
+}
+
+/* Enhanced auto-dismiss animation for toast messages */
+@keyframes toast-slide-in-out {
+    0% {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    15% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    85% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
+.toast-message.auto-dismiss {
+    animation: toast-slide-in-out 1.5s ease-in-out forwards;
+}
+
+/* Close button for toast messages */
+.toast-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: inherit;
+    opacity: 0.8;
+    cursor: pointer;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+
+/* Progress bar for toast messages */
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 0 0 8px 8px;
+    animation: toast-progress-bar 5s linear forwards;
+}
+
+@keyframes toast-progress-bar {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+
+/* Hover to pause animations */
+.toast-message:hover,
+.flash-message:hover {
+    animation-play-state: paused;
+}
+
+.toast-message:hover .toast-progress {
+    animation-play-state: paused;
+}
+
+.wrs_modal_overlay,
+.wrs_modal_dialog,
+.wirisplugin-iframe {
+  z-index: 2000 !important;
+}

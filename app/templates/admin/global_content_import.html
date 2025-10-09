@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Global Content Import{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-cloud-upload-fill me-2"></i>Global Content Import</h4>
+                </div>
+                <div class="card-body p-4">
+                    <p class="card-text text-muted">Upload a single CSV or Excel file to add content to multiple topics across different subjects and exams at once.</p>
+                    
+                    <div class="alert alert-info">
+                        <strong>Instructions:</strong> Your file must contain the columns: <code>exam_name</code>, <code>subject_name</code>, <code>topic_name</code>, <code>display_order</code>, <code>title</code>, <code>content_type</code>, and <code>content_value</code>.
+                    </div>
+
+                    <form id="globalImportForm">
+                        <div class="mb-3">
+                            <label for="importFile" class="form-label fw-bold">Select File (.csv or .xlsx)</label>
+                            <input class="form-control" type="file" id="importFile" accept=".csv, .xlsx" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                            <span class="button-text">Start Import</span>
+                        </button>
+                    </form>
+                    
+                    <div id="import-results" class="mt-4" style="display:none;">
+                        <h5>Import Summary</h5>
+                        <div class="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const importForm = document.getElementById('globalImportForm');
+    const importFile = document.getElementById('importFile');
+    const resultsDiv = document.getElementById('import-results');
+    const resultsAlert = resultsDiv.querySelector('.alert');
+    const submitBtn = importForm.querySelector('button[type="submit"]');
+
+    importForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (importFile.files.length === 0) {
+            resultsAlert.className = 'alert alert-warning';
+            resultsAlert.textContent = 'Please select a file to upload.';
+            resultsDiv.style.display = 'block';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('content_file', importFile.files[0]);
+
+        submitBtn.disabled = true;
+        submitBtn.querySelector('.spinner-border').classList.remove('d-none');
+        resultsDiv.style.display = 'none';
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/content/global-import', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.message);
+            }
+            
+            resultsAlert.className = 'alert alert-success';
+            resultsAlert.innerHTML = `<strong>Success!</strong><br>${data.message}`;
+
+        } catch (err) {
+            resultsAlert.className = 'alert alert-danger';
+            resultsAlert.innerHTML = `<strong>Error:</strong><br>${err.message}`;
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.querySelector('.spinner-border').classList.add('d-none');
+            resultsDiv.style.display = 'block';
+            importForm.reset();
+        }
+    });
+});
+</script>
+{% endblock %}

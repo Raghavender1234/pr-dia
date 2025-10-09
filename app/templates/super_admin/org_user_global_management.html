@@ -1,0 +1,611 @@
+{% extends "base.html" %}
+{% block title %}Global Management – DIA{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="h2 mb-2">Global Management</h1>
+    <p class="lead text-muted mb-4">Oversee all registered organizations and users across the entire DIA platform.</p>
+
+    <div id="globalMessage" class="mb-4"></div>
+
+    <!-- CREATE ORG CARD -->
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-success text-white py-3">
+            <h5 class="mb-0"><i class="bi bi-plus-circle-fill me-2"></i>Create New Organization</h5>
+        </div>
+        <div class="card-body p-4">
+            <form id="createOrgForm" novalidate>
+                <!-- Org Details -->
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="newOrgName" placeholder="Organization Name" required>
+                            <label for="newOrgName">Organization Name <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="newOrgCode" placeholder="Unique Code" required>
+                            <label for="newOrgCode">Unique Organization Code <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-12">
+                        <div class="form-floating">
+                            <select class="form-select" id="newOrgPlanId" required>
+                                <option value="" disabled selected>Loading plans…</option>
+                            </select>
+                            <label for="newOrgPlanId">Subscription Plan <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Admin Details -->
+                <hr class="my-4">
+                <h6 class="text-secondary fw-bold">Main Co-Admin Details</h6>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="newAdminFirstName" placeholder="Admin First Name" required>
+                            <label for="newAdminFirstName">Admin First Name <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="newAdminLastName" placeholder="Admin Last Name" required>
+                            <label for="newAdminLastName">Admin Last Name <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-floating mb-3">
+                            <input type="email" class="form-control" id="newAdminEmail" placeholder="Admin Email" required>
+                            <label for="newAdminEmail">Admin Email <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">Please enter a valid email.</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                         <div class="form-floating">
+                            <input type="password" class="form-control" id="newAdminPassword" placeholder="Password" required>
+                            <label for="newAdminPassword">Temporary Password <span class="text-danger">*</span></label>
+                            <div class="invalid-feedback">This field is required.</div>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success w-100 mt-4" id="createOrgSubmitBtn">
+                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    <span class="button-text">Create Organization & Admin</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <ul class="nav nav-tabs" id="managementTabs" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="orgs-tab" data-bs-toggle="tab" data-bs-target="#orgs-panel" type="button">Organizations</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users-panel" type="button">Users</button></li>
+    </ul>
+
+    <div class="tab-content" id="managementTabsContent">
+        <div class="tab-pane fade show active" id="orgs-panel" role="tabpanel">
+            <div class="card shadow-sm card-flush"><div class="card-body"><div class="table-responsive"><table class="table table-hover table-striped" id="organizationsTable" width="100%"></table></div></div></div>
+        </div>
+        <div class="tab-pane fade" id="users-panel" role="tabpanel">
+            <div class="card shadow-sm card-flush">
+                <div class="card-header bg-white py-3"><div class="d-flex justify-content-end"><select class="form-select form-select-sm w-auto" id="orgFilterSelect"><option value="">All Organizations</option></select></div></div>
+                <div class="card-body"><div class="table-responsive"><table class="table table-hover table-striped" id="usersTable" width="100%"></table></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FIX: All modals are now included only ONCE from this single file -->
+{% include 'super_admin/_modals.html' %}
+{% endblock content %}
+
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    // --- 1. SETUP & CACHE ---
+    const $createOrgForm = $('#createOrgForm');
+    const $orgFilterSelect = $('#orgFilterSelect');
+    let organizationsDataTable, usersDataTable;
+    let currentActionTarget = {};
+    const modals = {
+        deleteOrg: new bootstrap.Modal($('#deleteOrgConfirmModal')[0]),
+        deleteUser: new bootstrap.Modal($('#deleteUserConfirmModal')[0]),
+        changeStatus: new bootstrap.Modal($('#changeUserStatusModal')[0]),
+        changeType: new bootstrap.Modal($('#changeUserTypeModal')[0]),
+        editOrg: new bootstrap.Modal($('#editOrgModal')[0])
+    };
+
+    // --- 2. HELPER FUNCTIONS ---
+    function toggleButtonSpinner($btn, show) {
+        $btn.prop('disabled', show);
+        $btn.find('.spinner-border').toggleClass('d-none', !show);
+    }
+
+    function toggleSpinner($btn, show) {
+        $btn.prop('disabled', show);
+        if (show) {
+            $btn.prepend('<span class="spinner-border spinner-border-sm me-2" role="status"></span>');
+        } else {
+            $btn.find('.spinner-border').remove();
+        }
+    }
+
+    function showMessage(message, type, isModal = false) {
+        const targetSelector = isModal ? '#editOrgMessage' : '#globalMessage';
+        const alertClass = type === 'danger' ? 'alert-danger' : type === 'success' ? 'alert-success' : 'alert-info';
+        const iconClass = type === 'danger' ? 'exclamation-triangle-fill' : type === 'success' ? 'check-circle-fill' : 'info-circle-fill';
+        
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${iconClass} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        $(targetSelector).html(alertHtml);
+        
+        // Also show toast for better UX
+        window.showToast(message, type);
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            $(targetSelector).find('.alert').alert('close');
+        }, 5000);
+    }
+
+    const resetCreateForm = () => {
+        $createOrgForm[0].reset();
+        $createOrgForm.find('.is-invalid').removeClass('is-invalid');
+    };
+
+    const renderBadge = (text, type) => {
+        const map = {
+            status: { active: 'bg-success', inactive: 'bg-secondary', pending_payment: 'bg-warning text-dark' },
+            type: { super_admin: 'bg-dark', main_co_admin: 'bg-primary', co_admin: 'bg-info', student: 'bg-light text-dark' }
+        };
+        const cls = (map[type] && map[type][text]) || 'bg-light text-dark';
+        return `<span class="badge ${cls} text-capitalize">${(text || 'N/A').replace(/_/g, ' ')}</span>`;
+    };
+
+    const initOrgsTable = () => {
+        organizationsDataTable = $('#organizationsTable').DataTable({
+            responsive: true,
+            processing: true,
+            ajax: (data, callback, settings) => {
+                (async () => {
+                    try {
+                        const response = await window.authenticatedFetch('/api/super-admin/organizations');
+                        const json = await response.json();
+                        if (!response.ok) throw new Error(json.message);
+                        callback({ data: json });
+                    } catch (error) {
+                        window.showToast(`Could not load organizations: ${error.message}`, 'danger');
+                        callback({ data: [] });
+                    }
+                })();
+
+                return {
+                    abort: () => {} // prevent n.abort error
+                };
+            },
+            columns: [
+                {
+                    data: 'name',
+                    title: 'Name',
+                    render: function(data, type, row) {
+                        const url = `/super-admin/organization/${row.id}/details`;
+                        return `<a href="${url}" class="text-decoration-none">
+                                    <div class="fw-medium text-primary">${data}</div>
+                                    <small class="text-muted">${row.org_code}</small>
+                                </a>`;
+                    }
+                },
+                {
+                    data: 'is_verified',
+                    title: 'Verified',
+                    render: (is_verified) => is_verified
+                        ? `<span class="badge bg-success"><i class="bi bi-patch-check-fill me-1"></i> Yes</span>`
+                        : `<span class="badge bg-secondary">No</span>`
+                },
+                { 
+                    data: 'status', 
+                    title: 'Status',
+                    render: (d) => `<span class="badge bg-${d === 'active' ? 'success' : 'secondary'} text-capitalize">${d.replace('_',' ')}</span>` 
+                },
+                { data: 'plan_name', title: 'Plan', defaultContent: 'N/A' },
+                { data: 'current_student_count', title: 'Students' },
+                { data: 'current_coadmin_count', title: 'Co-Admins' },
+                {
+                    data: 'id',
+                    title: 'Actions',
+                    orderable: false,
+                    render: (id, _, row) => {
+                        const verifyBtnClass = row.is_verified ? 'btn-success' : 'btn-outline-secondary';
+                        const verifyBtnTitle = row.is_verified ? 'Un-verify Organization' : 'Verify Organization';
+
+                        const verifyBtn = `<button class="btn btn-sm ${verifyBtnClass} toggle-verify-btn" data-id="${id}" data-name="${row.name}" title="${verifyBtnTitle}">
+                            <i class="bi bi-patch-check-fill"></i>
+                        </button>`;
+
+                        return `
+                            <div class="btn-group">
+                                ${verifyBtn}
+                                <button class="btn btn-sm btn-outline-warning edit-org-btn" data-id="${id}">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-org-btn" data-id="${id}" data-name="${row.name}">
+                                    <i class="bi bi-trash-fill"></i>
+                                </button>
+                            </div>`;
+                    }
+                }
+            ]
+        });
+    };
+
+const initUsersTable = () => {
+    usersDataTable = $('#usersTable').DataTable({
+        responsive: true,
+        processing: true,
+        ajax: (data, callback, settings) => {
+            (async () => {
+                try {
+                    const orgId = $orgFilterSelect.val();
+                    const url = orgId
+                        ? `/api/super-admin/users?organization_id=${orgId}`
+                        : '/api/super-admin/users';
+
+                    const response = await window.authenticatedFetch(url);
+                    const json = await response.json();
+                    if (!response.ok) throw new Error(json.message || 'Failed to load users');
+                    callback({ data: json });
+                } catch (error) {
+                    showMessage(`Could not load users: ${error.message}`, 'danger');
+                    callback({ data: [] });
+                }
+            })();
+
+            // Return an object with an abort method to satisfy DataTables
+            return {
+                abort: () => {}
+            };
+        },
+        columns: [
+            {
+                data: null,
+                title: 'Name & Email',
+                render: (d) => `${d.first_name} ${d.last_name}<br><small class="text-muted">${d.email}</small>`
+            },
+            {
+                data: 'user_type',
+                title: 'Role',
+                render: d => renderBadge(d, 'type')
+            },
+            {
+                data: 'status',
+                title: 'Status',
+                render: d => renderBadge(d, 'status')
+            },
+            {
+                data: 'organization_name',
+                title: 'Organization',
+                defaultContent: 'N/A'
+            },
+            {
+                data: 'id',
+                title: 'Actions',
+                orderable: false,
+                render: (id, _, row) => {
+                    if (row.user_type === 'super_admin') return '';
+                    return `
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info change-status-btn" data-id="${id}" data-name="${row.first_name} ${row.last_name}" data-current-status="${row.status}">
+                                <i class="bi bi-toggles"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning change-type-btn" data-id="${id}" data-name="${row.first_name} ${row.last_name}" data-current-type="${row.user_type}">
+                                <i class="bi bi-person-badge"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-user-btn" data-id="${id}" data-name="${row.first_name} ${row.last_name}" data-email="${row.email}">
+                                <i class="bi bi-trash-fill"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        ]
+    });
+};
+
+const populatePlans = async (selectId = '#newOrgPlanId') => {
+        try {
+            const r = await window.authenticatedFetch('/api/super-admin/plans');
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.message || 'Failed to load plans');
+            const $select = $(selectId).empty().append('<option value="" disabled selected>Select a plan</option>');
+            data.forEach(p => $select.append(new Option(p.name, p.id)));
+        } catch (e) { 
+            showMessage(`Could not load plans: ${e.message}`, 'danger'); 
+        }
+    };
+
+    const populateFilter = async () => {
+        try {
+            const r = await window.authenticatedFetch('/api/super-admin/organizations');
+            const data = await r.json();
+            if (!r.ok) return;
+            const $s = $('#orgFilterSelect').empty().append('<option value="">All Organizations</option>');
+            data.forEach(o => $s.append(new Option(o.name, o.id)));
+        } catch (e) { 
+            console.error('Could not populate filter:', e); 
+        }
+    };
+
+    // --- 3. EVENT HANDLERS ---
+    $createOrgForm.on('submit', async function(e) {
+        e.preventDefault();
+        if (!window.validateForm('#createOrgForm')) return;
+        
+        const $btn = $('#createOrgSubmitBtn');
+        toggleButtonSpinner($btn, true);
+        const payload = {
+            name: $('#newOrgName').val(),
+            code: $('#newOrgCode').val(),
+            plan_id: parseInt($('#newOrgPlanId').val(), 10),
+            main_co_admin_first_name: $('#newAdminFirstName').val(),
+            main_co_admin_last_name: $('#newAdminLastName').val(),
+            main_co_admin_email: $('#newAdminEmail').val(),
+            main_co_admin_password: $('#newAdminPassword').val()
+        };
+        
+        try {
+            const r = await window.authenticatedFetch('/api/super-admin/organizations', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const d = await r.json();
+            
+            if (!r.ok) {
+                throw new Error(d.message || `Server error: ${r.status}`);
+            }
+            
+            showMessage('Organization & Admin created successfully!', 'success');
+            resetCreateForm();
+            organizationsDataTable.ajax.reload();
+            usersDataTable.ajax.reload();
+            populateFilter();
+        } catch (err) {
+            console.error('Create org error:', err); // Debug log
+            showMessage(`Failed to create organization: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    });
+
+    $orgFilterSelect.on('change', () => usersDataTable.ajax.reload());
+
+    // EDIT ORG
+    $('#organizationsTable').on('click', '.edit-org-btn', async function() {
+        const id = $(this).data('id');
+        currentActionTarget = { id };
+        $('#editOrgMessage').empty();
+        try {
+            const r = await window.authenticatedFetch(`/api/super-admin/organizations/${id}`);
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            $('#editOrgId').val(d.id);
+            $('#editOrgName').val(d.name);
+            $('#editOrgCode').val(d.org_code);
+            $('#editOrgStatus').val(d.status);
+            $('#editOrgSubdomain').val(d.subdomain || '');
+            await populatePlans('#editOrgPlan');
+            $('#editOrgPlan').val(d.plan_id);
+            modals.editOrg && modals.editOrg.show();
+        } catch (err) {
+            showMessage(`Could not load organization details: ${err.message}`, 'danger');
+        }
+    });
+
+    $('#confirmUpdateOrgBtn').on('click', async function() {
+        // --- THIS IS THE FIX ---
+        // Add this line to validate the modal's form before proceeding
+        if (!window.validateForm('#editOrgForm')) {
+            return;
+        }
+        // --- END OF FIX ---
+
+        const $btn = $(this);
+        toggleSpinner($btn, true);
+        const id = $('#editOrgId').val();
+        const payload = {
+            name: $('#editOrgName').val(),
+            code: $('#editOrgCode').val(),
+            plan_id: parseInt($('#editOrgPlan').val()),
+            status: $('#editOrgStatus').val(),
+            subdomain: $('#editOrgSubdomain').val().trim() 
+        };
+        try {
+            const r = await window.authenticatedFetch(`/api/super-admin/organizations/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            
+            // Use a toast for better UX
+            window.showToast('Organization updated!', 'success');
+            modals.editOrg.hide();
+            organizationsDataTable.ajax.reload();
+        } catch (err) {
+            // Show the error message inside the modal
+            showMessage(err.message, 'danger', true);
+        } finally {
+            toggleSpinner($btn, false);
+        }
+    });
+
+    // DELETE ORG
+    $('#organizationsTable').on('click', '.delete-org-btn', function() {
+        currentActionTarget = {
+            id: $(this).data('id'),
+            name: $(this).data('name')
+        };
+        $('#deleteOrgName').text(currentActionTarget.name);
+        modals.deleteOrg.show();
+    });
+
+    $('#confirmDeleteOrgBtn').on('click', async function() {
+        const $btn = $(this); 
+        toggleSpinner($btn, true);
+        try {
+            const r = await window.authenticatedFetch(`/api/super-admin/organizations/${currentActionTarget.id}`, { method: 'DELETE' });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            showMessage('Organization deleted successfully.', 'success');
+            modals.deleteOrg.hide();
+            organizationsDataTable.ajax.reload();
+            usersDataTable.ajax.reload();
+            populateFilter();
+        } catch (err) {
+            showMessage(`Failed to delete organization: ${err.message}`, 'danger');
+        } finally {
+            toggleSpinner($btn, false);
+        }
+    });
+
+    // DELETE USER
+    $('#usersTable').on('click', '.delete-user-btn', function() {
+        currentActionTarget = {
+            id: $(this).data('id'),
+            name: $(this).data('name'),
+            email: $(this).data('email')
+        };
+        $('#deleteUserName').text(currentActionTarget.name);
+        $('#deleteUserEmail').text(currentActionTarget.email);
+        modals.deleteUser.show();
+    });
+
+    $('#confirmDeleteUserBtn').on('click', async function() {
+        const $btn = $(this); 
+        toggleSpinner($btn, true);
+        try {
+            const r = await window.authenticatedFetch(`/api/super-admin/users/${currentActionTarget.id}`, { method: 'DELETE' });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            showMessage('User deleted successfully.', 'success');
+            modals.deleteUser.hide();
+            usersDataTable.ajax.reload();
+            organizationsDataTable.ajax.reload();
+        } catch (err) {
+            showMessage(`Failed to delete user: ${err.message}`, 'danger');
+        } finally {
+            toggleSpinner($btn, false);
+        }
+    });
+
+    // CHANGE STATUS
+    $('#usersTable').on('click', '.change-status-btn', function() {
+        currentActionTarget = {
+            id: $(this).data('id'),
+            name: $(this).data('name')
+        };
+        $('#statusChangeUserName').text(currentActionTarget.name);
+        $('#newUserStatus').val($(this).data('current-status'));
+        modals.changeStatus.show();
+    });
+
+    $('#confirmChangeUserStatusBtn').on('click', async function() {
+        const $btn = $(this); 
+        toggleSpinner($btn, true);
+        try {
+            const st = $('#newUserStatus').val();
+            const r = await window.authenticatedFetch(`/api/super-admin/users/${currentActionTarget.id}/status`, {
+                method: 'PUT', 
+                body: { status: st }
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            showMessage('User status updated successfully.', 'success');
+            modals.changeStatus.hide();
+            usersDataTable.ajax.reload();
+        } catch (err) {
+            showMessage(`Failed to update user status: ${err.message}`, 'danger');
+        } finally {
+            toggleSpinner($btn, false);
+        }
+    });
+
+    // CHANGE TYPE
+    $('#usersTable').on('click', '.change-type-btn', function() {
+        currentActionTarget = {
+            id: $(this).data('id'),
+            name: $(this).data('name')
+        };
+        $('#typeChangeUserName').text(currentActionTarget.name);
+        $('#typeChangeCurrentUserType').text(
+            $(this).data('current-type').replace(/_/g, ' ')
+        );
+        $('#newUserType').val($(this).data('current-type'));
+        modals.changeType.show();
+    });
+
+        $('#organizationsTable').on('click', '.toggle-verify-btn', async function() {
+        const orgId = $(this).data('id');
+        const orgName = $(this).data('name');
+        
+        if (!confirm(`Are you sure you want to change the verification status for "${orgName}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await window.authenticatedFetch(`/api/super-admin/organizations/${orgId}/toggle-verification`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            window.showToast(data.message, 'success');
+            organizationsDataTable.ajax.reload();
+        } catch (error) {
+            window.showToast(`Update failed: ${error.message}`, 'danger');
+        }
+    });
+
+    $('#confirmChangeUserTypeBtn').on('click', async function() {
+        const $btn = $(this); 
+        toggleSpinner($btn, true);
+        try {
+            const t = $('#newUserType').val();
+            const r = await window.authenticatedFetch(`/api/super-admin/users/${currentActionTarget.id}/type`, {
+                method: 'PUT', 
+                body: { user_type: t }
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.message);
+            showMessage('User type updated successfully.', 'success');
+            modals.changeType.hide();
+            usersDataTable.ajax.reload();
+        } catch (err) {
+            showMessage(`Failed to update user type: ${err.message}`, 'danger');
+        } finally {
+            toggleSpinner($btn, false);
+        }
+    });
+
+    // --- 4. INITIALIZATION ---
+    populatePlans();
+    populateFilter();
+    initOrgsTable();
+    initUsersTable();
+};
+</script>
+{% endblock body_extra %}

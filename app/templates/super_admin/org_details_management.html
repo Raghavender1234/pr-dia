@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Manage {{ org.name }} – {{ super() }}{% endblock title %}
+
+{% block head_extra %}
+<style>
+  .stat-card-sm {
+    border: none;
+    border-left: 4px solid var(--bs-primary);
+  }
+  .stat-card-sm .bi {
+    opacity: 0.6;
+  }
+</style>
+{% endblock head_extra %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('frontend.super_admin_dashboard') }}">Super Admin</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('frontend.org_user_global_management') }}">Organizations</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Manage: <span id="orgNameBreadcrumb">{{ org.name }}</span></li>
+        </ol>
+    </nav>
+    
+    <h1 class="h2 mb-4">Manage Organization</h1>
+
+    <div id="pageMessage" class="mb-4"></div>
+
+    <div id="page-loading" class="text-center py-5">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+        <p class="mt-2 lead">Loading Organization Details...</p>
+    </div>
+
+    <div id="page-content" class="d-none">
+        <div class="row g-4 mb-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow-sm stat-card-sm h-100" style="border-left-color: var(--bs-indigo);">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="bi bi-award-fill fs-2 text-indigo me-3"></i>
+                        <div>
+                            <h6 class="text-uppercase text-muted small mb-1">Plan</h6>
+                            <h5 id="statPlanName" class="fw-bold mb-0">—</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow-sm stat-card-sm h-100" style="border-left-color: var(--bs-success);">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill fs-2 text-success me-3"></i>
+                        <div>
+                            <h6 class="text-uppercase text-muted small mb-1">Status</h6>
+                            <h5 id="statStatus" class="fw-bold mb-0">—</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow-sm stat-card-sm h-100" style="border-left-color: var(--bs-primary);">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="bi bi-people-fill fs-2 text-primary me-3"></i>
+                        <div>
+                            <h6 class="text-uppercase text-muted small mb-1">Students</h6>
+                            <h5 id="statStudentCount" class="fw-bold mb-0">—</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="card shadow-sm stat-card-sm h-100" style="border-left-color: var(--bs-info);">
+                    <div class="card-body d-flex align-items-center">
+                        <i class="bi bi-person-workspace fs-2 text-info me-3"></i>
+                        <div>
+                            <h6 class="text-uppercase text-muted small mb-1">Co-Admins</h6>
+                            <h5 id="statCoAdminCount" class="fw-bold mb-0">—</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0"><i class="bi bi-pencil-square me-2 text-primary"></i>Edit Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="orgDetailsForm">
+                            <div class="mb-3">
+                                <label for="orgNameInput" class="form-label fw-bold">Organization Name</label>
+                                <input type="text" class="form-control" id="orgNameInput" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="orgCodeInput" class="form-label fw-bold">Organization Code</label>
+                                <input type="text" class="form-control" id="orgCodeInput" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="orgPlanSelect" class="form-label fw-bold">Subscription Plan</label>
+                                <select class="form-select" id="orgPlanSelect" required></select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="orgStatusSelect" class="form-label fw-bold">Status</label>
+                                <select class="form-select" id="orgStatusSelect" required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="pending_payment">Pending Payment</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="saveOrgChangesBtn">
+                                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                Save Changes
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="mb-0"><i class="bi bi-people-fill me-2 text-success"></i>Organization Members (<span id="memberCount">0</span>)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="membersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>  
+</div>
+{% endblock content %}
+{% include 'super_admin/_modals.html' %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function() {
+    const orgId = "{{ org.id }}";
+    const $pageMessage = $('#pageMessage');
+    // Initialize the new modal
+    const editUserModal = new bootstrap.Modal(document.getElementById('editUserModal'));
+
+    const renderBadge = (text, type = 'status') => {
+        const statusMap = { 'active': 'bg-success', 'inactive': 'bg-secondary', 'pending_payment': 'bg-warning text-dark' };
+        const roleMap = { 'main_co_admin': 'bg-primary', 'co_admin': 'bg-info', 'student': 'bg-light text-dark' };
+        const map = type === 'status' ? statusMap : roleMap;
+        const cssClass = map[text] || 'bg-secondary';
+        return `<span class="badge ${cssClass} text-capitalize">${(text || '').replace(/_/g, ' ')}</span>`;
+    };
+    
+    const showMessage = (msg, type='info') => {
+        $pageMessage.html(`<div class="alert alert-${type} alert-dismissible fade show" role="alert">${msg}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`);
+        window.showToast(msg, type); // Use global toast helper
+    };
+    
+    async function fetchOrgDetails() {
+        try {
+            const [orgRes, plansRes] = await Promise.all([
+                window.authenticatedFetch(`/api/super-admin/organizations/${orgId}`),
+                window.authenticatedFetch('/api/super-admin/plans')
+            ]);
+            const orgData = await orgRes.json();
+            const plansData = await plansRes.json();
+            if (!orgRes.ok) throw new Error(orgData.message);
+            if (!plansRes.ok) throw new Error(plansData.message);
+
+            // Populate Stats and Forms (same as before)
+            $('#statPlanName').text(orgData.plan_name || 'N/A');
+            $('#statStatus').html(renderBadge(orgData.status, 'status'));
+            $('#statStudentCount').text(orgData.current_student_count);
+            $('#statCoAdminCount').text(orgData.current_coadmin_count);
+            $('#orgNameBreadcrumb').text(orgData.name);
+            $('#orgNameInput').val(orgData.name);
+            $('#orgCodeInput').val(orgData.org_code);
+            $('#orgStatusSelect').val(orgData.status);
+            const $planSel = $('#orgPlanSelect').empty();
+            plansData.forEach(p => $planSel.append(new Option(p.name, p.id)));
+            $planSel.val(orgData.plan_id);
+
+            // Populate Members table with functional buttons
+            $('#memberCount').text(orgData.members.length);
+            const $tbody = $('#membersTable tbody').empty();
+            if (orgData.members.length) {
+                orgData.members.forEach(m => {
+                    $tbody.append(`
+                        <tr>
+                            <td>${m.full_name}<small class="d-block text-muted">${m.email}</small></td>
+                            <td>${renderBadge(m.user_type, 'role')}</td>
+                            <td>${renderBadge(m.status, 'status')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary edit-member-btn" title="Edit User" data-user-id="${m.user_id}">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `);
+                });
+            } else {
+                $tbody.append('<tr><td colspan="4" class="text-center text-muted">No members found.</td></tr>');
+            }
+
+            $('#page-loading').hide();
+            $('#page-content').removeClass('d-none');
+        } catch (err) {
+            $('#page-loading').hide();
+            showMessage(`Error loading details: ${err.message}`, 'danger');
+        }
+    }
+
+    // --- NEW: Event listener for clicking the new "Edit User" button ---
+    $('#membersTable').on('click', '.edit-member-btn', async function() {
+        const userId = $(this).data('user-id');
+        $('#editUserMessage').empty();
+        $('#editUserForm')[0].reset();
+
+        try {
+            const res = await window.authenticatedFetch(`/api/super-admin/users/${userId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            // Populate the Edit User modal with the fetched data
+            $('#editUserId').val(data.id);
+            $('#editUserFirstName').val(data.first_name);
+            $('#editUserLastName').val(data.last_name);
+            $('#editUserEmail').val(data.email);
+            
+            editUserModal.show(); // Show the modal
+        } catch (err) {
+            showMessage(`Error loading user details: ${err.message}`, 'danger');
+        }
+    });
+
+    // --- NEW: Event listener for the "Save Changes" button inside the Edit User modal ---
+    $('#confirmUpdateUserBtn').on('click', async function() {
+        const $btn = $(this);
+        const userId = $('#editUserId').val();
+        
+        const payload = {
+            first_name: $('#editUserFirstName').val(),
+            last_name: $('#editUserLastName').val(),
+            email: $('#editUserEmail').val()
+        };
+
+        $btn.prop('disabled', true).find('span').removeClass('d-none');
+
+        try {
+            const res = await window.authenticatedFetch(`/api/super-admin/users/${userId}`, {
+                method: 'PUT',
+                body: payload
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            showMessage('User updated successfully!', 'success');
+            editUserModal.hide();
+            fetchOrgDetails(); // Refresh the page data to show the changes in the table
+        } catch (err) {
+            $('#editUserMessage').html(`<div class="alert alert-danger">${err.message}</div>`);
+        } finally {
+            $btn.prop('disabled', false).find('span').addClass('d-none');
+        }
+    });
+
+    $('#orgDetailsForm').on('submit', async function(e) {
+        e.preventDefault();
+        const $btn = $('#saveOrgChangesBtn')
+          .prop('disabled', true)
+          .html('<span class="spinner-border spinner-border-sm"></span> Saving…');
+
+        const payload = {
+            name:    $('#orgNameInput').val(),
+            code:    $('#orgCodeInput').val(),
+            plan_id: parseInt($('#orgPlanSelect').val()),
+            status:  $('#orgStatusSelect').val()
+        };
+
+        try {
+            const resp = await window.authenticatedFetch(
+              `/api/super-admin/organizations/${orgId}`,
+              { method:'PUT', body: payload}
+            );
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.message);
+
+            showMessage('Organization updated successfully!', 'success');
+            $('#orgNameBreadcrumb').text(payload.name);
+            $('#statPlanName').text($('#orgPlanSelect option:selected').text());
+            $('#statStatus').html(renderBadge(payload.status));
+        } catch (err) {
+            showMessage(`Update failed: ${err.message}`, 'danger');
+        } finally {
+            $btn.prop('disabled', false).text('Save Changes');
+        }
+    });
+
+    fetchOrgDetails();
+});
+</script>
+{% endblock body_extra %}
+
+
+

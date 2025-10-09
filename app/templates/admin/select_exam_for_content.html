@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Select Exam to Manage - DIA{% endblock %}
+
+{% block head_extra %}
+<style>
+    .page-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1.5rem 0;
+        margin-bottom: 2rem;
+    }
+    
+    .card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .card-header {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 1rem 1.5rem;
+    }
+    
+    .card-body {
+        padding: 1.5rem;
+    }
+    
+    .alert {
+        border-radius: 6px;
+        border: none;
+        padding: 0.75rem 1rem;
+    }
+    
+    .exam-card {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+    
+    .exam-card:hover {
+        border-color: #0d6efd;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-1px);
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .exam-card:active {
+        transform: translateY(0);
+    }
+    
+    .exam-title {
+        color: #0d6efd;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .exam-description {
+        color: #6c757d;
+        margin-bottom: 0.5rem;
+    }
+    
+    .exam-meta {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+    
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+    }
+    
+    .no-exams-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+    }
+    
+    .no-exams-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .loading-state {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+    
+    .error-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #dc3545;
+    }
+    
+    .error-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+    
+    .spinner-border {
+        width: 2rem;
+        height: 2rem;
+    }
+    
+    .breadcrumb {
+        background: transparent;
+        padding: 0;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ g.user_context.dashboard_url or url_for('frontend.index', **org_param) }}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Content Management</li>
+        </ol>
+    </nav>
+
+    <div class="page-header">
+        <div class="text-center">
+            <h1 class="h3 mb-1">Content Management</h1>
+            <p class="text-muted mb-0">Choose an exam to begin managing its subjects and content</p>
+        </div>
+    </div>
+
+    <div id="pageMessage" class="mb-3"></div>
+
+    <div class="card" style="max-width: 900px; margin: 0 auto;">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-collection-fill me-2"></i>Select an Exam
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- Loading State -->
+            <div id="examsLoading" class="loading-state">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 mb-0">Loading exams...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="examsError" class="error-state d-none">
+                <i class="bi bi-exclamation-triangle"></i>
+                <h5>Error Loading Exams</h5>
+                <p class="mb-3">Unable to load exams at this time.</p>
+                <button class="btn btn-outline-primary" onclick="window.location.reload()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Retry
+                </button>
+            </div>
+
+            <!-- No Data State -->
+            <div id="examsNoData" class="no-exams-state d-none">
+                <i class="bi bi-journal-plus"></i>
+                <h5>No Exams Available</h5>
+                <p>Once a Main Co-Admin creates an exam, it will appear here for content management.</p>
+            </div>
+
+            <!-- Exams List -->
+            <div id="examsList" class="d-none">
+                <!-- Exam cards will be populated here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function() {
+    const $pageMessage = $('#pageMessage');
+    const $loading = $('#examsLoading');
+    const $error = $('#examsError');
+    const $noData = $('#examsNoData');
+    const $list = $('#examsList');
+
+    const showMessage = (message, type = 'danger') => {
+        $pageMessage.html(`
+            <div class="alert alert-${type} alert-dismissible fade show">
+                <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                ${message}
+                <button class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+    };
+
+    const fetchExamsForSelection = async () => {
+        $loading.show();
+        $error.hide();
+        $noData.hide();
+        $list.hide().empty();
+
+        try {
+            const response = await window.authenticatedFetch('/api/main-co-admin/exams');
+            const exams = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(exams.message || 'Failed to fetch exams.');
+            }
+
+            if (exams.length > 0) {
+                exams.forEach(exam => {
+                    const subjectManagementUrl = "{{ url_for('frontend.subject_management', exam_id=0) }}".replace('0', exam.id);
+                    const examCardHtml = `
+                        <a href="${subjectManagementUrl}" class="exam-card">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="exam-title mb-0">${exam.name}</h5>
+                                <span class="badge bg-${exam.is_free ? 'success' : 'secondary'}">
+                                    ${exam.is_free ? 'Free' : 'Paid'}
+                                </span>
+                            </div>
+                            <p class="exam-description mb-2">${exam.description || 'No description provided.'}</p>
+                            <div class="exam-meta">
+                                <i class="bi bi-arrow-right-circle me-1"></i>
+                                Click to manage subjects and topics
+                            </div>
+                        </a>
+                    `;
+                    $list.append(examCardHtml);
+                });
+                $list.show();
+            } else {
+                $noData.show();
+            }
+        } catch (err) {
+            console.error('Error fetching exams:', err);
+            $error.show();
+            showMessage(`An error occurred: ${err.message}`);
+        } finally {
+            $loading.hide();
+        }
+    };
+
+    // Initialize
+    fetchExamsForSelection();
+});
+</script>
+{% endblock %}

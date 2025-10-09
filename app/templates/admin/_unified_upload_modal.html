@@ -1,0 +1,124 @@
+<div class="modal fade" id="unifiedUploadModal" tabindex="-1" aria-labelledby="unifiedUploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="unifiedUploadModalLabel"><i class="bi bi-upload me-2"></i>Upload File to S3</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Upload a file to get a secure S3 link. You can then copy this link and paste it into your content editor.</p>
+        
+        <form id="unifiedUploadModalForm">
+            <div class="input-group">
+                <input class="form-control" type="file" id="unifiedFileInput" accept="image/*,video/*,application/pdf" required>
+                <button class="btn btn-primary" type="submit" id="modalUploadBtn">
+                    <span class="spinner-border spinner-border-sm d-none me-1"></span>
+                    <i class="bi bi-upload me-1"></i> Upload
+                </button>
+            </div>
+        </form>
+
+        <div id="uploadResult" class="mt-3" style="display: none;">
+            <div class="alert alert-success d-flex align-items-center">
+                <div class="flex-grow-1">
+                    <strong>Success!</strong> File URL copied to clipboard.
+                    <input type="text" id="fileUrlResult" class="form-control form-control-sm mt-2" readonly>
+                </div>
+                <button class="btn btn-outline-secondary ms-2" id="copyUrlBtn"><i class="bi bi-clipboard"></i></button>
+            </div>
+        </div>
+        <div id="uploadError" class="mt-3 alert alert-danger" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('unifiedUploadModalForm');
+    const fileInput = document.getElementById('unifiedFileInput');
+    const uploadBtn = document.getElementById('modalUploadBtn');
+    const uploadResult = document.getElementById('uploadResult');
+    const fileUrlResult = document.getElementById('fileUrlResult');
+    const copyUrlBtn = document.getElementById('copyUrlBtn');
+    const uploadError = document.getElementById('uploadError');
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const file = fileInput.files[0];
+        if (!file) {
+            return;
+        }
+
+        let endpoint = '';
+        let fieldName = 'file';
+        const fileType = file.type;
+        if (fileType.startsWith('image/')) {
+            endpoint = '/api/main-co-admin/image-upload';
+            fieldName = 'image_file';
+        } else if (fileType.startsWith('video/')) {
+            endpoint = '/api/main-co-admin/upload/video';
+        } else if (fileType === 'application/pdf') {
+            endpoint = '/api/main-co-admin/upload/pdf';
+        } else {
+            showError('Unsupported file type.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append(fieldName, file);
+
+        showLoading(true);
+
+        window.authenticatedFetch(endpoint, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // The image upload endpoint returns 'image_url'
+            const url = data.url || data.image_url;
+            if (url) {
+                showResult(url);
+                navigator.clipboard.writeText(url);
+            } else {
+                showError(data.message || 'An unknown error occurred.');
+            }
+        })
+        .catch(error => {
+            showError('Upload failed. Please try again.');
+            console.error('Upload error:', error);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    });
+
+    copyUrlBtn.addEventListener('click', function() {
+        navigator.clipboard.writeText(fileUrlResult.value);
+    });
+
+    function showLoading(isLoading) {
+        const spinner = uploadBtn.querySelector('.spinner-border');
+        if (isLoading) {
+            uploadBtn.disabled = true;
+            spinner.classList.remove('d-none');
+        } else {
+            uploadBtn.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    }
+
+    function showResult(url) {
+        fileUrlResult.value = url;
+        uploadResult.style.display = 'block';
+        uploadError.style.display = 'none';
+    }
+
+    function showError(message) {
+        uploadError.textContent = message;
+        uploadError.style.display = 'block';
+        uploadResult.style.display = 'none';
+    }
+});
+</script>

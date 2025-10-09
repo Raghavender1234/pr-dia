@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}AI Tutor Session - {{ subject.name }}{% endblock %}
+
+{% block head_extra %}
+<style>
+
+  main.flex-grow-1 { padding: 0 !important; margin: 0 !important; max-width: 100vw !important; }
+
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: #f8f9fa;
+  }
+  .chat-header {
+    flex-shrink: 0;
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+  }
+  .chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  .chat-input-area {
+    flex-shrink: 0;
+    background-color: #fff;
+    border-top: 1px solid #dee2e6;
+  }
+  .message-bubble {
+    max-width: 75%;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    margin-bottom: 0.5rem;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+  .user-message {
+    background-color: var(--bs-primary);
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 0.25rem;
+  }
+  .ai-message {
+    background-color: #e9ecef;
+    color: #212529;
+    margin-right: auto;
+    border-bottom-left-radius: 0.25rem;
+  }
+  .typing-indicator span {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    background-color: #6c757d;
+    animation: typing 1s infinite ease-in-out;
+  }
+  .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing { 0%,100%{opacity:.3} 50%{opacity:1} }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+
+<div class="chat-container">
+  <div class="chat-header p-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h5 class="mb-0">AI Tutor</h5>
+        <p class="mb-0 text-muted small">
+          Studying: <strong>{{ subject.name }}</strong> (from Exam: {{ exam.name }})
+        </p>
+      </div>
+      <a href="{{ url_for('frontend.student_learn_with_ai', **org_param) }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-x-lg"></i> End Session
+      </a>
+    </div>
+  </div>
+
+  <div class="chat-messages" id="chat-messages">
+    <div class="message-bubble ai-message">
+      Hello {{ g.user_context.user_name }}! I'm your AI tutor. We're focusing on <strong>{{ subject.name }}</strong> for the <strong>{{ exam.name }}</strong> exam. How can I help you today?
+    </div>
+  </div>
+
+  <div class="chat-input-area p-3">
+    <div id="aiChatError" class="mb-2"></div>
+    <form id="chatForm">
+      <div class="input-group">
+        <input type="text" id="userInput" class="form-control form-control-lg" placeholder="Ask a question about {{ subject.name }}..." autocomplete="off" required>
+        <button class="btn btn-outline-info" type="button" id="generateQuestionsBtn" title="Generate practice questions based on this conversation">
+          <i class="bi bi-magic"></i>
+        </button>
+        <button class="btn btn-primary" type="submit" id="sendBtn">
+          <i class="bi bi-send-fill"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Generated Questions -->
+<div class="modal fade" id="generatedQuestionsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-dark">
+        <h5 class="modal-title"><i class="bi bi-magic me-2"></i>AI-Generated Practice Questions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="ai-q-loading" class="text-center py-5">
+          <div class="spinner-border text-info" role="status"></div>
+          <p class="mt-2">Generating questions based on our chat...</p>
+        </div>
+        <div id="ai-q-content"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function() {
+  const examName = {{ exam.name|tojson }};
+  const subjectName = {{ subject.name|tojson }};
+  const defaultTopic = {{ (topic_id or '')|tojson }};
+  let chatHistory    = [];
+
+  const $chatMessages  = $('#chat-messages');
+  const $chatForm      = $('#chatForm');
+  const $userInput     = $('#userInput');
+  const $sendBtn       = $('#sendBtn');
+  const $errorBox      = $('#aiChatError');
+  const $genBtn        = $('#generateQuestionsBtn');
+
+  const genModal       = new bootstrap.Modal(document.getElementById('generatedQuestionsModal'));
+  const $genLoading    = $('#ai-q-loading');
+  const $genContent    = $('#ai-q-content');
+
+  // Utility: basic escape to avoid injecting HTML when we format with <br>
+  function escapeHTML(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function addMessageToUI(role, message) {
+    const msgClass = role === 'user' ? 'user-message' : 'ai-message';
+
+    // render safely + preserve newlines
+    const bubble = $('<div/>').addClass(`message-bubble ${msgClass}`);
+    const safe = escapeHTML(message).replace(/\n/g, '<br>');
+    bubble.html(safe);
+
+    $chatMessages.append(bubble);
+    $chatMessages.scrollTop($chatMessages[0].scrollHeight);
+
+    // MathJax typesetting for AI replies
+    if (role !== 'user' && window.typesetMath) {
+      window.typesetMath(bubble[0]);
+    }
+  }
+
+  function showTyping(show) {
+    $('.typing-indicator').remove();
+    if (show) {
+      $chatMessages.append(`
+        <div class="message-bubble ai-message typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+      `);
+      $chatMessages.scrollTop($chatMessages[0].scrollHeight);
+    }
+  }
+
+  function parseAIQuestions(text) {
+    const questions = [];
+    const blocks = text.split(/\n\s*\d+\.\s/);
+    blocks.forEach(block => {
+      if (!block.trim()) return;
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 5) return;
+
+      const q = { question_text: lines[0], options: [] };
+      lines.slice(1,5).forEach(line => {
+        const idx = line.indexOf(')');
+        let opt = idx > -1 ? line.slice(idx+1).trim() : line.trim();
+        let correct = false;
+        if (/\*\s*$/.test(opt)) { opt = opt.replace(/\*\s*$/, '').trim(); correct = true; }
+        q.options.push({ text: opt, is_correct: correct });
+      });
+      questions.push(q);
+    });
+    return questions;
+  }
+
+  function renderAIQuestions(questions) {
+    $genContent.empty();
+    if (!questions.length) {
+      $genContent.html('<div class="alert alert-warning">The AI did not return questions in a valid format. Please try again.</div>');
+      return;
+    }
+    questions.forEach((q, i) => {
+      const $card = $(`
+        <div class="card mb-3">
+          <div class="card-body">
+            <p class="fw-bold">${i+1}. ${escapeHTML(q.question_text)}</p>
+            <ul class="list-group list-group-flush"></ul>
+          </div>
+          <div class="card-footer text-end">
+            <button class="btn btn-sm btn-success save-ai-question-btn">
+              <i class="bi bi-save"></i> Save to Practice Questions
+            </button>
+          </div>
+        </div>
+      `);
+      const $ul = $card.find('ul');
+      q.options.forEach(opt => {
+        $ul.append(`<li class="list-group-item ${opt.is_correct?'list-group-item-success':''}">${escapeHTML(opt.text)}</li>`);
+      });
+      $card.data('question', q);
+      $genContent.append($card);
+    });
+    if (window.typesetMath) window.typesetMath($genContent[0]);
+  }
+
+  // Initial typeset of the greeting
+  if (window.typesetMath) window.typesetMath(document.getElementById('chat-messages'));
+
+  // ---------- 2) Chat submit ----------
+  $chatForm.on('submit', async function(e) {
+    e.preventDefault();
+    const userMsg = $userInput.val().trim();
+    if (!userMsg) return;
+
+    addMessageToUI('user', userMsg);
+    chatHistory.push({ role: 'user', content: userMsg });
+
+    $userInput.val('').prop('disabled', true);
+    $sendBtn.prop('disabled', true);
+    $errorBox.empty();
+    showTyping(true);
+
+    try {
+      const res = await window.authenticatedFetch('/api/ai/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          exam_name: examName,
+          subject_name: subjectName,
+          message: userMsg,
+          history: chatHistory.slice(0, -1)
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'AI chat failed');
+      addMessageToUI('assistant', json.reply || '');
+      chatHistory.push({ role: 'assistant', content: json.reply || '' });
+    } catch (err) {
+      $errorBox.html(`<div class="alert alert-danger alert-sm">${escapeHTML(err.message)}</div>`);
+    } finally {
+      showTyping(false);
+      $userInput.prop('disabled', false).focus();
+      $sendBtn.prop('disabled', false);
+    }
+  });
+
+  // ---------- 3) Generate practice from chat ----------
+  $genBtn.on('click', async function() {
+    if (chatHistory.length < 2) {
+      alert('Have a brief conversation first, then generate practice.');
+      return;
+    }
+    $genContent.empty(); $genLoading.show(); genModal.show();
+
+    try {
+      const res = await window.authenticatedFetch('/api/ai/generate-practice-from-chat', {
+        method: 'POST',
+        body: JSON.stringify({ history: chatHistory, subject_name: subjectName })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Failed to generate');
+
+      const parsed = parseAIQuestions(json.generated_questions || '');
+      renderAIQuestions(parsed);
+    } catch (err) {
+      $genContent.html(`<div class="alert alert-danger">${escapeHTML(err.message)}</div>`);
+    } finally {
+      $genLoading.hide();
+    }
+  });
+
+  // ---------- 4) Save generated question ----------
+  $('#ai-q-content').on('click', '.save-ai-question-btn', async function() {
+    const $btn = $(this);
+    const data = $btn.closest('.card').data('question');
+
+    if (!defaultTopic) {
+      alert('No default topic available for this subject.');
+      return;
+    }
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Saving...');
+    try {
+      const payload = { ...data, topic_id: defaultTopic };
+      const res = await window.authenticatedFetch('/api/ai/save-generated-question', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Save failed');
+
+      $btn.removeClass('btn-success').addClass('btn-secondary disabled')
+          .html('<i class="bi bi-check-circle-fill"></i> Saved!');
+    } catch (err) {
+      alert(`Error: ${err.message}`);
+      $btn.prop('disabled', false).html('<i class="bi bi-save"></i> Save to Practice Questions');
+    }
+  });
+});
+</script>
+{% endblock %}

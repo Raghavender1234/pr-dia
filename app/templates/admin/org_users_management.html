@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Organization Users - {{ super() }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid py-4">
+    <div class="text-center">
+        <h1 class="h2 mb-2">Organization User Management</h1>
+        <p class="lead text-muted mb-4">Invite new co-admins or students and manage existing user accounts.</p>
+    </div>
+    <div id="pageMessage" class="mb-4"></div>
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-white py-3">
+            <h5 class="mb-0"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Invite New User</h5>
+        </div>
+        <div class="card-body p-4">
+            <form id="inviteUserForm" novalidate>
+                 <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="inviteEmail" class="form-label fw-bold">User Email <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="email" class="form-control" id="inviteEmail" required placeholder="Enter email to check or invite...">
+                            <span class="input-group-text d-none" id="email-check-spinner"><div class="spinner-border spinner-border-sm"></div></span>
+                        </div>
+                        <small id="email-status-msg" class="form-text mt-1 d-block"></small>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="inviteUserType" class="form-label fw-bold">User Role <span class="text-danger">*</span></label>
+                        <select class="form-select" id="inviteUserType" required>
+                            <option value="" disabled selected>Select a role...</option>
+                            <option value="co_admin">Co-Admin (Teacher)</option>
+                            <option value="student">Student</option>
+                        </select>
+                    </div>
+                    <div id="newUserDetails" class="row g-3 d-none mt-2 ps-2 pe-2">
+                         <div class="col-md-6"><label for="inviteFirstName" class="form-label fw-bold">First Name <span class="text-danger">*</span></label><input type="text" class="form-control" id="inviteFirstName" required></div>
+                        <div class="col-md-6"><label for="inviteLastName" class="form-label fw-bold">Last Name <span class="text-danger">*</span></label><input type="text" class="form-control" id="inviteLastName" required></div>
+                        <div class="col-12"><label for="invitePassword" class="form-label fw-bold">Set Initial Password <span class="text-danger">*</span></label><input type="password" class="form-control" id="invitePassword" required></div>
+                    </div>
+                    <div class="col-12 mt-4"><button type="submit" class="btn btn-primary" id="inviteUserSubmitBtn" disabled><span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span><span class="button-text">Send Invitation</span></button></div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3"><h5 class="mb-0"><i class="bi bi-people-fill me-2 text-success"></i>Existing Users in Your Organization</h5></div>
+        <div class="card-body"><div class="table-responsive"><table class="table table-hover table-striped" id="usersTable" width="100%"></table></div></div>
+    </div>
+</div>
+{% include 'admin/_org_users_modals.html' %} 
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function () {
+    // --- 1. SETUP ---
+    const $pageMessage = $('#pageMessage');
+    const $inviteForm = $('#inviteUserForm');
+    const $submitBtn = $('#inviteUserSubmitBtn');
+    const $emailInput = $('#inviteEmail');
+    const $newUserDetails = $('#newUserDetails');
+    const $emailStatusMsg = $('#email-status-msg');
+    const $usersTable = $('#usersTable');
+    let usersDataTable, currentUserId = null, userExists = false;
+
+    const modals = {
+        changeStatus: new bootstrap.Modal($('#changeUserStatusModal')[0]),
+        removeUser: new bootstrap.Modal($('#deleteUserConfirmModal')[0])
+    };
+    
+    // --- 2. HELPER FUNCTIONS ---
+    const showMessage = (message, type = 'info') => {
+        $pageMessage.html(`<div class="alert alert-${type} alert-dismissible fade show">${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`);
+        window.scrollTo(0, 0);
+    };
+
+    const toggleButtonSpinner = ($btn, show) => {
+        $btn.prop('disabled', show);
+        $btn.find('.spinner-border').toggleClass('d-none', !show);
+    };
+    
+    const renderBadge = (text, type) => {
+        const map = {
+            status: { active: 'bg-success', inactive: 'bg-danger' },
+            type: { main_co_admin: 'bg-primary', co_admin: 'bg-info text-dark', student: 'bg-secondary' }
+        };
+        const cssClass = (map[type] && map[type][text]) || 'bg-light text-dark';
+        return `<span class="badge ${cssClass} text-capitalize">${(text || 'N/A').replace(/_/g, ' ')}</span>`;
+    };
+
+    // --- 3. DATATABLE INITIALIZATION ---
+    const initUsersTable = () => {
+        usersDataTable = $usersTable.DataTable({
+            responsive: true,
+            processing: true,
+            ajax: (data, callback, settings) => {
+                (async () => {
+                    try {
+                        const res = await window.authenticatedFetch('/api/main-co-admin/organization/users');
+                        const json = await res.json();
+                        if (!res.ok) throw new Error(json.message);
+                        callback({ data: json });
+                    } catch (err) {
+                        showMessage(`Could not load users: ${err.message}`, 'danger');
+                        callback({ data: [] });
+                    }
+                })();
+                return { abort: () => {} };
+            },
+            columns: [
+                { data: null, title: 'Name', render: (data, type, row) => `${row.first_name} ${row.last_name}` },
+                { data: 'email', title: 'Email' },
+                { data: 'user_type', title: 'Role', render: (data) => renderBadge(data, 'type') },
+                { data: 'status', title: 'Status', render: (data) => renderBadge(data, 'status') },
+                { data: 'joined_at_org', title: 'Joined On', render: (data) => data ? new Date(data).toLocaleDateString() : 'N/A' },
+                {data: 'id', title: 'Actions', orderable: false, render: (id, type, row) => {
+            if (row.user_type === 'main_co_admin') {
+                return '<span class="text-muted small">Not Modifiable</span>';
+            }
+
+            const changeStatusBtn = `<button class="btn btn-sm btn-outline-info change-status-btn" data-id="${id}" data-name="${row.first_name} ${row.last_name}" data-status="${row.status}"><i class="bi bi-toggles"></i></button>`;
+            
+            // --- THIS IS THE NEW LOGIC ---
+            // Check if the user is inactive.
+            const isInactive = row.status === 'inactive';
+            
+            // Conditionally add the 'disabled' attribute and a helpful tooltip if the user is not inactive.
+            const removeUserBtn = `<button 
+                class="btn btn-sm btn-outline-danger remove-user-btn" 
+                data-id="${id}" 
+                data-name="${row.first_name} ${row.last_name}" 
+                data-email="${row.email}"
+                ${isInactive ? '' : 'disabled title="User must be inactive to be removed"'}
+            ><i class="bi bi-person-x-fill"></i></button>`;
+
+            return `<div class="btn-group">${changeStatusBtn}${removeUserBtn}</div>`;
+        }
+    }
+],
+
+            order: [[4, "desc"]]
+        });
+    };
+
+    // --- 4. EVENT HANDLERS ---
+    
+    // Smart Invite Form Logic
+    let debounceTimer;
+    $emailInput.on('keyup', function() {
+        clearTimeout(debounceTimer);
+        const email = $(this).val().trim();
+        $newUserDetails.addClass('d-none');
+        $submitBtn.prop('disabled', true);
+        $emailStatusMsg.text('').removeClass('text-success text-danger text-info');
+        
+        if (email.length < 5 || !email.includes('@')) {
+            $('#email-check-spinner').addClass('d-none');
+            return;
+        }
+        $('#email-check-spinner').removeClass('d-none');
+        
+        debounceTimer = setTimeout(async () => {
+            try {
+                const res = await window.authenticatedFetch('/api/main-co-admin/users/check-existence', { method: 'POST', body: JSON.stringify({ email }) });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message);
+
+                userExists = data.exists;
+                if (userExists) {
+                    $emailStatusMsg.text('This user already exists. They will be invited to join.').addClass('text-success');
+                    $newUserDetails.addClass('d-none');
+                } else {
+                    $emailStatusMsg.text('This is a new user. Please provide their details.').addClass('text-info');
+                    $newUserDetails.removeClass('d-none');
+                }
+                $submitBtn.prop('disabled', false); // Enable the button after check is complete
+            } catch (err) {
+                $emailStatusMsg.text(`Error: ${err.message}`).addClass('text-danger');
+            } finally {
+                $('#email-check-spinner').addClass('d-none');
+            }
+        }, 500);
+    });
+
+
+    // --- 4. EVENT HANDLERS ---
+    $inviteForm.on('submit', async function(e) {
+        e.preventDefault();
+        toggleButtonSpinner($submitBtn, true);
+        const payload = { email: $emailInput.val(), user_type: $('#inviteUserType').val() };
+        if (!userExists) {
+            payload.first_name = $('#inviteFirstName').val();
+            payload.last_name = $('#inviteLastName').val();
+            payload.password = $('#invitePassword').val();
+        }
+        try {
+            const response = await window.authenticatedFetch('/api/main-co-admin/users/invite', { method: 'POST', body: JSON.stringify(payload) });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            showMessage('User invited successfully!', 'success');
+            $inviteForm[0].reset();
+            $newUserDetails.addClass('d-none');
+            $emailStatusMsg.text('');
+            $submitBtn.prop('disabled', true);
+            usersDataTable.ajax.reload();
+        } catch (error) {
+            showMessage(error.message, 'danger');
+        } finally {
+            toggleButtonSpinner($submitBtn, false);
+        }
+    });
+
+    $usersTable.on('click', '.change-status-btn', function() {
+        const data = $(this).data();
+        currentUserId = data.id;
+        $('#statusChangeUserName').text(data.name);
+        $('#newUserStatus').val(data.status);
+        modals.changeStatus.show();
+    });
+
+    $('#confirmChangeUserStatusBtn').on('click', async function() {
+        if (!currentUserId) return;
+        const newStatus = $('#newUserStatus').val();
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/organization/users/${currentUserId}/status`, {
+                method: 'PUT', body: JSON.stringify({ status: newStatus })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            showMessage('User status updated successfully.', 'success');
+            usersDataTable.ajax.reload();
+        } catch (error) {
+            showMessage(error.message, 'danger');
+        } finally {
+            modals.changeStatus.hide();
+        }
+    });
+
+    $usersTable.on('click', '.remove-user-btn', function() {
+        const data = $(this).data();
+        currentUserId = data.id;
+        $('#deleteUserName').text(data.name);
+        $('#deleteUserEmail').text(data.email);
+        modals.removeUser.show();
+    });
+
+    $('#confirmDeleteUserBtn').on('click', async function() {
+        if (!currentUserId) return;
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/organization/users/${currentUserId}`, { method: 'DELETE' });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            showMessage('User has been removed from the organization.', 'success');
+            usersDataTable.ajax.reload();
+        } catch (error) {
+            showMessage(error.message, 'danger');
+        } finally {
+            modals.removeUser.hide();
+        }
+    });
+
+    // --- 5. INITIALIZATION ---
+    initUsersTable();
+});
+</script>
+{% endblock %}

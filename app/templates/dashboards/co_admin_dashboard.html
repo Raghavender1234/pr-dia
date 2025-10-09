@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+
+{% block title %}Co-Admin Dashboard - DIA{% endblock %}
+
+{% block head_extra %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    /* Dashboard header styling */
+    .dashboard-header {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.15);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    .dashboard-header h1 {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+        font-weight: 700;
+    }
+
+    .dashboard-header p {
+        color: #6c757d;
+        margin: 0;
+        font-size: 1.1rem;
+    }
+
+    /* Enhanced stat cards */
+    .stat-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        border-radius: 20px;
+        border-left: 5px solid transparent;
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.1);
+    }
+
+    .stat-card-primary {
+        border-left-color: #667eea;
+        background: linear-gradient(135deg, #ffffff 0%, #f0f2ff 100%);
+    }
+
+    .stat-card-success {
+        border-left-color: #43e97b;
+        background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.2);
+        border-left-width: 8px;
+    }
+
+    .stat-card .bi {
+        opacity: 0.8;
+        color: #667eea;
+        transition: all 0.3s ease;
+    }
+
+    .stat-card-success .bi {
+        color: #43e97b;
+    }
+
+    .stat-card:hover .bi {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #2d3748;
+        line-height: 1;
+    }
+
+    /* CTA Card styling */
+    .cta-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .cta-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), transparent);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .cta-card:hover::before {
+        opacity: 1;
+    }
+
+    .cta-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4);
+    }
+
+    .cta-card .card-title {
+        color: white;
+        font-size: 1.5rem;
+    }
+
+    .cta-card p {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .cta-card .bi {
+        color: rgba(255, 255, 255, 0.8);
+        transition: all 0.3s ease;
+    }
+
+    .cta-card:hover .bi {
+        color: white;
+        transform: scale(1.1);
+    }
+
+    /* CTA Button */
+    .cta-btn {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        text-decoration: none;
+        padding: 12px 30px;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .cta-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Chart card styling */
+    .chart-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .chart-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+    }
+
+    .chart-card .card-header {
+        background: linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%);
+        border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        border-radius: 20px 20px 0 0;
+        padding: 1.5rem;
+    }
+
+    .chart-card .card-header h5 {
+        color: #495057;
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .chart-card .card-header .bi {
+        color: #667eea;
+    }
+
+    .chart-body {
+        padding: 1.5rem;
+        position: relative;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+
+    .chart-container canvas {
+        max-height: 300px !important;
+    }
+
+    .pie-chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Loading spinner enhancement */
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Alert styling */
+    .alert {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, rgba(220, 53, 69, 0.1), rgba(255, 255, 255, 0.9));
+        color: #721c24;
+        border-left: 4px solid #dc3545;
+    }
+
+    .alert-success {
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(255, 255, 255, 0.9));
+        color: #155724;
+        border-left: 4px solid #28a745;
+    }
+
+    /* Animation classes */
+    .animate-on-load {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fadeInUp 0.6s ease-out forwards;
+    }
+
+    @keyframes fadeInUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Responsive enhancements */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding: 1rem 0.5rem;
+        }
+        
+        .dashboard-header {
+            padding: 1.5rem;
+            border-radius: 15px;
+        }
+        
+        .stat-card, .cta-card, .chart-card {
+            border-radius: 15px;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+        }
+    }
+
+    /* Hover effects for better interactivity */
+    .card {
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    /* Custom scrollbar for better aesthetics */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: rgba(102, 126, 234, 0.5);
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(102, 126, 234, 0.7);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid">
+
+  <div class="dashboard-header animate-on-load">
+    <h1><i class="bi bi-speedometer2 me-2"></i>Co-Admin Dashboard</h1>
+    <p>
+      Welcome back, <strong>{{ g.user_context.user_name or 'Co-Admin' }}</strong>! 
+      Ready to create amazing educational content for 
+      <span class="fw-bold">{{ g.user_context.organization_name or 'your organization' }}</span>?
+    </p>
+  </div>
+
+  <div id="coAdminMessage"></div>
+
+<div class="row g-4 mb-4">
+  <!-- Total Questions -->
+  <div class="col-md-4">
+    <div class="card stat-card stat-card-primary p-3 h-100 animate-on-load">
+      <div class="d-flex align-items-center">
+        <div class="stat-icon">
+          <i class="bi bi-journal-richtext fs-3"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="stat-label">Total Questions in Organization</div>
+          <div id="totalQuestionsCount" class="stat-number">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Mock Tests -->
+  <div class="col-md-4">
+    <div class="card stat-card stat-card-success p-3 h-100 animate-on-load">
+      <div class="d-flex align-items-center">
+        <div class="stat-icon">
+          <i class="bi bi-check-circle-fill fs-3"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="stat-label">Active Mock Tests</div>
+          <div id="activeMockTestsCount" class="stat-number">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Content Import (Button Card) -->
+  <div class="col-md-4">
+    <a href="{{ url_for('frontend.global_content_import_page') }}" class="text-decoration-none">
+      <div class="card stat-card stat-card-primary p-3 h-100 animate-on-load text-center">
+        <div class="d-flex flex-column align-items-center justify-content-center h-100">
+          <div class="stat-icon mb-2">
+            <i class="bi bi-cloud-upload-fill fs-2"></i>
+          </div>
+          <div class="stat-label">Global Content Import</div>
+          <span class="btn btn-sm btn-outline-primary mt-2">
+            <i class="bi bi-arrow-right-circle me-1"></i> Open
+          </span>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card cta-card h-100 animate-on-load">
+            <div class="card-body text-center d-flex flex-column justify-content-center align-items-center p-4">
+                <div class="mb-3">
+                  <i class="bi bi-pencil-square display-4 mb-2"></i>
+                </div>
+                <h4 class="card-title fw-bold mb-3">Manage Content</h4>
+                <p class="mb-4 opacity-90">Select an exam to begin creating and editing subjects, topics, and questions for your students.</p>
+                <a href="{{ url_for('frontend.exam_management', **org_param) }}" class="cta-btn">
+                    <i class="bi bi-arrow-right-circle me-2"></i>Go to Content Editor
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card chart-card h-100 animate-on-load">
+        <div class="card-header">
+          <h5><i class="bi bi-pie-chart-fill me-2"></i>Question Type Distribution</h5>
+        </div>
+        <div class="card-body chart-body">
+          <canvas id="questionTypeChart"></canvas>
+          <div id="questionTypeChartLoading" class="position-absolute top-50 start-50 translate-middle text-center">
+            <div class="loading-spinner"></div>
+            <p class="mt-2 text-muted small">Loading chart data...</p>
+          </div>
+          <div id="questionTypeChartError" class="d-none position-absolute top-50 start-50 translate-middle text-center">
+            <i class="bi bi-exclamation-triangle-fill fs-1 text-warning mb-2"></i>
+            <p class="text-danger fw-semibold">Error loading chart data</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // The access token is now available directly from the Jinja2 context
+    const accessToken = "{{ g.user_context.access_token }}";
+    let questionTypeChart;
+
+    // Add loading animations with stagger effect
+    setTimeout(() => {
+        const elements = document.querySelectorAll('.animate-on-load');
+        elements.forEach((element, index) => {
+            setTimeout(() => {
+                element.classList.add('animate-on-load');
+            }, index * 100);
+        });
+    }, 100);
+
+    // This is our self-contained fetch function
+    const authenticatedFetch = (url, options = {}) => {
+        // If the access token isn't available, we can't make an authenticated request.
+        if (!accessToken) {
+            const errorMessage = "Authentication token not found. Cannot make API requests.";
+            showMsg(errorMessage);
+            console.error(errorMessage);
+            // Return a rejected promise to stop the function that called this
+            return Promise.reject(new Error(errorMessage));
+        }
+
+        // Add the Authorization header to any options the caller passed in
+        const newOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        return fetch(url, newOptions);
+    };
+
+    // Helper to display enhanced messages
+    const showMsg = (txt, type = 'danger') => {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show animate-on-load" role="alert">
+                <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-2"></i>
+                ${txt}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        document.getElementById('coAdminMessage').innerHTML = alertHtml;
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-20px)';
+                setTimeout(() => alert.remove(), 300);
+            });
+        }, 5000);
+    };
+
+    // Enhanced number counting animation
+    const animateNumber = (element, targetNumber, duration = 1000) => {
+        const start = 0;
+        const startTime = performance.now();
+        
+        const updateNumber = (currentTime) => {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Easing function for smooth animation
+            const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+            const currentNumber = Math.floor(start + (targetNumber - start) * easeOutCubic);
+            
+            element.textContent = currentNumber.toLocaleString();
+            
+            if (progress < 1) {
+                requestAnimationFrame(updateNumber);
+            } else {
+                element.textContent = targetNumber.toLocaleString();
+            }
+        };
+        
+        requestAnimationFrame(updateNumber);
+    };
+
+    // --- FETCH AND DISPLAY DATA ---
+
+    // 1. Load Quick Stats with enhanced animations
+// --- FETCH AND DISPLAY DATA ---
+const loadStats = async () => {
+    try {
+        const response = await authenticatedFetch('/api/co-admin/dashboard/summary');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch summary');
+        }
+        const data = await response.json();
+
+        // Animate the numbers for the stat cards
+        animateNumber(
+            document.getElementById('totalQuestionsCount'),
+            data.total_questions_in_org,
+            1500
+        );
+        animateNumber(
+            document.getElementById('activeMockTestsCount'),
+            data.active_mock_tests,
+            1200
+        );
+
+        // No update needed for Global Content Import card — it’s just a link button
+    } catch (e) {
+        showMsg(`Unable to load dashboard statistics: ${e.message}`, 'danger');
+        document.getElementById('totalQuestionsCount').textContent = '—';
+        document.getElementById('activeMockTestsCount').textContent = '—';
+    }
+};
+
+    // 2. Load Enhanced Chart Data
+    const loadChart = async () => {
+        const loadingSpinner = document.getElementById('questionTypeChartLoading');
+        const errorContainer = document.getElementById('questionTypeChartError');
+        loadingSpinner.style.display = 'block';
+        errorContainer.classList.add('d-none');
+        errorContainer.style.display = 'none';
+
+        try {
+            const response = await authenticatedFetch('/api/co-admin/question-type-distribution');
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to fetch chart data');
+
+            const ctx = document.getElementById('questionTypeChart');
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists and is a valid Chart instance
+            if (questionTypeChart && typeof questionTypeChart.destroy === 'function') {
+                questionTypeChart.destroy();
+            }
+
+            if (data.labels && data.labels.length > 0) {
+                const colors = [
+                    { bg: 'rgba(102, 126, 234, 0.8)', border: '#667eea' },
+                    { bg: 'rgba(75, 172, 254, 0.8)', border: '#4facfe' },
+                    { bg: 'rgba(240, 147, 251, 0.8)', border: '#f093fb' },
+                    { bg: 'rgba(67, 233, 123, 0.8)', border: '#43e97b' },
+                    { bg: 'rgba(250, 112, 154, 0.8)', border: '#fa709a' }
+                ];
+
+                questionTypeChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.counts,
+                            backgroundColor: colors.map(c => c.bg),
+                            borderColor: colors.map(c => c.border),
+                            borderWidth: 2,
+                            hoverOffset: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    padding: 20,
+                                    font: {
+                                        size: 12
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                titleColor: 'white',
+                                bodyColor: 'white',
+                                cornerRadius: 8,
+                                displayColors: true
+                            }
+                        },
+                        animation: {
+                            animateScale: true,
+                            animateRotate: true,
+                            duration: 1000,
+                            easing: 'easeOutCubic'
+                        }
+                    }
+                });
+            } else {
+                errorContainer.querySelector('p').textContent = 'No question data available to display.';
+                errorContainer.classList.remove('d-none');
+                errorContainer.style.display = 'block';
+            }
+        } catch (e) {
+            errorContainer.querySelector('p').textContent = `Error: ${e.message}`;
+            errorContainer.classList.remove('d-none');
+            errorContainer.style.display = 'block';
+        } finally {
+            loadingSpinner.style.display = 'none';
+        }
+    };
+
+    // --- INITIALIZE ALL DASHBOARD COMPONENTS ---
+    setTimeout(() => {
+        loadStats();
+        loadChart();
+    }, 500); // Small delay for better UX
+});
+</script>
+{% endblock %}

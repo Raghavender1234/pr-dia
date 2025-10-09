@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}My Reviewed Questions - {{ super() }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid py-4">
+    <!-- Breadcrumb Navigation -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb bg-light rounded-3 px-3 py-2">
+            <li class="breadcrumb-item">
+                <a href="{{ url_for('frontend.student_dashboard', **org_param) }}" class="text-decoration-none">
+                    <i class="bi bi-house-fill me-1"></i>Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item active text-primary fw-medium" aria-current="page">
+                <i class="bi bi-bookmark-star-fill me-1"></i>My Reviewed Questions
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Header Section -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <div class="mb-4">
+                <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 rounded-circle p-3 mb-3">
+                    <i class="bi bi-bookmark-star-fill text-primary" style="font-size: 2rem;"></i>
+                </div>
+                <h1 class="display-5 fw-bold text-dark mb-3">My Reviewed Questions</h1>
+                <p class="lead text-muted">Your personalized collection of bookmarked questions for focused practice and review.</p>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="row g-3 mb-4" id="stats-container" style="display: none;">
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body text-center py-3">
+                            <h3 class="h4 mb-1 text-primary" id="total-questions">0</h3>
+                            <small class="text-muted">Total Questions</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body text-center py-3">
+                            <h3 class="h4 mb-1 text-success" id="total-subjects">0</h3>
+                            <small class="text-muted">Subjects</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body text-center py-3">
+                            <h3 class="h4 mb-1 text-info" id="total-topics">0</h3>
+                            <small class="text-muted">Topics</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card border-0 bg-light">
+                        <div class="card-body text-center py-3">
+                            <h3 class="h4 mb-1 text-warning" id="most-common-type">-</h3>
+                            <small class="text-muted">Common Type</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-state" class="text-center py-5">
+        <div class="d-flex flex-column align-items-center">
+            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted">Loading your reviewed questions...</p>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="alert alert-danger d-none border-0 shadow-sm">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>
+                <strong>Oops!</strong> <span id="error-message"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="no-data-state" class="text-center py-5 d-none">
+        <div class="col-lg-6 mx-auto">
+            <div class="mb-4">
+                <i class="bi bi-bookmark-x display-1 text-muted opacity-50"></i>
+            </div>
+            <h3 class="h4 text-dark mb-3">No Questions Marked for Review</h3>
+            <p class="text-muted mb-4">Start practicing and bookmark questions you'd like to review later. Your bookmarked questions will appear here for easy access.</p>
+            <div class="d-flex gap-3 justify-content-center flex-wrap">
+                <a href="{{ url_for('frontend.student_my_exams', **org_param) }}" class="btn btn-primary btn-lg px-4">
+                    <i class="bi bi-play-circle-fill me-2"></i>Start Practicing
+                </a>
+                <a href="{{ url_for('frontend.student_dashboard', **org_param) }}" class="btn btn-outline-secondary btn-lg px-4">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter and Sort Controls -->
+    <div id="controls-container" class="row mb-4 d-none">
+        <div class="col-lg-8 mx-auto">
+            <div class="card border-0 shadow-sm bg-light">
+                <div class="card-body py-3">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <select id="subject-filter" class="form-select">
+                                <option value="">All Subjects</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select id="type-filter" class="form-select">
+                                <option value="">All Question Types</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select id="sort-options" class="form-select">
+                                <option value="recent">Recently Added</option>
+                                <option value="subject">By Subject</option>
+                                <option value="type">By Type</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questions List -->
+    <div id="review-list-container" class="row g-3">
+        <!-- Questions will be dynamically inserted here -->
+    </div>
+</div>
+
+<style>
+/* Custom styles for enhanced visual appeal */
+.question-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.question-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+    border-color: #007bff;
+}
+
+.question-type-badge {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.question-preview {
+    line-height: 1.6;
+    color: #495057;
+}
+
+.question-meta {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+#most-common-type {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1.05rem;
+}
+
+.breadcrumb {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 1px solid #dee2e6;
+}
+
+.stats-card {
+    transition: transform 0.2s ease;
+}
+
+.stats-card:hover {
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    .question-card {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function () {
+    // --- 1. ELEMENT CACHE & SETUP ---
+    const $loading = $('#loading-state');
+    const $error = $('#error-state');
+    const $noData = $('#no-data-state');
+    const $container = $('#review-list-container');
+    const $statsContainer = $('#stats-container');
+    const $controlsContainer = $('#controls-container');
+    const $subjectFilter = $('#subject-filter');
+    const $typeFilter = $('#type-filter');
+    const $sortOptions = $('#sort-options');
+
+    let allQuestions = [];
+    let filteredQuestions = [];
+
+    // --- 2. UTILITY FUNCTIONS ---
+    const getQuestionTypeIcon = (type) => {
+        const icons = {
+            'MultipleChoice': 'bi-list-check',
+            'Comprehension': 'bi-book-half',
+            'OpenEnded': 'bi-textarea-t',
+            'TrueFalse': 'bi-toggle-on',
+            'FillInBlank': 'bi-input-cursor-text',
+            'Essay': 'bi-journal-text'
+        };
+        return icons[type] || 'bi-patch-question-fill';
+    };
+
+    const getQuestionTypeColor = (type) => {
+        const colors = {
+            'MultipleChoice': 'primary',
+            'Comprehension': 'success',
+            'OpenEnded': 'info',
+            'TrueFalse': 'warning',
+            'FillInBlank': 'secondary',
+            'Essay': 'dark'
+        };
+        return colors[type] || 'primary';
+    };
+
+    const truncateText = (text, maxLength = 120) => {
+        const cleanText = $('<div>').html(text).text();
+        return cleanText.length > maxLength ? 
+            cleanText.substring(0, maxLength) + '...' : cleanText;
+    };
+
+    // --- 3. STATS CALCULATION ---
+    const updateStats = (questions) => {
+        if (questions.length === 0) return;
+
+        const subjects = [...new Set(questions.map(q => q.subject_name).filter(Boolean))];
+        const topics = [...new Set(questions.map(q => q.topic_name).filter(Boolean))];
+        const types = questions.map(q => q.question_type);
+        const typeCount = types.reduce((acc, type) => {
+            acc[type] = (acc[type] || 0) + 1;
+            return acc;
+        }, {});
+        const mostCommonType = Object.keys(typeCount).reduce((a, b) => 
+            typeCount[a] > typeCount[b] ? a : b);
+
+        $('#total-questions').text(questions.length);
+        $('#total-subjects').text(subjects.length);
+        $('#total-topics').text(topics.length);
+        $('#most-common-type').text(mostCommonType);
+
+        $statsContainer.fadeIn();
+    };
+
+    // --- 4. FILTER SETUP ---
+    const setupFilters = (questions) => {
+        // Populate subject filter
+        const subjects = [...new Set(questions.map(q => q.subject_name).filter(Boolean))];
+        subjects.sort().forEach(subject => {
+            $subjectFilter.append(`<option value="${subject}">${subject}</option>`);
+        });
+
+        // Populate type filter
+        const types = [...new Set(questions.map(q => q.question_type))];
+        types.sort().forEach(type => {
+            $typeFilter.append(`<option value="${type}">${type}</option>`);
+        });
+
+        $controlsContainer.fadeIn();
+    };
+
+    // --- 5. FILTERING & SORTING ---
+    const filterAndSortQuestions = () => {
+        let filtered = [...allQuestions];
+
+        // Apply filters
+        const selectedSubject = $subjectFilter.val();
+        const selectedType = $typeFilter.val();
+
+        if (selectedSubject) {
+            filtered = filtered.filter(q => q.subject_name === selectedSubject);
+        }
+        if (selectedType) {
+            filtered = filtered.filter(q => q.question_type === selectedType);
+        }
+
+        // Apply sorting
+        const sortBy = $sortOptions.val();
+        switch (sortBy) {
+            case 'subject':
+                filtered.sort((a, b) => (a.subject_name || '').localeCompare(b.subject_name || ''));
+                break;
+            case 'type':
+                filtered.sort((a, b) => a.question_type.localeCompare(b.question_type));
+                break;
+            case 'recent':
+            default:
+                // Assume questions are already in recent order from API
+                break;
+        }
+
+        filteredQuestions = filtered;
+        renderQuestions(filteredQuestions);
+    };
+
+    // --- 6. QUESTION RENDERING ---
+    const renderQuestions = (questions) => {
+        $container.empty();
+
+        if (questions.length === 0) {
+            $container.html(`
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="bi bi-funnel display-4 text-muted opacity-50"></i>
+                        <h4 class="mt-3 text-muted">No questions match your filters</h4>
+                        <p class="text-muted">Try adjusting your filter criteria</p>
+                    </div>
+                </div>
+            `);
+            return;
+        }
+
+        questions.forEach(q => {
+            const practiceUrl = `{{ url_for('frontend.student_question_practice', topic_id=0) }}`.replace('0', q.topic_id) + `?question=${q.id}`;
+            const questionPreview = truncateText(q.question_text);
+            const typeIcon = getQuestionTypeIcon(q.question_type);
+            const typeColor = getQuestionTypeColor(q.question_type);
+
+            const questionCardHtml = `
+                <div class="col-lg-6 col-xl-4">
+                    <div class="card question-card h-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <span class="badge bg-${typeColor} question-type-badge">
+                                    <i class="bi ${typeIcon} me-1"></i>${q.question_type}
+                                </span>
+                                <i class="bi bi-bookmark-star-fill text-warning"></i>
+                            </div>
+                            
+                            <h5 class="card-title question-preview mb-3" style="height: 3.6rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">
+                                ${questionPreview}
+                            </h5>
+                            
+                            <div class="question-meta mb-3" style="height: 2.5rem;">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-book me-2 text-muted"></i>
+                                    <small class="text-truncate"><strong>Subject:</strong> ${q.subject_name || 'N/A'}</small>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-tag me-2 text-muted"></i>
+                                    <small class="text-truncate"><strong>Topic:</strong> ${q.topic_name || 'N/A'}</small>
+                                </div>
+                            </div>
+                            
+                            <a href="${practiceUrl}" class="btn btn-primary w-100">
+                                <i class="bi bi-play-circle-fill me-2"></i>Practice Question
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `;
+            $container.append(questionCardHtml);
+        });
+    };
+
+    // --- 7. EVENT LISTENERS ---
+    $subjectFilter.on('change', filterAndSortQuestions);
+    $typeFilter.on('change', filterAndSortQuestions);
+    $sortOptions.on('change', filterAndSortQuestions);
+
+    // --- 8. DATA FETCHING & RENDERING ---
+    const fetchReviewedQuestions = async () => {
+        $loading.show();
+        $error.hide();
+        $noData.hide();
+        $container.hide();
+        $statsContainer.hide();
+        $controlsContainer.hide();
+
+        try {
+            const orgId = "{{ g.current_organization.id if g.current_organization else '' }}";
+
+            // Build the URL, adding the org_id as a parameter if it exists
+            let apiUrl = '/api/student/reviewed-questions';
+            if (orgId) {
+                apiUrl += `?org_id=${orgId}`;
+            }
+
+            // Make the API call with the new, smarter URL
+            const response = await window.authenticatedFetch(apiUrl);
+
+            const questions = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(questions.message || 'Failed to fetch reviewed questions.');
+            }
+
+            allQuestions = questions;
+
+            if (questions.length > 0) {
+                updateStats(questions);
+                setupFilters(questions);
+                filterAndSortQuestions();
+                $container.show();
+            } else {
+                $noData.show();
+            }
+        } catch (err) {
+            $('#error-message').text(err.message);
+            $error.show();
+        } finally {
+            $loading.hide();
+        }
+    };
+
+    // --- 9. INITIALIZATION ---
+    fetchReviewedQuestions();
+});
+</script>
+{% endblock %}

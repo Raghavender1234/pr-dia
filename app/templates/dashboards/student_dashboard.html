@@ -1,0 +1,872 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - DIA{% endblock %}
+
+{% block head_extra %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+:root {
+  --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%); /* Deep Indigo */
+  --success-gradient: linear-gradient(135deg, #10b981 0%, #34d399 100%); /* Emerald to Mint */
+  --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); /* Amber Gold */
+  --danger-gradient: linear-gradient(135deg, #ef4444 0%, #f87171 100%); /* Soft Coral Red */
+  --info-gradient: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); /* Sky Blue */
+  --purple-gradient: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); /* Soft Violet */
+  
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  
+  --text-primary: #f9fafb;
+  --text-secondary: #e5e7eb;
+  --text-muted: #9ca3af;
+}
+
+/* Sophisticated animated background */
+.dashboard-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background: linear-gradient(-45deg, #1e293b, #334155, #475569, #3b82f6);
+  background-size: 400% 400%;
+  animation: gradientShift 20s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Subtle floating particles */
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  animation: float 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.3; }
+  50% { transform: translateY(-15px) rotate(180deg); opacity: 0.6; }
+}
+
+/* Modern glass cards with subtle effects */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.6s;
+}
+
+.glass-card:hover::before {
+  left: 100%;
+}
+
+/* Refined stat cards */
+.stat-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  color: var(--text-primary);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card.primary { 
+  background: var(--primary-gradient);
+  box-shadow: 0 4px 20px rgba(79, 70, 229, 0.2);
+}
+.stat-card.success { 
+  background: var(--success-gradient);
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.2);
+}
+.stat-card.warning { 
+  background: var(--warning-gradient);
+  box-shadow: 0 4px 20px rgba(217, 119, 6, 0.2);
+}
+.stat-card.info { 
+  background: var(--info-gradient);
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.2);
+}
+.stat-card.purple { 
+  background: var(--purple-gradient);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.2);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon {
+  font-size: 2.5rem;
+  opacity: 0.9;
+  animation: pulse 3s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+/* Counter with smooth animation */
+.counter {
+  font-size: 2.2rem;
+  font-weight: 700;
+  display: inline-block;
+  color: white;
+}
+
+/* Elegant welcome section */
+.welcome-section {
+  background: var(--glass-bg);
+  backdrop-filter: blur(25px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-primary);
+  text-align: center;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.welcome-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(45deg, #f1f5f9, #e2e8f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: titleGlow 4s ease-in-out infinite alternate;
+}
+
+@keyframes titleGlow {
+  from { filter: drop-shadow(0 0 3px rgba(241, 245, 249, 0.3)); }
+  to { filter: drop-shadow(0 0 8px rgba(241, 245, 249, 0.5)); }
+}
+
+/* Refined activity items */
+.activity-item {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 1rem;
+  display: block;
+}
+
+.activity-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(8px);
+  color: ffffff;
+  text-decoration: none;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Exam list styling */
+.exam-item {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.exam-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(8px);
+  color: #ffffff;
+  text-decoration: none;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Membership item styling */
+.membership-item {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+  padding: 1rem;
+}
+
+.membership-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Refined loading animations */
+.modern-spinner {
+  width: 40px;
+  height: 40px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top: 2px solid var(--text-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Chart container styling */
+/* Improve recent activity date/time visibility */
+.activity-item .small.opacity-50 {
+  color: var(--text-secondary) !important;  /* was --text-muted, now brighter */
+  font-size: 0.85rem;                       /* slightly larger for readability */
+}
+
+/* Optional: improve other small texts inside activity-item */
+.activity-item .small.opacity-75 {
+  color: var(--text-secondary) !important;
+}
+
+/* Improve chart container size and layout */
+.chart-container {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  padding: 1.5rem;
+  height: 240px; /* fixed height for pie chart to render well */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Chart legend labels (in case you want extra control) */
+.chartjs-legend li span {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+/* Optional: add subtle shadow to improve contrast */
+.chart-container canvas {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.4));
+}
+
+/* Optional: improve hover on activity items */
+.activity-item:hover .fw-bold {
+  text-decoration: underline;
+}
+
+/* Professional button styling */
+.modern-btn {
+  background: linear-gradient(45deg, #4f46e5, #6366f1);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 28px;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+  text-decoration: none;
+}
+
+.modern-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+  color: white;
+  text-decoration: none;
+}
+
+/* Refined score badge */
+.score-badge {
+  background: linear-gradient(45deg, #059669, #10b981);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* No content state */
+.no-content-container {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.no-content-icon {
+  font-size: 3.5rem;
+  opacity: 0.6;
+  margin-bottom: 1rem;
+  animation: bounce 3s infinite;
+  color: var(--text-muted);
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-8px); }
+  60% { transform: translateY(-4px); }
+}
+
+/* Alert styling */
+.alert {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fecaca;
+}
+
+.alert-success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #bbf7d0;
+}
+
+/* Card headers */
+.card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card-header h5 {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.modern-btn:hover::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.modern-btn:hover::after {
+  left: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .welcome-title { 
+    font-size: 1.8rem; 
+  }
+  .stat-card { 
+    margin-bottom: 1rem; 
+  }
+  .counter { 
+    font-size: 1.8rem; 
+  }
+  .welcome-section {
+    padding: 1.5rem;
+  }
+  .stat-icon {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .welcome-title { 
+    font-size: 1.6rem; 
+  }
+  .counter { 
+    font-size: 1.6rem; 
+  }
+  .stat-card {
+    padding: 1rem !important;
+  }
+}
+
+/* Additional professional touches */
+.small {
+  color: var(--text-muted);
+}
+
+.opacity-75 {
+  color: var(--text-secondary) !important;
+}
+
+.opacity-50 {
+  color: var(--text-muted) !important;
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+/* Focus states for accessibility */
+.stat-card:focus,
+.activity-item:focus,
+.exam-item:focus,
+.modern-btn:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline-offset: 2px;
+}
+
+/* Subtle animation delays for staggered loading effect */
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
+.stat-card:nth-child(5) { animation-delay: 0.5s; }
+  </style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="dashboard-bg"></div>
+
+<!-- Floating particles -->
+<div class="particle" style="width: 10px; height: 10px; top: 20%; left: 10%; animation-delay: 0s;"></div>
+<div class="particle" style="width: 15px; height: 15px; top: 60%; left: 80%; animation-delay: 2s;"></div>
+<div class="particle" style="width: 8px; height: 8px; top: 80%; left: 20%; animation-delay: 4s;"></div>
+<div class="particle" style="width: 12px; height: 12px; top: 30%; left: 70%; animation-delay: 1s;"></div>
+<div class="particle" style="width: 20px; height: 20px; top: 10%; left: 60%; animation-delay: 3s;"></div>
+
+<div class="container-fluid">
+    <!-- Welcome Section -->
+    <div class="welcome-section">
+        <h1 class="welcome-title">🚀 Welcome Back!</h1>
+        <p class="lead mb-0">
+            Hello <strong id="studentFirstName">{{ g.user_context.user_name or 'Future Achiever' }}</strong>! 
+            Ready to conquer your goals today? Your success journey continues here.
+        </p>
+    </div>
+
+    <div id="studentDashboardMessage"></div>
+
+    <!-- Stats Cards - Now with 5 cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-lg-3 col-xl">
+            <div class="card stat-card primary p-4 h-100">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-journals stat-icon me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase small mb-1 opacity-75">Exams Enrolled</h6>
+                        <div id="examsEnrolledCount" class="counter">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3 col-xl">
+            <div class="card stat-card success p-4 h-100">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-clipboard2-check-fill stat-icon me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase small mb-1 opacity-75">Tests Completed</h6>
+                        <div id="testsCompletedCount" class="counter">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3 col-xl">
+            <div class="card stat-card warning p-4 h-100">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-bullseye stat-icon me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase small mb-1 opacity-75">Overall Accuracy</h6>
+                        <div id="overallAccuracy" class="counter">—%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3 col-xl">
+            <div class="card stat-card info p-4 h-100" style="cursor: pointer;" onclick="window.location.href='{{ url_for('frontend.student_review_list', **org_param) }}'">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-bookmark-star-fill stat-icon me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase small mb-1 opacity-75">Bookmarked</h6>
+                        <div id="reviewCount" class="counter">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg-3 col-xl">
+            <div class="card stat-card purple p-4 h-100">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-people-fill stat-icon me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase small mb-1 opacity-75">Memberships</h6>
+                        <div id="membershipCount" class="counter">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Left Column - Exams and Activity -->
+        <div class="col-lg-8">
+            <!-- My Enrolled Exams -->
+            <div class="card glass-card border-0 mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0 text-white">
+                        <i class="bi bi-collection-play-fill me-2"></i>My Enrolled Exams
+                    </h5>
+                </div>
+                <div id="myExamsLoading" class="text-center py-5">
+                    <div class="modern-spinner mx-auto"></div>
+                    <p class="text-white mt-3">Loading your exams...</p>
+                </div>
+                <div id="myExamsError" class="alert alert-danger m-3 d-none"></div>
+                <div class="card-body">
+                    <div id="myExamsList"></div>
+                    <div id="noExams" class="no-content-container d-none">
+                        <i class="bi bi-rocket-takeoff no-content-icon"></i>
+                        <h5 class="mt-3">Ready for Takeoff!</h5>
+                        <p class="opacity-75 mb-4">Your learning journey awaits! Find your first exam and start achieving greatness.</p>
+                        <a href="{{ url_for('frontend.browse_all_exams', **org_param) }}" class="modern-btn">
+                            <i class="bi bi-search me-2"></i>Discover Exams
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card glass-card border-0">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0 text-white">
+                        <i class="bi bi-clock-history me-2"></i>Recent Activity
+                    </h5>
+                </div>
+                <div id="recentActivityLoading" class="text-center py-5">
+                    <div class="modern-spinner mx-auto"></div>
+                    <p class="text-white mt-3">Loading recent activity...</p>
+                </div>
+                <div id="recentActivityError" class="alert alert-danger m-3 d-none"></div>
+                <div class="card-body">
+                    <div id="recentActivityList"></div>
+                    <div id="noActivity" class="no-content-container d-none">
+                        <i class="bi bi-activity no-content-icon"></i>
+                        <h5 class="mt-3">No Recent Activity</h5>
+                        <p class="opacity-75 mb-4">Take your first mock test to see your activity here!</p>
+                        <a href="{{ url_for('frontend.student_mock_test_browse', **org_param) }}" class="modern-btn">
+                            <i class="bi bi-play-circle me-2"></i>Start Testing
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column - Performance & Memberships -->
+        <div class="col-lg-4">
+            <!-- Performance Chart -->
+            <div class="card glass-card border-0 mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0 text-white">
+                        <i class="bi bi-pie-chart-fill me-2"></i>Performance Snapshot
+                    </h5>
+                </div>
+                <div id="performanceChartLoading" class="text-center py-5">
+                    <div class="modern-spinner mx-auto"></div>
+                    <p class="text-white mt-3">Analyzing performance...</p>
+                </div>
+                <div id="performanceChartError" class="alert alert-danger m-3 d-none"></div>
+                <div class="card-body d-flex align-items-center justify-content-center">
+                    <div class="chart-container w-100">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Memberships -->
+            <div class="card glass-card border-0">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="mb-0 text-white">
+                        <i class="bi bi-building me-2"></i>My Organizations
+                    </h5>
+                </div>
+                <div id="membershipsLoading" class="text-center py-5">
+                    <div class="modern-spinner mx-auto"></div>
+                    <p class="text-white mt-3">Loading memberships...</p>
+                </div>
+                <div id="membershipsError" class="alert alert-danger m-3 d-none"></div>
+                <div class="card-body">
+                    <div id="membershipsList"></div>
+                    <div id="noMemberships" class="no-content-container d-none">
+                        <i class="bi bi-people no-content-icon"></i>
+                        <h5 class="mt-3">No Memberships</h5>
+                        <p class="opacity-75 mb-0">You're not part of any organizations yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function() {
+    const showMessage = (msg, type = 'danger') => {
+        const alertClass = type === 'danger' ? 'alert-danger' : 'alert-success';
+        $('#studentDashboardMessage').html(`
+            <div class="alert ${alertClass} glass-card border-0 text-white">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>${msg}
+            </div>
+        `);
+    };
+
+    // Counter animation function
+    const animateCounter = (element, start, end, duration = 1000) => {
+        const increment = end / (duration / 16);
+        let current = start;
+        const timer = setInterval(() => {
+            current += increment;
+            if (current >= end) {
+                current = end;
+                clearInterval(timer);
+            }
+            $(element).text(Math.floor(current) + (element.includes('Accuracy') ? '%' : ''));
+        }, 16);
+    };
+
+    // Format date for display
+    const formatDate = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+        });
+    };
+
+    // Format time for display
+    const formatTime = (dateString) => {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+    };
+
+    const loadDashboardData = async () => {
+        const $myExamsLoading = $('#myExamsLoading');
+        const $myExamsError = $('#myExamsError');
+        const $myExamsList = $('#myExamsList');
+        const $noExams = $('#noExams');
+        
+        const $chartLoading = $('#performanceChartLoading');
+        const $chartError = $('#performanceChartError');
+        const $chartCanvas = $('#performanceChart');
+
+        const $activityLoading = $('#recentActivityLoading');
+        const $activityError = $('#recentActivityError');
+        const $activityList = $('#recentActivityList');
+        const $noActivity = $('#noActivity');
+
+        const $membershipsLoading = $('#membershipsLoading');
+        const $membershipsError = $('#membershipsError');
+        const $membershipsList = $('#membershipsList');
+        const $noMemberships = $('#noMemberships');
+
+        try {
+            const response = await window.authenticatedFetch('/api/student/dashboard-summary');
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to load dashboard data');
+
+            // --- Animate Stat Cards ---
+            $('#studentFirstName').text(data.student_name || 'Future Achiever');
+            
+            // Animate counters
+            setTimeout(() => animateCounter('#examsEnrolledCount', 0, data.exams_enrolled_count || 0), 200);
+            setTimeout(() => animateCounter('#testsCompletedCount', 0, data.tests_completed_count || 0), 400);
+            setTimeout(() => animateCounter('#overallAccuracy', 0, data.overall_accuracy || 0), 600);
+            setTimeout(() => animateCounter('#reviewCount', 0, data.review_count || 0), 800);
+            setTimeout(() => animateCounter('#membershipCount', 0, data.membership_count || 0), 1000);
+
+            // --- Populate "My Enrolled Exams" List ---
+            $myExamsLoading.hide();
+            if (data.my_exams && data.my_exams.length > 0) {
+                $myExamsList.empty();
+                data.my_exams.forEach((exam, index) => {
+                    const examUrl = `{{ url_for('frontend.student_subject_browse', exam_id=0) }}`.replace('0', exam.id);
+                    const examHtml = `
+                        <a href="${examUrl}" class="exam-item d-flex justify-content-between align-items-center p-3" 
+                           style="animation-delay: ${index * 0.1}s;">
+                            <div>
+                                <span class="fw-bold">${exam.name}</span>
+                                <small class="d-block opacity-75">Click to explore subjects</small>
+                            </div>
+                            <i class="bi bi-arrow-right-circle fs-5"></i>
+                        </a>`;
+                    $myExamsList.append(examHtml);
+                });
+            } else {
+                $noExams.removeClass('d-none');
+            }
+
+            // --- Populate Recent Activity ---
+            $activityLoading.hide();
+            if (data.recent_activity && data.recent_activity.length > 0) {
+                $activityList.empty();
+                data.recent_activity.forEach((activity, index) => {
+                    const activityUrl = `{{ url_for('frontend.student_mock_test_result', attempt_id=0) }}`.replace('0', activity.attempt_id);
+                    const scorePercentage = activity.total_questions > 0 ? Math.round((activity.correct_answers / activity.total_questions) * 100) : 0;
+                    const activityHtml = `
+                        <a href="${activityUrl}" class="activity-item" style="animation-delay: ${index * 0.1}s;">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold mb-1">${activity.exam_name}</div>
+                                    <div class="small opacity-75 mb-1">${activity.subject_name}</div>
+                                    <div class="small opacity-50">
+                                        <i class="bi bi-calendar-event me-1"></i>${formatDate(activity.completed_at)}
+                                        <i class="bi bi-clock ms-2 me-1"></i>${formatTime(activity.completed_at)}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="score-badge mb-1">${scorePercentage}%</div>
+                                    <div class="small opacity-75">${activity.correct_answers}/${activity.total_questions}</div>
+                                </div>
+                            </div>
+                        </a>`;
+                    $activityList.append(activityHtml);
+                });
+            } else {
+                $noActivity.removeClass('d-none');
+            }
+
+            // --- Populate Memberships ---
+            $membershipsLoading.hide();
+            if (data.memberships && data.memberships.length > 0) {
+                $membershipsList.empty();
+                data.memberships.forEach((membership, index) => {
+                    const membershipHtml = `
+                        <div class="membership-item" style="animation-delay: ${index * 0.1}s;">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-building me-3 fs-4 opacity-75"></i>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">${membership.organization_name}</div>
+                                    <small class="opacity-75">${membership.role || 'Member'}</small>
+                                </div>
+                            </div>
+                        </div>`;
+                    $membershipsList.append(membershipHtml);
+                });
+            } else {
+                $noMemberships.removeClass('d-none');
+            }
+
+            // --- Create Enhanced Performance Chart ---
+            $chartLoading.hide();
+            const correct = data.correct_questions_count || 0;
+            const incorrect = data.incorrect_questions_count || 0;
+            
+            if (correct + incorrect > 0) {
+                const ctx = $chartCanvas[0].getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Correct Answers', 'Incorrect Answers'],
+                        datasets: [{
+                            data: [correct, incorrect],
+                            backgroundColor: [
+                                '#34d399',  // soft green (tailwind emerald-400)
+                                '#f87171'   // soft red (tailwind red-400)
+                            ],
+                            borderColor: [
+                                '#10b981',  // emerald-500
+                                '#ef4444'   // red-500
+                            ],
+                            borderWidth: 2,
+                            hoverBackgroundColor: [
+                                '#10b981',
+                                '#ef4444'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '65%', // makes doughnut look modern
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: 'white',
+                                    padding: 20,
+                                    font: {
+                                        size: 12,
+                                        weight: 'bold'
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
+                                        return `${label}: ${value} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            animateRotate: true,
+                            duration: 1500
+                        }
+                    }
+                });
+            } else {
+                $chartCanvas.parent().html(`
+                    <div class="text-center py-4">
+                        <i class="bi bi-graph-up display-4 text-white opacity-50"></i>
+                        <p class="text-white mt-3 mb-0">Take your first test to see performance analytics!</p>
+                    </div>
+                `);
+            }
+
+        } catch (e) {
+            showMessage(`Could not load your dashboard: ${e.message}`);
+            $myExamsLoading.hide();
+            $myExamsError.text(e.message).removeClass('d-none');
+            $chartLoading.hide();
+            $chartError.text('Could not load chart.').removeClass('d-none');
+            $activityLoading.hide();
+            $activityError.text('Could not load recent activity.').removeClass('d-none');
+            $membershipsLoading.hide();
+            $membershipsError.text('Could not load memberships.').removeClass('d-none');
+        }
+    };
+
+    loadDashboardData();
+});
+</script>
+{% endblock %}

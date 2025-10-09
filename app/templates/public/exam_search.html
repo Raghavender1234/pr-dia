@@ -1,0 +1,650 @@
+{% extends "base.html" %}
+
+{% block title %}Find Your Perfect Exam Prep - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --glass-bg: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.2);
+        --shadow-glass: 0 8px 32px rgba(31, 38, 135, 0.37);
+        --shadow-card: 0 15px 35px rgba(0, 0, 0, 0.1);
+        --text-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    * {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        line-height: 1.6;
+    }
+
+    .hero-section {
+        background: var(--primary-gradient);
+        padding: 5rem 0 3rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        animation: float 20s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-20px) rotate(180deg); }
+    }
+
+    .hero-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: white;
+        text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        margin-bottom: 1rem;
+        animation: slideInUp 1s ease-out;
+    }
+
+    .hero-subtitle {
+        font-size: 1.3rem;
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 2rem;
+        animation: slideInUp 1s ease-out 0.2s both;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .search-container {
+        margin-top: -2rem;
+        position: relative;
+        z-index: 10;
+        animation: slideInUp 1s ease-out 0.4s both;
+    }
+
+    .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: 24px;
+        box-shadow: var(--shadow-glass);
+        padding: 2.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .glass-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 40px rgba(31, 38, 135, 0.4);
+    }
+
+    .form-control {
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 16px;
+        padding: 1rem 1.5rem;
+        font-size: 1.1rem;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        background: white;
+        transform: scale(1.02);
+    }
+
+    .form-label {
+        color: white;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .btn-search {
+        background: var(--secondary-gradient);
+        border: none;
+        border-radius: 16px;
+        padding: 1rem 2rem;
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: white;
+        box-shadow: 0 8px 20px rgba(240, 147, 251, 0.4);
+    }
+
+    .btn-search:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 25px rgba(240, 147, 251, 0.6);
+        color: white;
+    }
+
+    .form-check-input:checked {
+        background: var(--success-gradient);
+        border-color: transparent;
+    }
+
+    .form-check-label {
+        color: white;
+        font-weight: 500;
+    }
+
+    .results-section {
+        padding: 2rem 0 4rem;
+    }
+
+    .exam-card {
+        border: none;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: var(--shadow-card);
+        background: white;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        height: 100%;
+    }
+
+    .exam-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-body {
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .card-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.75rem;
+        line-height: 1.3;
+    }
+
+    .card-subtitle {
+        color: #667eea;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-text {
+        color: #64748b;
+        font-size: 0.95rem;
+        flex-grow: 1;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-footer {
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        border: none;
+        padding: 1.5rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .price-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 25px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-free {
+        background: var(--success-gradient);
+        color: white;
+        box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);
+    }
+
+    .badge-paid {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .enroll-btn {
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        min-width: 140px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-enroll-free {
+        background: var(--success-gradient);
+        color: white;
+        box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+    }
+
+    .btn-enroll-free:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(79, 172, 254, 0.6);
+        color: white;
+    }
+
+    .btn-enroll-paid {
+        background: var(--primary-gradient);
+        color: white;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-enroll-paid:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+        color: white;
+    }
+
+    .verified-badge {
+        color: #10b981;
+        font-size: 1.2rem;
+        margin-left: 0.5rem;
+        filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.3));
+    }
+
+    .loading-spinner {
+        width: 4rem;
+        height: 4rem;
+        border: 4px solid rgba(102, 126, 234, 0.2);
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .alert {
+        border: none;
+        border-radius: 16px;
+        padding: 1.5rem;
+        font-weight: 500;
+        backdrop-filter: blur(10px);
+        animation: slideInDown 0.5s ease-out;
+    }
+
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .alert-success {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+        color: #065f46;
+        border-left: 4px solid #10b981;
+    }
+
+    .alert-danger {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+        color: #7f1d1d;
+        border-left: 4px solid #ef4444;
+    }
+
+    .alert-warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+        color: #78350f;
+        border-left: 4px solid #f59e0b;
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%);
+        color: #1e3a8a;
+        border-left: 4px solid #3b82f6;
+    }
+
+    .fade-in {
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 2.5rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.1rem;
+        }
+        
+        .glass-card {
+            padding: 1.5rem;
+            margin: 1rem;
+        }
+        
+        .search-container {
+            margin-top: -1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="hero-section">
+    <div class="container text-center">
+        <h1 class="hero-title">Find Your Perfect Exam Prep</h1>
+        <p class="hero-subtitle">Discover thousands of practice exams from verified organizations worldwide</p>
+    </div>
+</div>
+
+<div class="search-container">
+    <div class="container">
+        <div class="glass-card">
+            <form id="examSearchForm" class="row g-4 align-items-end">
+                <div class="col-lg-5">
+                    <label for="searchInput" class="form-label">Search Exams</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="e.g., IBPS PO, JEE Main, UPSC">
+                </div>
+                <div class="col-lg-3">
+                    <label for="orgCodeInput" class="form-label">Organization Code</label>
+                    <input type="text" class="form-control" id="orgCodeInput" placeholder="e.g., BUDO123">
+                </div>
+                <div class="col-lg-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="form-check form-switch me-3">
+                            <input class="form-check-input" type="checkbox" id="freeOnlyCheckbox">
+                            <label class="form-check-label" for="freeOnlyCheckbox">Free Exams Only</label>
+                        </div>
+                        <!-- Status label for the toggle -->
+                        <small id="freeOnlyStatus" class="text-white" style="opacity:0.9;">Free only: Off</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-search w-100">
+                        <i class="bi bi-search me-2"></i>Search Exams
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="results-section">
+    <div class="container">
+        <div id="pageMessage" class="mb-4"></div>
+
+        <div id="results-loading" class="text-center py-5 d-none">
+            <div class="loading-spinner mx-auto mb-3"></div>
+            <p class="text-muted">Searching for your perfect exams...</p>
+        </div>
+
+        <div id="results-error" class="alert alert-danger d-none"></div>
+        <div id="results-no-data" class="alert alert-info d-none">
+            <i class="bi bi-info-circle me-2"></i>No exams found matching your criteria. Try adjusting your search terms.
+        </div>
+
+        <div id="results-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 fade-in">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+window.pageInit = function() {
+    const $searchForm = $('#examSearchForm');
+    const $searchInput = $('#searchInput');
+    const $orgCodeInput = $('#orgCodeInput');
+    const $freeOnlyCheckbox = $('#freeOnlyCheckbox');
+    const $resultsContainer = $('#results-container');
+    const $loadingEl = $('#results-loading');
+    const $errorEl = $('#results-error');
+    const $noDataEl = $('#results-no-data');
+    const $pageMessage = $('#pageMessage');
+
+    const showMessage = (message, type = 'danger') => {
+        $pageMessage.html(`
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${getAlertIcon(type)} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const getAlertIcon = (type) => ({
+        success: 'check-circle-fill',
+        danger: 'exclamation-triangle-fill',
+        warning: 'exclamation-circle-fill',
+        info: 'info-circle-fill'
+    }[type] || 'info-circle-fill');
+
+    const toggleButtonSpinner = ($btn, show) => {
+        if (show) {
+            $btn.prop('disabled', true)
+                .data('orig-text', $btn.html())
+                .html(`<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...`);
+        } else {
+            $btn.prop('disabled', false)
+                .html($btn.data('orig-text'));
+        }
+    };
+
+    const performSearch = async () => {
+        $loadingEl.removeClass('d-none');
+        $resultsContainer.addClass('d-none').empty();
+        $errorEl.addClass('d-none');
+        $noDataEl.addClass('d-none');
+        $pageMessage.empty();
+
+        const params = new URLSearchParams({
+            name: $searchInput.val(),
+            org_code: $orgCodeInput.val(),
+            is_free: $freeOnlyCheckbox.is(':checked')
+        });
+        const url = `/api/public/search-exams?${params.toString()}`;
+
+        try {
+            const response = await fetch(url);
+            const exams = await response.json();
+            if (!response.ok) throw new Error(exams.message || "Failed to search for exams.");
+
+            if (exams.length) {
+                // Deduplicate exams by ID just in case
+                const seen = new Set();
+                const uniqueExams = exams.filter(exam => {
+                    if (seen.has(exam.id)) return false;
+                    seen.add(exam.id);
+                    return true;
+                });
+
+                uniqueExams.forEach((exam, index) => {
+                    setTimeout(() => {
+                        const verifiedBadge = exam.is_verified
+                            ? `<i class="bi bi-patch-check-fill verified-badge" title="Verified Organization"></i>`
+                            : '';
+
+                        const priceBadge = exam.is_free
+                            ? `<span class="price-badge badge-free">Free</span>`
+                            : `<span class="price-badge badge-paid">₹${parseFloat(exam.price).toFixed(2)}</span>`;
+
+                        const actionButton = `<button class="btn enroll-btn ${exam.is_free ? 'btn-enroll-free' : 'btn-enroll-paid'}"
+                            data-exam-id="${exam.id}"
+                            data-is-free="${exam.is_free}">
+                            ${exam.is_free ? 'Enroll Free' : 'Purchase'}
+                        </button>`;
+
+                        const card = `
+                            <div class="col" style="animation-delay: ${index * 0.1}s;">
+                                <div class="card exam-card">
+                                    <div class="card-body">
+                                        <h5 class="card-title d-flex align-items-center">
+                                            ${exam.name}
+                                            ${verifiedBadge}
+                                        </h5>
+                                        <h6 class="card-subtitle">${exam.organization_name}</h6>
+                                        <p class="card-text">${exam.description || 'Comprehensive exam preparation with detailed study materials and practice tests.'}</p>
+                                    </div>
+                                    <div class="card-footer">
+                                        ${priceBadge}
+                                        ${actionButton}
+                                    </div>
+                                </div>
+                            </div>`;
+                        $resultsContainer.append(card);
+                    }, index * 100);
+                });
+            } else {
+                $noDataEl.removeClass('d-none');
+            }
+        } catch (err) {
+            $errorEl.html(`<i class="bi bi-exclamation-triangle-fill me-2"></i>${err.message}`).removeClass('d-none');
+        } finally {
+            setTimeout(() => {
+                $loadingEl.addClass('d-none');
+                $resultsContainer.removeClass('d-none');
+            }, 800);
+        }
+    };
+
+    const initiatePayment = async (data, $btn) => {
+        const options = {
+            key: data.razorpay_key_id,
+            amount: data.amount,
+            currency: "INR",
+            name: "DIA Exam Prep",
+            description: `Payment for: ${data.exam_name}`,
+            order_id: data.order_id,
+            handler: (response) => {
+                verifyPayment(response, data.exam_id, $btn);
+            },
+            prefill: {
+                name: "{{ g.user_context.user_name or 'Valued Student' }}",
+                email: "{{ g.user_context.user_email or '' }}"
+            },
+            theme: { color: "#667eea" },
+            modal: { ondismiss: () => toggleButtonSpinner($btn, false) }
+        };
+        const rzp = new Razorpay(options);
+        rzp.open();
+    };
+
+    const verifyPayment = async (paymentData, examId, $btn) => {
+        showMessage('Verifying payment, please wait...', 'info');
+        try {
+            const payload = { ...paymentData, exam_id: examId };
+            const resp = await window.authenticatedFetch('/api/payment/verify-exam-payment', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.message);
+
+            showMessage(data.message, 'success');
+            $btn.removeClass('btn-enroll-free btn-enroll-paid')
+                .addClass('btn-secondary')
+                .prop('disabled', true)
+                .html('<i class="bi bi-check-circle-fill me-2"></i>Enrolled');
+        } catch (err) {
+            showMessage(`Payment failed: ${err.message}`, 'danger');
+            toggleButtonSpinner($btn, false);
+        }
+    };
+
+    $(document).on('click', '.enroll-btn', async function () {
+        const $btn = $(this);
+
+        // This is the crucial first check to prevent double-clicks
+        if ($btn.prop('disabled')) {
+            return;
+        }
+
+        if (!"{{ g.user_context.is_logged_in }}") {
+            showMessage('Please log in or register to enroll in exams.', 'warning');
+            return setTimeout(() => location.href = "{{ url_for('frontend.login', **org_param) }}", 2000);
+        }
+
+        const examId = $btn.data('exam-id');
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const resp = await window.authenticatedFetch('/api/student/enroll-exam', {
+                method: 'POST',
+                body: JSON.stringify({ exam_id: examId })
+            });
+            const data = await resp.json();
+
+            if (resp.status === 202 && data.payment_required) {
+                // IMPORTANT: initiatePayment will handle the button state from now on
+                return initiatePayment(data, $btn);
+            }
+            if (!resp.ok) throw new Error(data.message);
+
+            // This part handles free enrollments
+            showMessage(data.message, 'success');
+            $btn.removeClass('btn-enroll-free btn-enroll-paid')
+                .addClass('btn-secondary')
+                .prop('disabled', true)
+                .html('<i class="bi bi-check-circle-fill me-2"></i>Enrolled');
+
+        } catch (err) {
+            showMessage(`Enrollment failed: ${err.message}`, 'danger');
+            // Only re-enable the button if there was an error BEFORE payment
+            toggleButtonSpinner($btn, false);
+        }
+    });
+    
+    $searchForm.on('submit', e => {
+        e.preventDefault();
+        performSearch();
+    });
+
+    let searchTimeout;
+    $searchInput.on('input', function () {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            if ($(this).val().length > 2) {
+                performSearch();
+            }
+        }, 500);
+    });
+
+    // Initial load
+    performSearch(); // ✅ Only called once inside pageInit
+};
+</script>
+{% endblock %}

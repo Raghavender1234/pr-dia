@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Complete Your Subscription{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 text-center">
+            <div class="card shadow">
+                <div class="card-header bg-warning">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Payment Required</h4>
+                </div>
+                <div class="card-body p-4 p-lg-5">
+                    <h2 class="card-title">Welcome, {{ g.user_context.user_name }}!</h2>
+                    <p class="lead text-muted">Your organization, <strong>{{ g.user_context.organization_name }}</strong>, is almost ready. Please complete the subscription payment to activate your account and access your dashboard.</p>
+                    
+                    <div id="paymentMessage" class="my-4"></div>
+                    
+                    <button class="btn btn-success btn-lg" id="payNowBtn">
+                        <span class="spinner-border spinner-border-sm d-none"></span>
+                        <span class="button-text">Proceed to Payment</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+window.pageInit = function() {
+    $('#payNowBtn').on('click', async function() {
+        const $btn = $(this);
+        window.toggleButtonSpinner($btn, true);
+
+        try {
+            // This API will create a new payment order for the existing subscription
+            const response = await window.authenticatedFetch('/api/payment/create-org-subscription-order', { method: 'POST' });
+            const orderData = await response.json();
+            if (!response.ok) throw new Error(orderData.message);
+
+            const options = {
+                key: orderData.razorpay_key_id,
+                amount: orderData.amount,
+                currency: "INR",
+                name: "DIA Organization Subscription",
+                description: `Payment for ${orderData.org_name}`,
+                order_id: orderData.order_id,
+                handler: function (response) {
+                    // After payment, verify it with our backend
+                    window.location.href = `/payment/verify-org-subscription?payment_id=${response.razorpay_payment_id}&order_id=${response.razorpay_order_id}&signature=${response.razorpay_signature}`;
+                },
+                prefill: { name: "{{ g.user_context.user_name }}", email: "{{ g.user_context.user_email }}" },
+                modal: { ondismiss: () => window.toggleButtonSpinner($btn, false, 'Proceed to Payment') }
+            };
+            new Razorpay(options).open();
+        } catch (error) {
+            $('#paymentMessage').html(`<div class="alert alert-danger">${error.message}</div>`);
+            window.toggleButtonSpinner($btn, false, 'Proceed to Payment');
+        }
+    });
+};
+</script>
+{% endblock %}

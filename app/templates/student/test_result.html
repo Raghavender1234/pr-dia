@@ -1,0 +1,852 @@
+{% extends "base.html" %}
+
+{% block title %}Test Results{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    :root {
+        --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --gradient-danger: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --shadow-soft: 0 10px 25px rgba(0,0,0,0.1);
+        --shadow-hover: 0 20px 40px rgba(0,0,0,0.15);
+    }
+
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        font-size: 14px;
+    }
+
+    .results-hero {
+        background: var(--gradient-primary);
+        color: white;
+        padding: 2.5rem 0;
+        margin-bottom: 2.5rem;
+        border-radius: 0 0 1.5rem 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .results-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+        opacity: 0.1;
+    }
+
+    .results-hero .container {
+        position: relative;
+        z-index: 1;
+    }
+
+    .hero-icon {
+        font-size: 3rem;
+        margin-bottom: 0.75rem;
+        opacity: 0.9;
+    }
+
+    .enhanced-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 1rem;
+        box-shadow: var(--shadow-soft);
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+
+    .enhanced-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-hover);
+    }
+
+    .stat-card {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--gradient-primary);
+    }
+
+    .stat-card.border-success::before {
+        background: var(--gradient-success);
+    }
+
+    .stat-card.border-danger::before {
+        background: var(--gradient-danger);
+    }
+
+    .score-display {
+        font-size: 2rem;
+        font-weight: 700;
+        background: var(--gradient-primary);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .enhanced-progress {
+        height: 8px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .enhanced-progress .progress-bar {
+        background: var(--gradient-primary);
+        border-radius: 10px;
+        transition: width 0.8s ease;
+    }
+
+    .result-status {
+        padding: 1.5rem;
+        border-radius: 1rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .result-status.passed {
+        background: var(--gradient-success);
+        color: white;
+    }
+
+    .result-status.failed {
+        background: var(--gradient-danger);
+        color: white;
+    }
+
+    .result-status::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        animation: shimmer 3s infinite;
+    }
+
+    @keyframes shimmer {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .chart-container {
+        position: relative;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 1rem;
+        box-shadow: var(--shadow-soft);
+        height: 280px;
+    }
+
+    .breakdown-accordion .accordion-item {
+        border: none;
+        margin-bottom: 1rem;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    .breakdown-accordion .accordion-header button {
+        background: white;
+        border: none;
+        padding: 1rem 1.25rem;
+        font-weight: 600;
+        border-radius: 0.75rem;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .breakdown-accordion .accordion-header button:not(.collapsed) {
+        background: var(--gradient-primary);
+        color: white;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+    }
+
+    .breakdown-accordion .accordion-body {
+        background: #f8f9fa;
+        padding: 1.25rem;
+    }
+
+    .option-item {
+        padding: 0.85rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.5rem;
+        transition: all 0.3s ease;
+        border: 1px solid #e9ecef;
+        background: white;
+        font-size: 0.9rem;
+    }
+
+    .option-item.correct {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border-color: #28a745;
+        color: #155724;
+    }
+
+    .option-item.incorrect {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        border-color: #dc3545;
+        color: #721c24;
+    }
+
+    .option-item.user-selected {
+        border-width: 2px;
+        font-weight: 500;
+    }
+
+    .explanation-box {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border: 1px solid #2196f3;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin-top: 1rem;
+        position: relative;
+        font-size: 0.9rem;
+    }
+
+    .explanation-box::before {
+        content: '💡';
+        position: absolute;
+        top: -0.5rem;
+        left: 1rem;
+        background: #2196f3;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.75rem;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .enhanced-btn {
+        padding: 0.65rem 1.75rem;
+        border-radius: 2rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        border: none;
+        position: relative;
+        overflow: hidden;
+        font-size: 0.9rem;
+    }
+
+    .enhanced-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .enhanced-btn:hover::before {
+        left: 100%;
+    }
+
+    .enhanced-btn.primary {
+        background: var(--gradient-primary);
+        color: white;
+    }
+
+    .enhanced-btn.secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .enhanced-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    .loading-spinner {
+        width: 3.5rem;
+        height: 3.5rem;
+        border: 4px solid rgba(102, 126, 234, 0.1);
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .fade-in {
+        animation: fadeIn 0.6s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .question-number {
+        background: var(--gradient-primary);
+        color: white;
+        border-radius: 50%;
+        width: 1.75rem;
+        height: 1.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.8rem;
+        margin-right: 0.85rem;
+    }
+
+    .card-title {
+        font-size: 1rem;
+    }
+
+    h5.card-title {
+        font-size: 0.95rem;
+    }
+
+    .display-4 {
+        font-size: 2rem;
+    }
+
+    .lead {
+        font-size: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .results-hero {
+            padding: 1.75rem 0;
+        }
+        
+        .hero-icon {
+            font-size: 2.5rem;
+        }
+        
+        .score-display {
+            font-size: 1.75rem;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .display-4 {
+            font-size: 1.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div id="results-loading" class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+    <div class="text-center">
+        <div class="loading-spinner mx-auto mb-3"></div>
+        <p class="text-muted">Loading your results...</p>
+    </div>
+</div>
+
+<div id="results-content" class="d-none">
+    <div class="results-hero">
+        <div class="container text-center">
+            <div class="hero-icon">🎯</div>
+            <h1 class="display-4 fw-bold mb-3" id="resultTitle">Test Results</h1>
+            <p class="lead mb-0" id="resultSubtitle">Here's how you performed</p>
+        </div>
+    </div>
+
+    <div class="container pb-5">
+        <div class="row g-4 mb-4">
+            <!-- Performance Chart -->
+            <div class="col-lg-4">
+                <div class="enhanced-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center mb-3 fw-bold">Performance Overview</h5>
+                        <div class="chart-container">
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="col-lg-8">
+                <div class="row g-4 h-100">
+                    <div class="col-md-6">
+                        <div class="enhanced-card h-100 stat-card">
+                            <div class="card-body text-center d-flex flex-column justify-content-center">
+                                <h5 class="card-title text-muted mb-3">Your Score</h5>
+                                <div class="score-display mb-3" id="finalScore">-- / --</div>
+                                <div class="enhanced-progress">
+                                    <div id="score-progress" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted mt-2" id="accuracyText">--% Accuracy</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="enhanced-card h-100">
+                            <div class="result-status" id="resultStatus">
+                                <div class="display-1 mb-2" id="resultIcon" style="font-size: 3rem;">🎯</div>
+                                <h2 class="fw-bold mb-0" style="font-size: 1.5rem;" id="passFailStatus">Processing...</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Question Review Section -->
+        <div class="enhanced-card mb-4">
+            <div class="card-body">
+                <h3 class="card-title fw-bold mb-4" style="font-size: 1.15rem;">
+                    <i class="bi bi-list-check me-2"></i>
+                    Question-by-Question Review
+                </h3>
+                <div id="results-breakdown-container" class="breakdown-accordion">
+                    <!-- Dynamic content will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="text-center">
+            <div class="action-buttons">
+                <a href="{{ url_for('frontend.student_dashboard', **org_param) }}" class="enhanced-btn secondary">
+                    <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                </a>
+                <a href="{{ url_for('frontend.leaderboard_page', mock_test_id=mock_test_id, **org_param) }}" class="enhanced-btn primary" style="background: var(--gradient-success);">
+                    <i class="bi bi-trophy-fill me-2"></i>View Leaderboard
+                </a>                
+                <a href="{{ url_for('frontend.student_mock_test_browse', **org_param) }}" class="enhanced-btn primary">
+                    Take Another Test<i class="bi bi-arrow-right ms-2"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="results-error" class="container">
+    <div class="alert alert-danger d-none mt-4 enhanced-card">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <span id="error-message"></span>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function() {
+    const attemptId = "{{ attempt_id }}";
+    const $loading = $('#results-loading');
+    const $content = $('#results-content');
+    const $error = $('#results-error .alert');
+    const $breakdownContainer = $('#results-breakdown-container');
+    
+    let mockTestId = null;
+
+    const fetchResults = async () => {
+        try {
+            const response = await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/result`);
+            const data = await response.json();
+            
+            console.log('API Response:', data); // Debug log
+            
+            if (!response.ok) throw new Error(data.message);
+
+            // Check if results are ready
+            if (data.status === 'awaiting_grading') {
+                // Show pending grading message (existing code)
+                $loading.addClass('d-none');
+                $content.removeClass('d-none').html(`
+                    <div class="results-hero">
+                        <div class="container text-center">
+                            <div class="hero-icon">⏳</div>
+                            <h1 class="display-4 fw-bold mb-3">Results Pending</h1>
+                            <p class="lead mb-0">Your test is being graded</p>
+                        </div>
+                    </div>
+                    <div class="container pb-5">
+                        <div class="enhanced-card">
+                            <div class="card-body text-center py-5">
+                                <div class="mb-4">
+                                    <div class="loading-spinner mx-auto mb-3"></div>
+                                </div>
+                                <h3 class="fw-bold mb-3">Grading in Progress</h3>
+                                <p class="text-muted mb-4">
+                                    Your test contains open-ended questions that require manual grading. 
+                                    Results will be available once all questions have been reviewed.
+                                </p>
+                                <div class="row justify-content-center">
+                                    <div class="col-md-6">
+                                        <div class="enhanced-card">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Test Completed</h5>
+                                                <p class="card-text">
+                                                    <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                                    ${new Date(data.completed_at).toLocaleString()}
+                                                </p>
+                                                <p class="card-text">
+                                                    <i class="bi bi-clock-fill text-primary me-2"></i>
+                                                    Estimated grading time: 24-48 hours
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-center mt-4">
+                                    <div class="action-buttons">
+                                        <a href="{{ url_for('frontend.student_dashboard', **org_param) }}" class="enhanced-btn secondary">
+                                            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                                        </a>
+                                        <button onclick="location.reload()" class="enhanced-btn primary">
+                                            <i class="bi bi-arrow-clockwise me-2"></i>Check Again
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+                return;
+            }
+
+            mockTestId = data.mock_test_id;
+            
+            const leaderboardBtn = document.querySelector('a[href*="leaderboard"]');
+            if (leaderboardBtn && mockTestId) {
+                const orgParam = "{{ '?org=' + g.current_organization.subdomain if g.current_organization else '' }}";
+                leaderboardBtn.href = `/student/mock-test/${mockTestId}/leaderboard${orgParam}`;
+            }
+
+            if (data.was_pending_grading) {
+                const $gradingCompleteMessage = $(`
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        <strong>Grading Complete!</strong> Your results are now ready.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `);
+                $('body').prepend($gradingCompleteMessage);
+            }
+
+            // Populate Summary
+            const score = parseFloat(data.score) || 0;
+            const total = parseFloat(data.total_possible_score) || 0;
+            const accuracy = total > 0 ? Math.round((score / total) * 100) : 0;
+            const passingMarks = parseFloat(data.passing_marks || (total * 0.5));
+            const passed = score >= passingMarks;
+
+            $('#resultTitle').text(`Results: ${data.mock_test_title}`);
+            $('#resultSubtitle').html(`
+                Completed on ${new Date(data.completed_at).toLocaleString()}
+                ${data.graded_at ? `<br><small class="text-muted">Graded on ${new Date(data.graded_at).toLocaleString()}</small>` : ''}
+            `);
+            $('#finalScore').text(`${score.toFixed(1)} / ${total.toFixed(1)}`);
+            $('#accuracyText').text(`${accuracy}% Accuracy`);
+            
+            setTimeout(() => {
+                $('#score-progress').css('width', `${accuracy}%`).attr('aria-valuenow', accuracy);
+            }, 500);
+
+            const $resultStatus = $('#resultStatus');
+            const $resultIcon = $('#resultIcon');
+            const $passFailStatus = $('#passFailStatus');
+
+            if (passed) {
+                $resultStatus.addClass('passed');
+                $resultIcon.text('🎉');
+                $passFailStatus.text('Congratulations! You Passed!');
+                $('.stat-card').addClass('border-success');
+            } else {
+                $resultStatus.addClass('failed');
+                $resultIcon.text('📚');
+                $passFailStatus.text('Keep Studying! You Can Do It!');
+                $('.stat-card').addClass('border-danger');
+            }
+
+            // Generate Question Breakdown - FIXED LOGIC
+            $breakdownContainer.empty();
+            let correctCount = 0, incorrectCount = 0;
+            
+            data.results.forEach((res, index) => {
+                const q = res.question;
+                const studentRes = res.student_response;
+                
+                console.log(`Question ${index + 1}:`, {
+                    type: q.question_type,
+                    studentResponse: studentRes,
+                    question: q
+                }); // Debug log
+                
+                let isCorrect = false;
+                let showResult = true;
+                let gradingStatus = '';
+                let userSelectedOptionId = null;
+                
+                if (q.question_type === 'OpenEnded') {
+                    if (studentRes && studentRes.grading_status === 'pending') {
+                        showResult = false;
+                        gradingStatus = 'Pending Review';
+                    } else if (studentRes && studentRes.grading_status === 'graded') {
+                        isCorrect = studentRes.points_awarded > 0;
+                        showResult = true;
+                    }
+                } else if (q.question_type === 'MCQ') {
+                    // FIXED: Check both possible properties
+                    userSelectedOptionId = studentRes?.selected_option_id || studentRes?.option_id;
+                    isCorrect = studentRes?.is_correct || false;
+                    
+                    console.log(`MCQ Question ${index + 1}:`, {
+                        userSelected: userSelectedOptionId,
+                        isCorrect: isCorrect,
+                        options: q.mcq_options
+                    });
+                }
+                
+                if (isCorrect && showResult) {
+                    correctCount++;
+                } else if (!isCorrect && showResult && (userSelectedOptionId != null || q.question_type === 'OpenEnded')) {
+                    incorrectCount++;
+                }
+
+                let optionsHtml = '';
+                if (q.question_type === 'MCQ') {
+                    q.mcq_options.forEach(opt => {
+                        let optionClass = 'option-item';
+                        let icon = '<i class="bi bi-circle text-muted"></i>';
+                        let userSelectedClass = '';
+                        
+                        // Check if this is the correct answer
+                        if (opt.is_correct) {
+                            optionClass += ' correct';
+                            icon = '<i class="bi bi-check-circle-fill text-success"></i>';
+                        }
+                        
+                        // Check if user selected this option
+                        if (userSelectedOptionId && (opt.id === userSelectedOptionId || opt.id == userSelectedOptionId)) {
+                            userSelectedClass = ' user-selected';
+                            
+                            // If user selected wrong answer
+                            if (!opt.is_correct) {
+                                optionClass += ' incorrect';
+                                icon = '<i class="bi bi-x-circle-fill text-danger"></i>';
+                            }
+                        }
+                        
+                        optionsHtml += `
+                            <div class="${optionClass}${userSelectedClass}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>${opt.option_text}</span>
+                                    <div>
+                                        ${userSelectedOptionId && (opt.id === userSelectedOptionId || opt.id == userSelectedOptionId) ? '<span class="badge bg-info me-2">Your Answer</span>' : ''}
+                                        ${icon}
+                                    </div>
+                                </div>
+                            </div>`;
+                    });
+                } else if (q.question_type === 'OpenEnded') {
+                    if (showResult) {
+                        optionsHtml = `
+                            <div class="option-item ${isCorrect ? 'correct' : 'incorrect'}">
+                                <h6 class="fw-bold mb-2">Your Answer:</h6>
+                                <div class="p-3 bg-light rounded border">
+                                    ${studentRes.open_ended_answer || 'No answer provided'}
+                                </div>
+                                ${studentRes.grader_comments ? `
+                                    <div class="mt-3">
+                                        <h6 class="fw-bold mb-2">Grader Comments:</h6>
+                                        <div class="p-2 bg-info bg-opacity-10 rounded">
+                                            ${studentRes.grader_comments}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                <div class="mt-2">
+                                    <strong>Points: ${studentRes.points_awarded || 0} / ${q.max_points || 'N/A'}</strong>
+                                </div>
+                            </div>`;
+                    } else {
+                        optionsHtml = `
+                            <div class="option-item">
+                                <div class="text-center py-4">
+                                    <i class="bi bi-hourglass-split fs-1 text-muted mb-3"></i>
+                                    <h6 class="text-muted">${gradingStatus}</h6>
+                                    <p class="small text-muted mb-0">This question is being reviewed by an instructor.</p>
+                                </div>
+                            </div>`;
+                    }
+                }
+
+                const questionIcon = !showResult ? '⏳' : (isCorrect ? '✅' : '❌');
+
+                const cardHtml = `
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading-${index}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-${index}">
+                                <div class="d-flex align-items-center w-100">
+                                    <span class="question-number">${index + 1}</span>
+                                    <div class="flex-grow-1">
+                                        <strong>Question ${index + 1}:</strong>
+                                        <span class="ms-2">${$('<div>').html(q.question_text).text().substring(0, 60)}...</span>
+                                        ${!showResult ? '<span class="badge bg-warning ms-2">Pending</span>' : ''}
+                                    </div>
+                                    <span class="ms-2 fs-4">${questionIcon}</span>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse-${index}" class="accordion-collapse collapse" data-bs-parent="#results-breakdown-container">
+                            <div class="accordion-body">
+                                <div class="mb-3">
+                                    <h6 class="fw-bold mb-3">Question:</h6>
+                                    <div class="p-3 bg-white rounded border">${q.question_text}</div>
+                                </div>
+                                <div class="mb-3">
+                                    <h6 class="fw-bold mb-3">${q.question_type === 'OpenEnded' ? 'Response:' : 'Options:'}</h6>
+                                    ${optionsHtml}
+                                </div>
+                                ${q.explanation_text && showResult ? `
+                                    <div class="explanation-box">
+                                        <h6 class="fw-bold mb-2">Explanation:</h6>
+                                        <div>${q.explanation_text}</div>
+                                        <div class="mt-3">
+                                            <button class="btn btn-sm btn-outline-primary explain-differently-btn"
+                                                    data-question-text="${encodeURIComponent(q.question_text)}"
+                                                    data-explanation-text="${encodeURIComponent(q.explanation_text)}">
+                                                <i class="bi bi-magic"></i> Explain Differently
+                                            </button>
+                                            <div class="ai-explanation-loading spinner-border spinner-border-sm text-primary ms-2" style="display: none;"></div>
+                                            <div class="ai-explanation-container mt-2"></div>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                const $card = $(cardHtml);
+                $breakdownContainer.append($card);
+
+                window.typesetMath($card[0]);
+            });
+
+        // Create Enhanced Chart
+        const unansweredCount = data.results.length - (correctCount + incorrectCount);
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        
+        // Create gradient for chart
+        const gradient1 = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient1.addColorStop(0, '#4facfe');
+        gradient1.addColorStop(1, '#00f2fe');
+        
+        const gradient2 = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient2.addColorStop(0, '#fa709a');
+        gradient2.addColorStop(1, '#fee140');
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Correct', 'Incorrect', 'Unanswered'],
+                datasets: [{
+                    data: [correctCount, incorrectCount, unansweredCount],
+                    backgroundColor: [
+                        gradient1,
+                        gradient2,
+                        '#6c757d'
+                    ],
+                    borderWidth: 0,
+                    cutout: '70%'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 12,
+                                weight: '600'
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 2000
+                }
+            }
+        });
+
+        // Show content with fade-in animation
+        $loading.addClass('d-none');
+        $content.removeClass('d-none').addClass('fade-in');
+        window.typesetMath($breakdownContainer[0]);
+
+    } catch (error) {
+        console.error('Error fetching results:', error);
+        $loading.fadeOut(300, () => {
+            $('#error-message').text(`Could not load test results: ${error.message}`);
+            $error.removeClass('d-none').addClass('fade-in');
+        });
+    }
+};
+    // Initialize the page
+    fetchResults();
+
+    $breakdownContainer.on('click', '.explain-differently-btn', async function() {
+        const $btn = $(this);
+        const $container = $btn.siblings('.ai-explanation-container');
+        const $loading = $btn.siblings('.ai-explanation-loading');
+        const questionText = $btn.data('question-text');
+        const explanationText = $btn.data('explanation-text');
+
+        $btn.hide();
+        $loading.show();
+        $container.hide();
+
+        try {
+            const response = await window.authenticatedFetch('/api/ai/explain-question', {
+                method: 'POST',
+                body: JSON.stringify({
+                    question_text: questionText,
+                    explanation_text: explanationText
+                })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            $container.html(data.explanation).show();
+        } catch (error) {
+            $container.html(`<div class="alert alert-danger">${error.message}</div>`).show();
+            $btn.show();
+        } finally {
+            $loading.hide();
+        }
+    });
+});
+</script>
+{% endblock %}

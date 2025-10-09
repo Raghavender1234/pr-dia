@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Locked Test Attempts{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Locked Test Attempts</h2>
+    <p class="text-muted">
+        Students are locked out of a "Live Test" after switching tabs more than 3 times.
+        Unlocking an attempt will reset its tab switch count and allow the student to resume.
+    </p>
+
+    <div id="unlockMessage" class="mb-3"></div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="lockedAttemptsTable" class="table table-hover" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function() {
+    // Function to display success or error messages
+    const showMessage = (msg, type = 'success') => {
+        $('#unlockMessage').html(`<div class="alert alert-${type}">${msg}</div>`);
+    };
+
+    // Initialize DataTable and store the instance globally so it is accessible everywhere
+    window.lockedAttemptsTable = $('#lockedAttemptsTable').DataTable({
+        ajax: {
+            url: "{{ url_for('main_co_admin_api.get_locked_attempts_api') }}",
+            dataSrc: 'data',
+            beforeSend: function (xhr) {
+                const token = window.APP_CONTEXT.accessToken;
+                if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            },
+            error: function(xhr, status, error) {
+                console.error('DataTables Ajax error:', status, error);
+                console.log('Response:', xhr.responseText);
+            }
+        },
+        columns: [
+            { data: 'student_email', title: 'Student' },
+            { data: 'test_title', title: 'Mock Test' },
+            { data: 'tab_switches', title: 'Tab Switches' },
+            {
+                data: 'attempt_id',
+                title: 'Action',
+                orderable: false,
+                render: function(data, type, row) {
+                    return `<button class="btn btn-sm btn-success unlock-btn" data-attempt-id="${data}">
+                                <i class="bi bi-unlock"></i> Unlock
+                            </button>`;
+                }
+            }
+        ]
+    });
+
+    // Handle Unlock button click
+    $('#lockedAttemptsTable').on('click', '.unlock-btn', async function() {
+        const $btn = $(this);
+        const attemptId = $btn.data('attempt-id');
+        
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/test-attempts/${attemptId}/unlock`, {
+                method: 'POST'
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.message || 'Unknown error');
+
+            // Show success message from your Flask route
+            showMessage(data.message, 'success');
+
+            // Reload table to reflect unlocked attempt
+            window.lockedAttemptsTable.ajax.reload();
+
+        } catch (error) {
+            showMessage(`Error: ${error.message}`, 'danger');
+            $btn.prop('disabled', false).html('<i class="bi bi-unlock"></i> Unlock');
+        }
+    });
+});
+</script>
+{% endblock %}

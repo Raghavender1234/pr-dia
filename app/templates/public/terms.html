@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Terms of Service - {{ super() }}{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="display-5 text-primary mb-4">Terms of Service</h1>
+            <p class="text-muted">Last updated: June 15, 2025</p>
+
+            <p>Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the DIA Exam Prep web application (the "Service") operated by DIA ("us", "we", or "our").</p>
+            <p>Your access to and use of the Service is conditioned on your acceptance of and compliance with these Terms. These Terms apply to all visitors, users, and others who access or use the Service. By accessing or using the Service you agree to be bound by these Terms.</p>
+
+            <h3 class="mt-5">1. Accounts</h3>
+            <p>When you create an account with us, you must provide us information that is accurate, complete, and current at all times. You are responsible for safeguarding the password that you use to access the Service and for any activities or actions under your password.</p>
+
+            <h3 class="mt-5">2. Subscriptions and Payments</h3>
+            <p>Some parts of the Service are billed on a subscription basis. You will be billed in advance on a recurring basis. For all purchases, you agree to provide current, complete, and accurate purchase and account information. All payments shall be in INR (Indian Rupees) unless otherwise specified.</p>
+
+            <h3 class="mt-5">3. Acceptable Use</h3>
+            <p>You agree not to use the Service for any unlawful purpose or any purpose prohibited under this clause. You agree not to use the Service in any way that could damage the Service, the reputation of DIA, or the general business of DIA.</p>
+
+            <h3 class="mt-5">4. Intellectual Property</h3>
+            <p>The Service and its original content (excluding Content provided by users or organizations), features, and functionality are and will remain the exclusive property of DIA and its licensors. Our trademarks may not be used in connection with any product or service without the prior written consent of DIA.</p>
+
+            <h3 class="mt-5">5. Termination</h3>
+            <p>We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.</p>
+
+            <h3 class="mt-5">6. Limitation of Liability</h3>
+            <p>In no event shall DIA, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your access to or use of or inability to access or use the Service.</p>
+            
+            <h3 class="mt-5">7. Changes</h3>
+            <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will try to provide at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.</p>
+
+            <h3 class="mt-5">8. Contact Us</h3>
+            <p>
+                If you have any questions about these Terms, please contact us by email:
+                {% if g.current_organization and g.current_organization.contact_email %}
+                    <a href="mailto:{{ g.current_organization.contact_email }}">{{ g.current_organization.contact_email }}</a>
+                {% else %}
+                    <a href="mailto:info@dia.com">info@dia.com</a>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

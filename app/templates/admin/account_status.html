@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Account Status - DIA{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="bi bi-exclamation-octagon-fill me-2"></i>Account Inactive</h4>
+                </div>
+                <div class="card-body p-4 p-lg-5">
+                    <h2 class="card-title">Access Restricted</h2>
+                    <p class="lead text-muted">
+                        Your organization's account, <strong>{{ g.user_context.organization_name }}</strong>, is currently inactive.
+                    </p>
+                    <p>
+                        Please contact your organization's primary administrator (Main Co-Admin) to resolve this issue. Full access will be restored once the account is reactivated.
+                    </p>
+                    <a href="{{ url_for('frontend.logout', **org_param) }}" class="btn btn-secondary mt-3">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

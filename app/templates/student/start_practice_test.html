@@ -1,0 +1,897 @@
+{% extends "base.html" %}
+
+{% block title %}Create a Practice Test - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --warning-color: #fd7e14;
+    --secondary-color: #6c757d;
+    --light-bg: #f8f9fa;
+    --card-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    --card-shadow-hover: 0 8px 30px rgba(0,0,0,0.12);
+    --border-radius: 16px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Page Layout */
+  .page-wrapper {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: white;
+    animation: fadeInDown 0.8s ease;
+  }
+
+  .page-title {
+    font-size: 3rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    background: linear-gradient(45deg, #fff, #e8f4fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .page-subtitle {
+    font-size: 1.3rem;
+    opacity: 0.9;
+    font-weight: 300;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Main Card */
+  .main-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border: none;
+    overflow: hidden;
+    animation: fadeInUp 0.8s ease 0.2s both;
+    position: relative;
+  }
+
+  .main-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, var(--primary-color), #20c997, var(--success-color));
+  }
+
+  .card-body {
+    padding: 3rem;
+  }
+
+  /* Form Sections */
+  .form-section {
+    margin-bottom: 3rem;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: slideInUp 0.6s ease forwards;
+  }
+
+  .form-section:nth-child(1) { animation-delay: 0.3s; }
+  .form-section:nth-child(2) { animation-delay: 0.5s; }
+  .form-section:nth-child(3) { animation-delay: 0.7s; }
+
+  .section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .section-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    background: linear-gradient(135deg, var(--primary-color), #0056b3);
+    color: white;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+  }
+
+  /* Scope Selection */
+  .scope-selection {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .scope-option {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scope-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .scope-option label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+    min-height: 140px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scope-option label::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: left 0.6s;
+  }
+
+  .scope-option input:checked + label::before {
+    left: 100%;
+  }
+
+  .scope-option label:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.15);
+  }
+
+  .scope-option input:checked + label {
+    border-color: var(--primary-color);
+    background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
+    color: var(--primary-color);
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(13, 110, 253, 0.2);
+  }
+
+  .scope-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.8;
+    transition: var(--transition);
+  }
+
+  .scope-option input:checked + label .scope-icon {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  .scope-title {
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .scope-description {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    line-height: 1.4;
+  }
+
+  /* Form Controls */
+  .form-floating {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-floating > .form-control,
+  .form-floating > .form-select {
+    height: 3.5rem;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: var(--transition);
+  }
+
+  .form-floating > .form-control:focus,
+  .form-floating > .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .form-floating > label {
+    font-weight: 500;
+    color: #6c757d;
+  }
+
+  /* Configuration Section */
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .config-item {
+    position: relative;
+  }
+
+  .config-item .form-floating {
+    margin-bottom: 0;
+  }
+
+  .config-hint {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Subject Container Animation */
+  #subjectSelectContainer {
+    transition: var(--transition);
+    transform-origin: top;
+  }
+
+  #subjectSelectContainer.show {
+    animation: expandDown 0.4s ease;
+  }
+
+  #subjectSelectContainer.hide {
+    animation: collapseUp 0.4s ease;
+  }
+
+  @keyframes expandDown {
+    from {
+      opacity: 0;
+      transform: scaleY(0);
+    }
+    to {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+
+  @keyframes collapseUp {
+    from {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+    to {
+      opacity: 0;
+      transform: scaleY(0);
+    }
+  }
+
+  /* Submit Button */
+  .submit-section {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 2px solid #f8f9fa;
+    margin-top: 2rem;
+  }
+
+  .submit-btn {
+    background: linear-gradient(135deg, var(--success-color), #20c997);
+    border: none;
+    border-radius: 50px;
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: white;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: var(--transition);
+    box-shadow: 0 6px 20px rgba(25, 135, 84, 0.3);
+    position: relative;
+    overflow: hidden;
+    min-width: 250px;
+  }
+
+  .submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.6s;
+  }
+
+  .submit-btn:hover::before {
+    left: 100%;
+  }
+
+  .submit-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 10px 30px rgba(25, 135, 84, 0.4);
+  }
+
+  .submit-btn:active {
+    transform: translateY(-1px) scale(1.02);
+  }
+
+  .submit-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Loading Animation */
+  .btn-loading {
+    position: relative;
+  }
+
+  .btn-loading .button-text {
+    opacity: 0.7;
+  }
+
+  .loading-dots {
+    display: inline-block;
+    position: relative;
+    margin-left: 0.5rem;
+  }
+
+  .loading-dots span {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    margin: 0 1px;
+    animation: loadingDots 1.4s ease-in-out infinite both;
+  }
+
+  .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+  .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+  @keyframes loadingDots {
+    0%, 80%, 100% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    40% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Alert Enhancements */
+  .alert {
+    border-radius: 12px;
+    border: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideDown 0.4s ease;
+  }
+
+  .alert-success {
+    background: linear-gradient(135deg, #d1f2eb, #a3e4d7);
+    color: #0f5132;
+  }
+
+  .alert-danger {
+    background: linear-gradient(135deg, #f8d7da, #f1aeb5);
+    color: #721c24;
+  }
+
+  .alert-icon {
+    font-size: 1.2rem;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .page-title {
+      font-size: 2.2rem;
+    }
+
+    .page-subtitle {
+      font-size: 1.1rem;
+    }
+
+    .card-body {
+      padding: 2rem 1.5rem;
+    }
+
+    .scope-selection {
+      grid-template-columns: 1fr;
+    }
+
+    .config-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+    }
+  }
+
+  /* Animations */
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Focus States for Accessibility */
+  .scope-option input:focus + label {
+    outline: 3px solid rgba(13, 110, 253, 0.5);
+    outline-offset: 2px;
+  }
+
+  .submit-btn:focus {
+    outline: 3px solid rgba(25, 135, 84, 0.5);
+    outline-offset: 3px;
+  }
+
+  /* Loading State for Selects */
+.form-select.loading {
+  background-image: url(...);
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  animation: spin 1s linear infinite;
+  opacity: 1;
+  color: inherit;
+}
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="page-wrapper">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-8 col-lg-10">
+                <!-- Enhanced Header -->
+                <div class="page-header">
+                    <h1 class="page-title">
+                        <i class="bi bi-gear-fill me-3"></i>
+                        Create Practice Test
+                    </h1>
+                    <p class="page-subtitle">
+                        Design a personalized assessment tailored to your learning goals. 
+                        Choose your scope, configure settings, and start practicing!
+                    </p>
+                </div>
+
+                <!-- Main Form Card -->
+                <div class="card main-card">
+                    <div class="card-body">
+                        <form id="startTestForm" novalidate>
+                            <!-- Messages -->
+                            <div id="startTestMessage" class="mb-4" role="alert"></div>
+                            
+                            <!-- Section 1: Scope Selection -->
+                            <div class="form-section">
+                                <h2 class="section-title">
+                                    <span class="section-number">1</span>
+                                    Choose Your Test Scope
+                                </h2>
+                                <div class="scope-selection">
+                                    <div class="scope-option">
+                                        <input type="radio" name="scopeType" id="scopeExam" value="exam" checked>
+                                        <label for="scopeExam">
+                                            <i class="bi bi-journal-album scope-icon"></i>
+                                            <div class="scope-title">Full Exam</div>
+                                            <div class="scope-description">
+                                                Test across all subjects and topics within a complete examination
+                                            </div>
+                                        </label>
+                                    </div>
+                                    <div class="scope-option">
+                                        <input type="radio" name="scopeType" id="scopeSubject" value="subject">
+                                        <label for="scopeSubject">
+                                            <i class="bi bi-bookmark-fill scope-icon"></i>
+                                            <div class="scope-title">Specific Subject</div>
+                                            <div class="scope-description">
+                                                Focus on a particular subject area for targeted practice
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Section 2: Content Selection -->
+                            <div class="form-section">
+                                <h2 class="section-title">
+                                    <span class="section-number">2</span>
+                                    Select Your Content
+                                </h2>
+                                
+                                <div class="form-floating">
+                                    <select class="form-select" id="examSelect" required aria-describedby="examHelp">
+                                        <option disabled selected value="">Loading available exams...</option>
+                                    </select>
+                                    <label for="examSelect">
+                                        <i class="bi bi-journal-text me-2"></i>Choose an Exam
+                                    </label>
+                                </div>
+                                <div id="examHelp" class="config-hint">
+                                    <i class="bi bi-info-circle"></i>
+                                    Select the examination you want to practice for
+                                </div>
+
+                                <div id="subjectSelectContainer" style="display: none;">
+                                    <div class="form-floating">
+                                        <select class="form-select" id="subjectSelect" aria-describedby="subjectHelp">
+                                            <option disabled selected value="">First select an exam...</option>
+                                        </select>
+                                        <label for="subjectSelect">
+                                            <i class="bi bi-bookmark me-2"></i>Choose a Subject
+                                        </label>
+                                    </div>
+                                    <div id="subjectHelp" class="config-hint">
+                                        <i class="bi bi-info-circle"></i>
+                                        Pick a specific subject area to focus your practice
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Section 3: Test Configuration -->
+                            <div class="form-section">
+                                <h2 class="section-title">
+                                    <span class="section-number">3</span>
+                                    Configure Your Test
+                                </h2>
+                                
+                                <div class="config-grid">
+                                    <div class="config-item">
+                                        <div class="form-floating">
+                                            <input type="number" class="form-control" id="numQuestions" 
+                                                   value="20" min="5" max="100" required aria-describedby="questionsHelp">
+                                            <label for="numQuestions">
+                                                <i class="bi bi-card-checklist me-2"></i>Number of Questions
+                                            </label>
+                                        </div>
+                                        <div id="questionsHelp" class="config-hint">
+                                            <i class="bi bi-lightbulb"></i>
+                                            Recommended: 20-30 questions for optimal practice
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="config-item">
+                                        <div class="form-floating">
+                                            <input type="number" class="form-control" id="timeLimit" 
+                                                   value="30" min="10" required aria-describedby="timeHelp">
+                                            <label for="timeLimit">
+                                                <i class="bi bi-stopwatch me-2"></i>Time Limit (minutes)
+                                            </label>
+                                        </div>
+                                        <div id="timeHelp" class="config-hint">
+                                            <i class="bi bi-clock"></i>
+                                            Allow 1-2 minutes per question on average
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Submit Section -->
+                            <div class="submit-section">
+                                <button type="submit" class="btn submit-btn" id="startTestBtn">
+                                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                                    <span class="button-text">
+                                        <i class="bi bi-rocket-takeoff me-2"></i>
+                                        Launch Practice Test
+                                    </span>
+                                    <div class="loading-dots d-none">
+                                        <span></span>
+                                        <span></span>
+                                        <span></span>
+                                    </div>
+                                </button>
+                                <div class="mt-3 text-muted">
+                                    <small>
+                                        <i class="bi bi-shield-check me-1"></i>
+                                        Your test will be automatically saved and can be resumed anytime
+                                    </small>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    // --- Element Cache ---
+    const $examSelect = $('#examSelect');
+    const $subjectSelect = $('#subjectSelect');
+    const $subjectContainer = $('#subjectSelectContainer');
+    const $scopeTypeToggle = $('input[name="scopeType"]');
+    const $startTestForm = $('#startTestForm');
+    const $startTestBtn = $('#startTestBtn');
+    const $messageDiv = $('#startTestMessage');
+    const $numQuestions = $('#numQuestions');
+    const $timeLimit = $('#timeLimit');
+    
+    let subjectsByExamId = {};
+    let isFormSubmitting = false;
+
+    // --- Helper Functions ---
+    const showMessage = (message, type = 'danger') => {
+        const icon = type === 'success' ? 'check-circle-fill' : 
+                    type === 'warning' ? 'exclamation-triangle-fill' : 'x-circle-fill';
+        
+        $messageDiv.html(`
+            <div class="alert alert-${type}" role="alert">
+                <i class="bi bi-${icon} alert-icon"></i>
+                <div>${message}</div>
+            </div>
+        `);
+        
+        // Auto-hide success messages
+        if (type === 'success') {
+            setTimeout(() => $messageDiv.fadeOut(400), 4000);
+        }
+        
+        // Scroll to message
+        $messageDiv[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    const toggleButtonSpinner = ($btn, show) => {
+        $btn.prop('disabled', show).toggleClass('btn-loading', show);
+        $btn.find('.spinner-border').toggleClass('d-none', !show);
+        $btn.find('.loading-dots').toggleClass('d-none', !show);
+        
+        const btnText = show ? 
+            '<i class="bi bi-gear-fill me-2"></i>Generating Your Test' : 
+            '<i class="bi bi-rocket-takeoff me-2"></i>Launch Practice Test';
+        $btn.find('.button-text').html(btnText);
+    };
+
+    const setSelectLoading = ($select, loading, placeholder = 'Loading...') => {
+        $select.toggleClass('loading', loading);
+        if (loading) {
+            $select.empty().append(`<option disabled selected>${placeholder}</option>`);
+        }
+    };
+
+    // --- Enhanced Scope Toggle Handling ---
+    const showCorrectScope = () => {
+        const selectedType = $scopeTypeToggle.filter(':checked').val();
+        const isSubjectScope = selectedType === 'subject';
+        
+        if (isSubjectScope) {
+            $subjectContainer.removeClass('hide').addClass('show').show();
+            $subjectSelect.prop('required', true);
+        } else {
+            $subjectContainer.removeClass('show').addClass('hide');
+            setTimeout(() => {
+                $subjectContainer.hide();
+            }, 400);
+            $subjectSelect.prop('required', false);
+        }
+        
+        // Clear any previous error messages
+        $messageDiv.empty();
+    };
+
+    $scopeTypeToggle.on('change', function() {
+        // Add visual feedback
+        $(this).closest('.scope-option').find('label').addClass('pulse');
+        setTimeout(() => {
+            $('.scope-option label').removeClass('pulse');
+        }, 300);
+        
+        showCorrectScope();
+    });
+
+    // --- Load Exams with Enhanced UX ---
+    const initForm = async () => {
+        try {
+            // FIX: This now calls the correct API endpoint
+            const response = await window.authenticatedFetch('/api/student/my-exams');
+            const exams = (await response.json()).data || [];
+            if (!response.ok) throw new Error(exams.message);
+
+            const $select = $('#examSelect').empty().append('<option value="">-- Select an Exam --</option>');
+            exams.forEach(exam => {
+                // We use exam_id and exam_name from the corrected API response
+                $select.append(new Option(exam.exam_name, exam.exam_id));
+            });
+        } catch(error) {
+            console.error('Error loading exams:', error);
+        }
+    };
+
+
+    // --- Enhanced Subject Loading ---
+    $examSelect.on('change', async function() {
+        const examId = $(this).val();
+        
+        if (!examId) {
+            $subjectSelect.empty().append('<option value="" disabled selected>First select an exam...</option>');
+            return;
+        }
+
+        // Check cache first
+        if (subjectsByExamId[examId]) { return populateSubjects(subjectsByExamId[examId]); }
+
+        setSelectLoading($subjectSelect, true, 'Loading subjects...');
+
+        try {
+            // FIX: This now calls the correct API endpoint
+            const response = await window.authenticatedFetch(`/api/student/exams/${examId}/subjects`);
+            const subjects = await response.json();
+            if (!response.ok) throw new Error(subjects.message);
+            
+            subjectsByExamId[examId] = subjects;
+            populateSubjects(subjects);
+            
+        } catch(error) {
+            console.error('Error loading subjects:', error);
+            $subjectSelect.removeClass('loading').html('<option value="" disabled selected>Error loading subjects</option>');
+            showMessage('Could not load subjects for this exam. Please try selecting a different exam.', 'danger');
+        }
+    });
+
+    const populateSubjects = (subjects) => {
+        $subjectSelect.removeClass('loading').empty();
+        
+        if (subjects.length === 0) {
+            $subjectSelect.append('<option value="" disabled selected>No subjects available</option>');
+            return;
+        }
+        
+        $subjectSelect.append('<option value="" disabled selected>-- Select Subject --</option>');
+        subjects.forEach(subject => {
+            $subjectSelect.append(new Option(subject.name, subject.id));
+        });
+    };
+
+    // --- Form Validation Enhancements ---
+    const validateForm = () => {
+        const errors = [];
+        
+        const scopeType = $('input[name="scopeType"]:checked').val();
+        const examId = $examSelect.val();
+        const subjectId = $subjectSelect.val();
+        const numQuestions = parseInt($numQuestions.val());
+        const timeLimit = parseInt($timeLimit.val());
+        
+        if (!examId) {
+            errors.push('Please select an exam');
+        }
+        
+        if (scopeType === 'subject' && !subjectId) {
+            errors.push('Please select a subject for subject-specific testing');
+        }
+        
+        if (numQuestions < 5 || numQuestions > 100) {
+            errors.push('Number of questions must be between 5 and 100');
+        }
+        
+        if (timeLimit < 10) {
+            errors.push('Time limit must be at least 10 minutes');
+        }
+        
+        // Reasonable time validation
+        const avgTimePerQuestion = timeLimit / numQuestions;
+        if (avgTimePerQuestion < 0.5) {
+            errors.push('Time limit is too short for the number of questions. Consider increasing time or reducing questions.');
+        }
+        
+        return errors;
+    };
+
+    // --- Enhanced Form Submission ---
+    $startTestForm.on('submit', async function(e) {
+        e.preventDefault();
+        
+        if (isFormSubmitting) return;
+        
+        $messageDiv.empty();
+        
+        // Validate form
+        const validationErrors = validateForm();
+        if (validationErrors.length > 0) {
+            showMessage(validationErrors.join('<br>'), 'danger');
+            return;
+        }
+        
+        isFormSubmitting = true;
+        toggleButtonSpinner($startTestBtn, true);
+
+        const scopeType = $('input[name="scopeType"]:checked').val();
+        const scopeId = (scopeType === 'subject') ? $subjectSelect.val() : $examSelect.val();
+
+        const payload = {
+            scope_type: scopeType,
+            scope_id: parseInt(scopeId),
+            num_questions: parseInt($numQuestions.val()),
+            time_limit: parseInt($timeLimit.val())
+        };
+
+        try {
+            const response = await window.authenticatedFetch('/api/student/generate-practice-test', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            // Redirect to the test page
+            window.location.href = `/student/mock-test/take/${data.attempt_id}`;
+
+        } catch (error) {
+            showMessage(error.message);
+            toggleButtonSpinner($startTestBtn, false);
+        }
+    });
+
+    initForm();
+};
+</script>
+{% endblock %}

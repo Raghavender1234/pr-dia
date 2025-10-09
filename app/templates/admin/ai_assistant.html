@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block title %}AI Content Assistant - DIA{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --surface: #ffffff;
+        --surface-variant: #f8fafc;
+        --on-surface: #1e293b;
+        --on-surface-variant: #64748b;
+        --border: #e2e8f0;
+        --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --border-radius: 16px;
+        --animation-speed: 0.2s;
+    }
+
+    /* 1. Force the main content area to be a flex container that fills the vertical space */
+    main.flex-grow-1 { 
+        display: flex;
+        flex-direction: column;
+        padding: 10px !important; /* Keep your desired padding */
+    }
+
+    /* 2. Make the chat container itself grow to fill the main area */
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1; /* This is the key change */
+        min-height: 0; /* Allows the chat messages to scroll correctly */
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+        background: var(--surface);
+        box-shadow: var(--shadow-lg);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+    }
+
+    /* 3. Your existing styles for the chat components will now work perfectly */
+    .chat-header { flex-shrink: 0; /* Header stays fixed at the top */ }
+    .chat-messages { flex: 1 1 auto; overflow-y: auto; /* This area will now scroll */ }
+    .chat-input-area { flex-shrink: 0; /* Input area stays fixed at the bottom */ }
+
+    /* --- The rest of your beautiful styling remains unchanged --- */
+    .chat-header { background: var(--primary-gradient); color: white; padding: 1.5rem 2rem; border-bottom: none; position: relative; overflow: hidden; }
+    .chat-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>'); opacity: 0.3; }
+    .chat-header-content { position: relative; z-index: 1; }
+    .chat-header h4 { font-size: 1.5rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.75rem; }
+    .chat-header .subtitle { font-size: 0.9rem; opacity: 0.9; margin: 0.25rem 0 0 0; font-weight: 400; }
+    .chat-messages { padding: 2rem; background: var(--surface-variant); scroll-behavior: smooth; }
+    .message-bubble { max-width: 75%; padding: 1rem 1.25rem; margin-bottom: 1.5rem; border-radius: 20px; line-height: 1.6; word-wrap: break-word; position: relative; animation: slideIn var(--animation-speed) ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .user-message { background: var(--primary-gradient); color: white; margin-left: auto; border-bottom-right-radius: 6px; box-shadow: var(--shadow); }
+    .ai-message { background: var(--surface); color: var(--on-surface); margin-right: auto; border-bottom-left-radius: 6px; box-shadow: var(--shadow); border: 1px solid var(--border); }
+    .chat-input-area { background: var(--surface); border-top: 1px solid var(--border); padding: 1.5rem 2rem 2rem; }
+    .suggestions-container { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .suggestion-chip { background: var(--surface-variant); border: 1px solid var(--border); border-radius: 25px; padding: 0.5rem 1rem; font-size: 0.85rem; cursor: pointer; transition: all var(--animation-speed); color: var(--on-surface-variant); }
+    .suggestion-chip:hover { background: var(--primary-gradient); color: white; border-color: transparent; transform: translateY(-1px); box-shadow: var(--shadow); }
+    .input-container { position: relative; }
+    #userInput { border-radius: 25px; border: 2px solid var(--border); padding: 0.875rem 6rem 0.875rem 1.25rem; font-size: 1rem; transition: all var(--animation-speed); }
+    #userInput:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); outline: none; }
+    .send-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--primary-gradient); border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--animation-speed); color: white; }
+    .generate-quiz-btn { position: absolute; right: 52px; top: 50%; transform: translateY(-50%); background: var(--secondary-gradient); border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--animation-speed); color: white; opacity: 0.7; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="chat-header-content">
+            <h4 class="mb-0">
+                <i class="bi bi-stars"></i>
+                AI Content Assistant
+            </h4>
+            <p class="subtitle mb-0">Hello {{ g.user_context.user_name }}! Your creative partner for generating questions and content ideas.</p>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+        <div class="welcome-message">
+            <div class="icon">🚀</div>
+            <h3>Welcome! I'm here to help you create amazing content.</h3>
+            <p>Try one of the suggestions below or ask me anything!</p>
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <div id="aiChatError" class="mb-2"></div>
+        <div class="suggestions-container">
+            <button class="suggestion-chip" data-text="Give me 5 MCQs about photosynthesis">📝 Generate MCQs</button>
+            <button class="suggestion-chip" data-text="Explain quantum physics in simple terms">🔬 Explain concepts</button>
+            <button class="suggestion-chip" data-text="Write a passage about the Renaissance period">📖 Create content</button>
+        </div>
+        <form id="chatForm">
+            <div class="input-container">
+                <input type="text" id="userInput" class="form-control form-control-lg" placeholder="Ask for content ideas..." autocomplete="off" required>
+                <button class="generate-quiz-btn" type="button" id="generateQuestionsBtn" title="Generate practice questions from this conversation"><i class="bi bi-magic"></i></button>
+                <button class="send-btn" type="submit" id="sendBtn"><i class="bi bi-send-fill"></i></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Generated Questions Modal -->
+<div class="modal fade" id="generatedQuestionsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-magic me-2"></i>AI-Generated Practice Questions</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="ai-q-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">Generating questions...</p>
+                </div>
+                <div id="ai-q-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Question Modal -->
+<div class="modal fade" id="saveQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Question to Topic</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Please select the topic where you want to save this question:</p>
+                <select id="topicSelectForSave" class="form-select" required>
+                    <option value="" selected disabled>-- Select a Topic --</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmSaveQuestionBtn">Save Question</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="saveQuestionModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Question to Topic</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="save-question-error" class="alert alert-danger d-none"></div>
+                <p>Please select the topic where you want to save this question:</p>
+                <select id="topicSelectForSave" class="form-select" required>
+                    <option value="" selected disabled>-- Loading Topics... --</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmSaveQuestionBtn">Save Question</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    const $chatMessages = $('#chat-messages');
+    const $chatForm = $('#chatForm');
+    const $userInput = $('#userInput');
+    const $sendBtn = $('#sendBtn');
+    const $generateQuestionsBtn = $('#generateQuestionsBtn');
+    const $errorContainer = $('#aiChatError');
+    let chatHistory = [];
+    let isLoading = false;
+    let questionToSave = null;
+    let topicsCache = null;
+
+    // Initialize modals
+    const generatedQuestionsModal = new bootstrap.Modal($('#generatedQuestionsModal')[0]);
+    const saveQuestionModal = new bootstrap.Modal($('#saveQuestionModal')[0]);
+
+    // Configure marked for better rendering
+    marked.setOptions({
+        highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                try {
+                    return hljs.highlight(code, { language: lang }).value;
+                } catch (__) {}
+            }
+            return hljs.highlightAuto(code).value;
+        },
+        breaks: true,
+        gfm: true
+    });
+
+    // Custom renderer for code blocks with copy button
+    const renderer = new marked.Renderer();
+    renderer.code = function(code, language) {
+        const langClass = language ? `language-${language}` : '';
+        return `<pre><button class="copy-code-btn" title="Copy Code"><i class="bi bi-clipboard"></i></button><code class="${langClass}">${code}</code></pre>`;
+    };
+    marked.use({ renderer });
+
+    const addMessageToUI = (role, message, isHtml = false) => {
+        // Remove welcome message if it exists
+        $('.welcome-message').remove();
+
+        const messageClass = role === 'user' ? 'user-message' : 'ai-message';
+        const bubble = $(`<div class="message-bubble ${messageClass}"></div>`);
+        
+        if (isHtml) {
+            bubble.html(message);
+        } else {
+            bubble.text(message);
+        }
+        
+        $chatMessages.append(bubble);
+        scrollToBottom();
+
+        // Apply syntax highlighting to new code blocks
+        bubble.find('pre code').each(function(i, block) {
+            hljs.highlightElement(block);
+        });
+    };
+
+    const showTypingIndicator = (show) => {
+        $('.typing-indicator').remove();
+        if (show) {
+            const typingHtml = `
+                <div class="typing-indicator">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+            $chatMessages.append(typingHtml);
+            scrollToBottom();
+        }
+    };
+
+    const scrollToBottom = () => {
+        $chatMessages.animate({
+            scrollTop: $chatMessages[0].scrollHeight
+        }, 300);
+    };
+
+    const setLoadingState = (loading) => {
+        isLoading = loading;
+        $userInput.prop('disabled', loading);
+        $sendBtn.prop('disabled', loading);
+        $generateQuestionsBtn.prop('disabled', loading);
+        $('.suggestion-chip').prop('disabled', loading);
+        
+        if (loading) {
+            $chatForm.addClass('loading');
+            $sendBtn.html('<div class="spinner-border spinner-border-sm" role="status"></div>');
+        } else {
+            $chatForm.removeClass('loading');
+            $sendBtn.html('<i class="bi bi-send-fill"></i>');
+        }
+    };
+
+    // Parse AI questions from text
+    const parseAIQuestions = (text) => {
+        const questions = [];
+        // Split the entire text into blocks for each question
+        const questionBlocks = text.split(/\n\s*(?=\d+\.\s)/).filter(Boolean);
+
+        questionBlocks.forEach(block => {
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            if (lines.length < 5) return; // Skip malformed blocks
+
+            const questionText = lines[0].replace(/^\d+\.\s/, '').trim();
+            const optionsRaw = lines.slice(1, 5);
+            let correctAnswerLine = lines.slice(5).find(l => /answer:|correct:/i.test(l));
+            let correctOptionLetter = '';
+
+            if (correctAnswerLine) {
+                // Extract the letter (e.g., "A", "B)")
+                const match = correctAnswerLine.match(/[A-D]\)/i);
+                if (match) {
+                    correctOptionLetter = match[0].charAt(0).toUpperCase();
+                }
+            }
+
+            const options = [];
+            optionsRaw.forEach(line => {
+                const optionLetterMatch = line.match(/^([A-D])\)\s*/i);
+                if (!optionLetterMatch) return;
+
+                const optionLetter = optionLetterMatch[1].toUpperCase();
+                const optionText = line.substring(optionLetterMatch[0].length).trim();
+                let isCorrect = false;
+
+                // Determine correctness by letter or by a fallback marker
+                if (correctOptionLetter) {
+                    isCorrect = (optionLetter === correctOptionLetter);
+                } else if (/\(Correct\)/i.test(optionText)) {
+                    isCorrect = true;
+                }
+                
+                options.push({
+                    text: optionText.replace(/\(Correct\)/i, '').trim(),
+                    is_correct: isCorrect
+                });
+            });
+
+            // Final validation: ensure we have a valid question
+            if (options.length === 4 && options.some(opt => opt.is_correct)) {
+                questions.push({
+                    question_text: questionText,
+                    options: options
+                });
+            }
+        });
+        return questions;
+    };
+
+    // Render AI questions
+const renderAIQuestions = (questions) => {
+    const $container = $('#ai-q-content');
+    $container.empty();
+
+    if (!questions || questions.length === 0) {
+        $container.html('<div class="alert alert-info">No valid questions were generated. Please try again.</div>');
+        return;
+    }
+
+    questions.forEach((q, index) => {
+        // --- THIS IS THE CORRECTED LOGIC ---
+        const optionsHtml = q.options.map(opt => 
+            `<li class="list-group-item ${opt.is_correct ? 'list-group-item-success' : ''}">${opt.text}</li>`
+        ).join('');
+
+        const questionCard = $(`
+            <div class="card ai-question-card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Question ${index + 1}</strong>
+                    <button class="btn save-ai-question-btn btn-sm">
+                        <i class="bi bi-save"></i> Save
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="card-text"><strong>${q.question_text}</strong></p>
+                    <ul class="list-unstyled">
+                        ${optionsHtml}
+                    </ul>
+                </div>
+            </div>
+        `);
+        
+        // Store the clean data object on the card element
+        questionCard.data('question', q);
+        $container.append(questionCard);
+        // --- END OF CORRECTION ---
+    });
+};
+
+    // Load topics for saving
+    const loadTopicsForSaving = async () => {
+        if (topicsCache) return topicsCache;
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/all-topics');
+            topicsCache = await res.json();
+            return topicsCache;
+        } catch (err) {
+            console.error("Failed to load topics", err);
+            return [];
+        }
+    };
+    $('#ai-q-content').off('click', '.save-ai-question-btn').on('click', '.save-ai-question-btn', async function() {
+        const $btn = $(this);
+        
+        // Prevent double-clicks immediately
+        if ($btn.prop('disabled')) {
+            return; 
+        }
+        $btn.prop('disabled', true);
+
+        questionToSave = $btn.closest('.card').data('question');
+        const topics = await loadTopicsForSaving();
+        
+        const $select = $('#topicSelectForSave');
+        $select.empty().append('<option value="" selected disabled>-- Select a Topic --</option>');
+        topics.forEach(topic => {
+            $select.append(`<option value="${topic.id}">${topic.exam_name} > ${topic.subject_name} > ${topic.name}</option>`);
+        });
+        
+        saveQuestionModal.show();
+
+        // Re-enable the button if the modal is closed without saving
+        $('#saveQuestionModal').one('hidden.bs.modal', function () {
+            $btn.prop('disabled', false);
+        });
+    });
+
+    // Your "Confirm Save" button logic is correct.
+    $('#confirmSaveQuestionBtn').on('click', async function() {
+        const topicId = $('#topicSelectForSave').val();
+        if (!topicId) {
+            alert('Please select a topic.');
+            return;
+        }
+
+        const payload = { ...questionToSave, topic_id: topicId };
+        
+        try {
+            const response = await window.authenticatedFetch('/api/ai/save-generated-question', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            window.showToast(data.message, 'success');
+            saveQuestionModal.hide();
+
+            // Find the original button in the other modal and mark it as "Saved"
+            $('#ai-q-content .save-ai-question-btn').each(function() {
+                const cardData = $(this).closest('.card').data('question');
+                if (cardData.question_text === questionToSave.question_text) {
+                    $(this).removeClass('btn-success').addClass('btn-secondary disabled').html('<i class="bi bi-check-circle-fill"></i> Saved!');
+                }
+            });
+
+        } catch (error) {
+            alert(`Error saving question: ${error.message}`);
+        }
+    });
+
+    // Form submission
+    $chatForm.on('submit', async function(e) {
+        e.preventDefault();
+        
+        if (isLoading) return;
+        
+        const userMessage = $userInput.val().trim();
+        if (!userMessage) return;
+
+        addMessageToUI('user', userMessage);
+        chatHistory.push({ role: 'user', content: userMessage });
+        
+        $userInput.val('');
+        setLoadingState(true);
+        showTypingIndicator(true);
+        $errorContainer.empty();
+
+        try {
+            const response = await window.authenticatedFetch('/api/ai/chat', {
+                method: 'POST',
+                body: { message: userMessage, history: chatHistory.slice(0, -1) }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            // Remove typing indicator
+            showTypingIndicator(false);
+            
+            // Render markdown response
+            const renderedHtml = marked.parse(data.reply);
+            addMessageToUI('assistant', renderedHtml, true);
+            
+            chatHistory.push({ role: 'assistant', content: data.reply });
+            
+        } catch (error) {
+            showTypingIndicator(false);
+            $errorContainer.html(`<div class="alert alert-danger alert-sm">${error.message}</div>`);
+        } finally {
+            setLoadingState(false);
+            $userInput.focus();
+        }
+    });
+
+    // Generate questions button click
+    $generateQuestionsBtn.on('click', async function() {
+        if (chatHistory.length < 2) {
+            alert("Please have a conversation first to generate relevant questions!");
+            return;
+        }
+
+        $('#ai-q-content').empty();
+        $('#ai-q-loading').show();
+        generatedQuestionsModal.show();
+
+        try {
+            const response = await window.authenticatedFetch('/api/ai/generate-practice-from-chat', {
+                method: 'POST',
+                body: { history: chatHistory, subject_name: 'General' }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            const parsedQuestions = parseAIQuestions(data.generated_questions);
+            renderAIQuestions(parsedQuestions);
+
+        } catch (error) {
+            $('#ai-q-content').html(`<div class="alert alert-danger">Error generating questions: ${error.message}</div>`);
+        } finally {
+            $('#ai-q-loading').hide();
+        }
+    });
+
+    // Save question button click
+    $('#ai-q-content').on('click', '.save-ai-question-btn', async function() {
+        const questionData = $(this).closest('.card').data('question');
+        questionToSave = questionData;
+        
+        const topics = await loadTopicsForSaving();
+        const $select = $('#topicSelectForSave');
+        $select.empty().append('<option value="" selected disabled>-- Select a Topic --</option>');
+        
+        topics.forEach(topic => {
+            $select.append(`<option value="${topic.id}">${topic.exam_name} > ${topic.subject_name} > ${topic.name}</option>`);
+        });
+        
+        saveQuestionModal.show();
+    });
+
+    // Confirm save question
+    $('#confirmSaveQuestionBtn').on('click', async function() {
+        const topicId = $('#topicSelectForSave').val();
+        if (!topicId) {
+            alert('Please select a topic.');
+            return;
+        }
+
+        const payload = { ...questionToSave, topic_id: topicId };
+        
+        try {
+            const response = await window.authenticatedFetch('/api/ai/save-generated-question', {
+                method: 'POST',
+                body: payload
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            
+            window.showToast(data.message, 'success');
+            saveQuestionModal.hide();
+        } catch (error) {
+            alert(`Error saving question: ${error.message}`);
+        }
+    });
+
+    // Suggestion chip handlers
+    $('.suggestion-chip').on('click', function() {
+        if (isLoading) return;
+        const text = $(this).data('text') || $(this).text().replace(/📝|🔬|📖|🎓/g, '').trim();
+        $userInput.val(text).focus();
+    });
+
+    // Copy code button handler
+    $chatMessages.on('click', '.copy-code-btn', function() {
+        const code = $(this).siblings('code').text();
+        navigator.clipboard.writeText(code).then(() => {
+            const $btn = $(this);
+            const originalContent = $btn.html();
+            $btn.html('<i class="bi bi-check-lg"></i>');
+            setTimeout(() => $btn.html(originalContent), 2000);
+        }).catch(() => {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = code;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        });
+    });
+
+    // Focus input on page load
+    $userInput.focus();
+
+    // Handle Enter key
+    $userInput.on('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            $chatForm.submit();
+        }
+    });
+};
+</script>
+{% endblock %}

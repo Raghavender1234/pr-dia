@@ -1,0 +1,1154 @@
+{% extends "base.html" %}
+{% block title %}My Exams & Purchases - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root {
+    --primary-color: #667eea;
+    --primary-light: #764ba2;
+    --secondary-color: #f093fb;
+    --accent-color: #f5576c;
+    --success-color: #4ecdc4;
+    --warning-color: #ffeaa7;
+    --danger-color: #fd79a8;
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --glass-bg: rgba(255, 255, 255, 0.1);
+    --glass-border: rgba(255, 255, 255, 0.2);
+    --text-primary: #2d3748;
+    --text-secondary: #718096;
+    --shadow-soft: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    --shadow-glow: 0 0 40px rgba(102, 126, 234, 0.3);
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-success: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+    --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+    --border-radius: 16px;
+    --border-radius-lg: 24px;
+    --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body {
+    background: var(--gradient-bg);
+    min-height: 100vh;
+    position: relative;
+    overflow-x: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text-primary);
+  }
+
+  /* Animated Background Elements */
+  .bg-decoration {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    overflow: hidden;
+  }
+
+  .floating-shape {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    animation: float 20s infinite linear;
+  }
+
+  .floating-shape:nth-child(1) {
+    width: 80px;
+    height: 80px;
+    top: 20%;
+    left: 10%;
+    animation-delay: 0s;
+  }
+
+  .floating-shape:nth-child(2) {
+    width: 120px;
+    height: 120px;
+    top: 60%;
+    right: 20%;
+    animation-delay: -5s;
+  }
+
+  .floating-shape:nth-child(3) {
+    width: 60px;
+    height: 60px;
+    bottom: 30%;
+    left: 20%;
+    animation-delay: -10s;
+  }
+
+  .floating-shape:nth-child(4) {
+    width: 100px;
+    height: 100px;
+    top: 10%;
+    right: 10%;
+    animation-delay: -15s;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) rotate(0deg);
+      opacity: 0.7;
+    }
+    25% {
+      transform: translateY(-20px) rotate(90deg);
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(-40px) rotate(180deg);
+      opacity: 0.7;
+    }
+    75% {
+      transform: translateY(-20px) rotate(270deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  /* Header Section */
+  .page-header {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 0.8s ease-out;
+  }
+
+  .page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-primary);
+  }
+
+  .page-header::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+    animation: pulse 4s ease-in-out infinite;
+  }
+
+  .page-header h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-weight: 800;
+    font-size: 2rem;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    position: relative;
+    z-index: 1;
+  }
+
+  .page-header .bi {
+    color: var(--primary-color);
+    filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.5));
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  /* Stats Cards */
+  .stats-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .stat-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    padding: 2.5rem;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    animation: slideInLeft 0.8s ease-out;
+  }
+
+  .stat-card:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .stat-card:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient-success);
+  }
+
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(78, 205, 196, 0.1) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    box-shadow: var(--shadow-glow), var(--shadow-soft);
+  }
+
+  .stat-number {
+    font-size: 3rem;
+    font-weight: 900;
+    background: var(--gradient-success);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .stat-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Navigation Tabs */
+  .nav-container {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    padding: 0.75rem;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 2rem;
+    border: 1px solid var(--glass-border);
+    animation: fadeInUp 1s ease-out;
+  }
+
+  .nav-pills .nav-link {
+    border-radius: var(--border-radius);
+    padding: 1rem 2rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    border: none;
+    background: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .nav-pills .nav-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--gradient-primary);
+    transition: var(--transition);
+    z-index: -1;
+  }
+
+  .nav-pills .nav-link:hover {
+    color: white;
+    transform: translateY(-2px);
+  }
+
+  .nav-pills .nav-link:hover::before {
+    left: 0;
+  }
+
+  .nav-pills .nav-link.active {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-2px);
+  }
+
+  .nav-pills .nav-link.active::before {
+    left: 0;
+  }
+
+  /* Content Cards */
+  .content-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    overflow: hidden;
+    animation: fadeInUp 1.2s ease-out;
+  }
+
+  /* Table Styling */
+  .table-container {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    animation: fadeInUp 1.2s ease-out;
+  }
+
+  .table {
+    margin-bottom: 0;
+    background: transparent;
+  }
+
+  .table th {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-bottom: 2px solid var(--glass-border);
+    font-weight: 700;
+    color: var(--text-primary);
+    padding: 1.25rem;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .table td {
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--glass-border);
+    vertical-align: middle;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(5px);
+  }
+
+  .table tbody tr {
+    transition: var(--transition);
+  }
+
+  .table tbody tr:hover {
+    background: var(--glass-bg);
+    backdrop-filter: blur(15px);
+    transform: translateX(5px);
+  }
+
+  /* Exam Cards */
+  .exam-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    transition: var(--transition);
+    overflow: hidden;
+    height: 100%;
+    position: relative;
+    animation: fadeInUp 1s ease-out;
+  }
+
+  .exam-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-secondary);
+  }
+
+  .exam-card:hover {
+    transform: translateY(-15px) scale(1.03);
+    box-shadow: var(--shadow-glow), var(--shadow-soft);
+  }
+
+  .exam-card .card-body {
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .exam-card .card-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+  }
+
+  .exam-card .card-text {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  .exam-card .card-footer {
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--glass-border);
+    padding: 1.25rem 2rem;
+  }
+
+  /* Buttons */
+  .btn {
+    border-radius: var(--border-radius);
+    font-weight: 600;
+    padding: 0.875rem 1.75rem;
+    transition: var(--transition);
+    border: none;
+    font-size: 0.875rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: var(--transition);
+  }
+
+  .btn:hover::before {
+    left: 100%;
+  }
+
+  .btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+  }
+
+  .btn-success {
+    background: var(--gradient-success);
+    color: white;
+    box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
+  }
+
+  .btn-success:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(78, 205, 196, 0.6);
+  }
+
+  .btn-sm {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Badges */
+  .badge {
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    text-transform: capitalize;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .bg-success {
+    background: var(--gradient-success) !important;
+  }
+
+  .bg-warning {
+    background: linear-gradient(135deg, var(--warning-color) 0%, #fdcb6e 100%) !important;
+    color: #2d3748 !important;
+  }
+
+  .bg-danger {
+    background: linear-gradient(135deg, var(--danger-color) 0%, #e84393 100%) !important;
+  }
+
+  /* Loading and Empty States */
+  .loading-state, .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--glass-border);
+    animation: fadeInUp 1s ease-out;
+  }
+
+  .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 0.3em;
+    border-color: var(--primary-color) transparent var(--primary-color) transparent;
+  }
+
+  .spinner-border-sm {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-width: 0.15em;
+  }
+
+  .text-primary {
+    color: var(--primary-color) !important;
+  }
+
+  .text-success {
+    color: var(--success-color) !important;
+  }
+
+  .text-muted {
+    color: var(--text-secondary) !important;
+  }
+
+  /* DataTables Styling */
+  .dataTables_wrapper {
+    padding: 2rem;
+  }
+
+  .dataTables_length select,
+  .dataTables_filter input {
+    border: 1px solid var(--glass-border);
+    border-radius: var(--border-radius);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    transition: var(--transition);
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text-primary);
+  }
+
+  .dataTables_length select:focus,
+  .dataTables_filter input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+  }
+
+  .dataTables_info {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .dataTables_paginate .paginate_button {
+    margin: 0 3px;
+    border-radius: var(--border-radius);
+    padding: 0.625rem 1rem;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    color: var(--text-primary) !important;
+    transition: var(--transition);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .dataTables_paginate .paginate_button:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white !important;
+    transform: translateY(-2px);
+  }
+
+  .dataTables_paginate .paginate_button.current {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  }
+
+  /* Alerts */
+  .alert {
+    border-radius: var(--border-radius-lg);
+    border: none;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(20px);
+  }
+
+  .alert-danger {
+    background: rgba(253, 121, 168, 0.1);
+    color: var(--danger-color);
+    border-left: 4px solid var(--danger-color);
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .stats-container {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+    
+    .page-header {
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .page-header h2 {
+      font-size: 1.75rem;
+    }
+    
+    .stat-card {
+      padding: 2rem;
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+    }
+    
+    .nav-pills .nav-link {
+      padding: 0.875rem 1.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .table-responsive {
+      font-size: 0.875rem;
+    }
+    
+    .exam-card .card-body {
+      padding: 1.5rem;
+    }
+
+    .floating-shape {
+      display: none;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .stats-container {
+      margin-bottom: 1.5rem;
+    }
+    
+    .nav-container {
+      margin-bottom: 1.5rem;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+    }
+  }
+
+  /* Additional animations */
+  .fade-in {
+    animation: fadeInUp 0.8s ease-out;
+  }
+
+  .slide-in {
+    animation: slideInLeft 0.8s ease-out;
+  }
+
+  /* Scroll animations */
+  @media (prefers-reduced-motion: no-preference) {
+    .exam-card:nth-child(odd) {
+      animation-delay: 0.1s;
+    }
+    
+    .exam-card:nth-child(even) {
+      animation-delay: 0.3s;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-4">
+    <!-- Page Header -->
+    <div class="page-header">
+            <h2><i class="bi bi-journal-bookmark-fill me-3"></i>My Exams & Courses</h2>
+            
+            {% if g.current_organization %}
+            <div>
+                <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reportOrgModal">
+                    <i class="bi bi-flag-fill me-1"></i> Report this Organization
+                </button>
+            </div>
+            {% endif %}
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-container d-none" id="statsContainer">
+        <div class="stat-card">
+            <div class="stat-number" id="totalExams">0</div>
+            <div class="stat-label">Total Exams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="activeExams">0</div>
+            <div class="stat-label">Active Exams</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="organizationsCount">0</div>
+            <div class="stat-label">Organizations</div>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-container">
+        <ul class="nav nav-pills nav-fill" id="examsTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#enrolled-panel" type="button" role="tab">
+                    <i class="bi bi-bookmark-check me-2"></i>Enrolled Exams
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#available-panel" type="button" role="tab">
+                    <i class="bi bi-plus-circle me-2"></i>Available to Enroll
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="examsTabContent">
+        <!-- Enrolled Exams Tab -->
+        <div class="tab-pane fade show active" id="enrolled-panel" role="tabpanel">
+            <div class="table-container">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="myExamsTable" width="100%"></table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Exams Tab -->
+        <div class="tab-pane fade" id="available-panel" role="tabpanel">
+            <!-- Loading State -->
+            <div id="available-loading" class="loading-state">
+                <div class="spinner-border text-primary mb-3"></div>
+                <h5 class="mb-2">Loading Available Exams</h5>
+                <p class="text-muted mb-0">Please wait while we fetch the latest exam offerings...</p>
+            </div>
+            
+            <!-- Exams Grid -->
+            <div id="available-container" class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4"></div>
+            
+            <!-- Empty State -->
+            <div id="available-no-data" class="empty-state d-none">
+                <i class="bi bi-check-circle-fill display-4 text-success mb-3"></i>
+                <h5 class="mb-2">You're All Caught Up!</h5>
+                <p class="text-muted mb-0">No more available exams at this time. Check back later for new opportunities.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% if g.current_organization %}
+    {% include 'student/_report_org_modal.html' %}
+{% endif %}
+{% endblock %}
+
+
+{% block body_extra %}
+<script>
+window.pageInit = function () {
+  // ------------------ Tenancy helpers ------------------
+  const orgId  = "{{ g.current_organization.id if g.current_organization else '' }}";
+  const orgSub = "{{ g.current_organization.subdomain if g.current_organization else '' }}";
+  const host   = window.location.hostname;
+  const isOrgDomain = !!orgSub && (host === orgSub || host.startsWith(orgSub + ".") || host.split(".")[0] === orgSub);
+
+  // If already on org subdomain => no query param; otherwise append ?org_id=
+  const buildUrl = (path) => {
+    if (isOrgDomain) return path;
+    if (orgId) return path + (path.includes("?") ? "&" : "?") + "org_id=" + encodeURIComponent(orgId);
+    return path;
+  };
+
+  // Normalize API responses that are either [] or { data: [] }
+  const extractList = (json) => Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
+
+  // ------------------ State ------------------
+  let currentEnrolledExams = [];
+  let hasLoadedAvailable = false;
+
+  // ------------------ UI helpers ------------------
+  const getStatusBadge = (status) => {
+    const cls = {
+      active: 'bg-success',
+      enrolled: 'bg-success',
+      pending: 'bg-warning',
+      expired: 'bg-danger'
+    }[status] || 'bg-secondary';
+    const text = (status || 'unknown').replace(/_/g, ' ');
+    return `<span class="badge ${cls}">${text}</span>`;
+  };
+
+  const toggleEnrollButton = ($btn, loading) => {
+    if (loading) {
+      $btn.prop('disabled', true)
+          .data('orig-html', $btn.html())
+          .html('<span class="spinner-border spinner-border-sm me-2"></span>Processing...');
+    } else {
+      const orig = $btn.data('orig-html');
+      $btn.prop('disabled', false).html(orig || '<i class="bi bi-plus-circle me-2"></i>Enroll Now');
+    }
+  };
+
+  const updateStats = (enrolledExams = [], availableExams = []) => {
+    const enrolledCount  = enrolledExams.length;
+    const availableCount = availableExams.length;
+    const totalCount     = enrolledCount + availableCount;
+    const orgCount       = [...new Set(enrolledExams.map(e => e.organization_name).filter(Boolean))].length;
+
+    $('#totalExams').text(totalCount);
+    $('#activeExams').text(enrolledCount);
+    $('#organizationsCount').text(orgCount);
+    $('#statsContainer').removeClass('d-none');
+  };
+
+  // ------------------ Razorpay ------------------
+  function initiatePayment(paymentData, $button, examId) {
+    if (typeof Razorpay === 'undefined') {
+      window.showToast?.('Payment library not loaded', 'danger');
+      toggleEnrollButton($button, false);
+      return;
+    }
+    const options = {
+      key: paymentData.razorpay_key_id,
+      amount: paymentData.amount,
+      currency: "INR",
+      name: "DIA Exam Prep",
+      description: `Payment for ${paymentData.exam_name || 'Exam'}`,
+      order_id: paymentData.order_id,
+      handler: async function (response) {
+        try {
+          const verificationResponse = await window.authenticatedFetch(
+            buildUrl('/api/payment/verify-exam-payment'),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                exam_id: examId
+              })
+            }
+          );
+          const data = await verificationResponse.json();
+          if (!verificationResponse.ok) throw new Error(data.message || 'Payment verification failed.');
+
+          window.showToast?.('Payment successful! Updating your exams…', 'success');
+          await initEnrolledTable();
+          await loadAvailableExams(true);
+        } catch (err) {
+          window.showToast?.(`Error: ${err.message}`, 'danger');
+        } finally {
+          toggleEnrollButton($button, false);
+        }
+      },
+      prefill: {
+        name:  "{{ g.user_context.user_name }}",
+        email: "{{ g.user_context.user_email }}"
+      },
+      modal: {
+        ondismiss: function () {
+          window.showToast?.('Payment was cancelled.', 'info');
+          toggleEnrollButton($button, false);
+        }
+      },
+      theme: { color: "#667eea" }
+    };
+    const rzp = new Razorpay(options);
+    rzp.open();
+  }
+
+  // ------------------ Enrolled table ------------------
+  async function initEnrolledTable() {
+    try {
+      const res  = await window.authenticatedFetch(buildUrl('/api/student/my-exams'));
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+      const enrolled = extractList(json);
+      currentEnrolledExams = enrolled;
+
+      if ($.fn.DataTable.isDataTable('#myExamsTable')) {
+        $('#myExamsTable').DataTable().destroy();
+        $('#myExamsTable').empty();
+      }
+
+      $('#myExamsTable').DataTable({
+        data: enrolled,
+        responsive: true,
+        pageLength: 10,
+        columns: [
+          { data: 'exam_name', title: 'Exam' },
+          { data: 'organization_name', title: 'Organization' },
+          {
+            data: 'access_status',
+            title: 'Status',
+            render: (d) => d ? getStatusBadge(d) : 'N/A'
+          },
+          {
+            data: 'purchased_at',
+            title: 'Enrolled On',
+            render: (d) => d ? new Date(d).toLocaleDateString() : 'N/A'
+          },
+          {
+            data: null,
+            title: 'Actions',
+            render: (row) => `
+              <div class="btn-group">
+                <a href="${buildUrl(`/student/exams/${row.exam_id}/subjects`)}" class="btn btn-sm btn-primary">View</a>
+                <button class="btn btn-sm btn-outline-danger unenroll-btn"
+                        data-exam-id="${row.exam_id}" data-exam-name="${row.exam_name}">
+                  Unenroll
+                </button>
+              </div>`
+          }
+        ],
+        order: [[3, 'desc']],
+        language: { emptyTable: "No enrolled exams found" }
+      });
+    } catch (err) {
+      console.error('Error loading enrolled exams:', err);
+      if ($.fn.DataTable.isDataTable('#myExamsTable')) {
+        $('#myExamsTable').DataTable().clear().draw();
+      } else {
+        $('#myExamsTable').html('<tr><td colspan="5" class="text-danger">Failed to load enrolled exams</td></tr>');
+      }
+    }
+  }
+
+  // ------------------ Available exams grid ------------------
+  async function loadAvailableExams(force = false) {
+    const $container = $('#available-container');
+    const $loading   = $('#available-loading').show();
+    const $noData    = $('#available-no-data').addClass('d-none');
+
+    if (hasLoadedAvailable && !force) {
+      $loading.hide();
+      return;
+    }
+
+    $container.empty();
+
+    try {
+      const res  = await window.authenticatedFetch(buildUrl('/api/student/available-exams'));
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
+      const exams = extractList(json);
+
+      updateStats(currentEnrolledExams, exams);
+
+      if (!exams.length) {
+        $noData.removeClass('d-none');
+        return;
+      }
+
+      $container.empty();
+      exams.forEach((exam) => {
+        const isFree = !!exam.is_free || Number(exam.price || 0) === 0;
+        const priceBadge = isFree
+          ? `<span class="badge bg-success ms-2">Free</span>`
+          : `<span class="badge bg-warning text-dark ms-2">₹${parseFloat(exam.price || 0).toFixed(2)}</span>`;
+
+        $container.append(`
+          <div class="col">
+            <div class="exam-card">
+              <div class="card-body">
+                <h5 class="card-title">${exam.name}</h5>
+                <p class="card-text">${exam.organization_name || 'Independent Exam'}</p>
+              </div>
+              <div class="card-footer">
+                <button class="btn btn-success w-100 enroll-btn"
+                        data-exam-id="${exam.id}" data-is-free="${isFree}">
+                  <i class="bi bi-plus-circle me-2"></i>Enroll Now ${priceBadge}
+                </button>
+              </div>
+            </div>
+          </div>`);
+      });
+
+      hasLoadedAvailable = true;
+    } catch (err) {
+      console.error('Error fetching available exams:', err);
+      $container.html(`<div class="col"><div class="alert alert-danger">Failed to load exams: ${err.message}</div></div>`);
+    } finally {
+      $loading.hide();
+    }
+  }
+
+  // ------------------ Report Organization (modal) ------------------
+  (function initReportOrg() {
+    const modalEl = document.getElementById('reportOrgModal');
+    if (!modalEl) return; // Only present when on org domain / has org
+    const reportModal = new bootstrap.Modal(modalEl);
+    const $reportForm = $('#reportOrgForm');
+
+    const toggleSubmitSpinner = ($btn, show) => {
+      if (show) {
+        $btn.prop('disabled', true)
+            .data('orig', $btn.html())
+            .html('<span class="spinner-border spinner-border-sm me-2"></span>Submitting...');
+      } else {
+        $btn.prop('disabled', false).html($btn.data('orig') || 'Submit');
+      }
+    };
+
+    $reportForm.on('submit', async function (e) {
+      e.preventDefault();
+      const $submitBtn = $(this).find('button[type="submit"]');
+      const reason   = $('#reportOrgReason').val();
+      const comments = $('#reportOrgComments').val();
+
+      if (!orgId) {
+        $('#reportOrgMessage').html('<div class="alert alert-danger">Organization not found in context.</div>');
+        return;
+      }
+      if (!reason) {
+        $('#reportOrgMessage').html('<div class="alert alert-warning">Please select a reason.</div>');
+        return;
+      }
+
+      toggleSubmitSpinner($submitBtn, true);
+      try {
+        const res = await window.authenticatedFetch(buildUrl(`/api/student/organizations/${orgId}/report`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason, comments })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+
+        window.showToast?.(data.message || 'Report submitted', 'success');
+        reportModal.hide();
+      } catch (err) {
+        $('#reportOrgMessage').html(`<div class="alert alert-danger">${err.message}</div>`);
+      } finally {
+        toggleSubmitSpinner($submitBtn, false);
+      }
+    });
+  })();
+
+  // ------------------ Events ------------------
+  // Enroll
+  $('#available-container').on('click', '.enroll-btn', async function () {
+    const $btn   = $(this);
+    const examId = $btn.data('exam-id');
+    const isFree = String($btn.data('is-free')) === 'true';
+
+    toggleEnrollButton($btn, true);
+    try {
+      const res = await window.authenticatedFetch(buildUrl('/api/student/enroll-exam'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exam_id: examId })
+      });
+      const data = await res.json();
+
+      // Paid flow starts payment
+      if (res.status === 202 && data?.payment_required) {
+        initiatePayment(data, $btn, examId);
+        return;
+      }
+
+      // Free flow success
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+      window.showToast?.(data?.message || 'Enrolled!', 'success');
+      await initEnrolledTable();
+      await loadAvailableExams(true);
+    } catch (err) {
+      console.error('Enrollment error:', err);
+      window.showToast?.(err.message, 'danger');
+      toggleEnrollButton($btn, false);
+    }
+  });
+
+  // Unenroll
+  $('#myExamsTable').on('click', '.unenroll-btn', async function () {
+    const $btn = $(this);
+    const examId = $btn.data('exam-id');
+    const examName = $btn.data('exam-name');
+
+    if (!confirm(`Unenroll from "${examName}"?`)) return;
+
+    $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+    try {
+      const res = await window.authenticatedFetch(buildUrl(`/api/student/my-exams/${examId}`), { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+
+      window.showToast?.(data?.message || 'Unenrolled.', 'success');
+      await initEnrolledTable();
+      await loadAvailableExams(true);
+    } catch (err) {
+      console.error('Unenroll error:', err);
+      window.showToast?.(err.message, 'danger');
+    } finally {
+      $btn.prop('disabled', false).text('Unenroll');
+    }
+  });
+
+  // Lazy-load available list when tab first shown
+  $('button[data-bs-target="#available-panel"]').on('shown.bs.tab', () => {
+    loadAvailableExams();
+  });
+
+  // ------------------ Init ------------------
+  (async () => {
+    await initEnrolledTable();
+    await loadAvailableExams(); // initial try; guarded by hasLoadedAvailable
+  })();
+};
+
+// Boot
+$(document).ready(() => {
+  if (typeof window.pageInit === 'function') window.pageInit();
+});
+</script>
+{% endblock %}

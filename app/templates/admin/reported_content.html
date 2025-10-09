@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Reported Content Queue{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2>Reported Questions Queue</h2>
+    <p class="text-muted">Review questions reported by students for potential issues.</p>
+    <div id="reportMessage" class="my-3"></div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="reportsTable" class="table table-hover" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    const showMessage = (msg, type = 'success') => {
+        $('#reportMessage').html(`<div class="alert alert-${type}">${msg}</div>`);
+    };
+
+    const table = $('#reportsTable').DataTable({
+        ajax: {
+            url: '/api/main-co-admin/reported-questions',
+            dataSrc: '',
+            headers: { 'Authorization': 'Bearer ' + window.APP_CONTEXT.accessToken }
+        },
+        columns: [
+            { data: 'question_text', title: 'Question Text', render: data => (data || '').substring(0, 80) + '...' },
+            { data: 'topic_name', title: 'Topic' },
+            { data: 'reason', title: 'Reason' },
+            { data: 'reporter_email', title: 'Reported By' },
+            {
+                data: 'report_id',
+                title: 'Actions',
+                orderable: false,
+                render: (id, type, row) => {
+                    // This is the URL to the question editor page
+                    const editUrl = `{{ url_for('frontend.question_management', topic_id=0) }}`.replace('0', row.topic_id);
+                    
+                    return `
+                        <div class="btn-group">
+                            <a href="${editUrl}" target="_blank" class="btn btn-sm btn-warning" title="Edit this question in a new tab">
+                                <i class="bi bi-pencil-fill"></i> Edit
+                            </a>
+                            <button class="btn btn-sm btn-success resolve-btn" data-id="${id}" title="Mark this report as resolved">
+                                <i class="bi bi-check-lg"></i> Mark Resolved
+                            </button>
+                            <button class="btn btn-sm btn-secondary dismiss-btn" data-id="${id}" title="Dismiss this report">
+                                <i class="bi bi-x-lg"></i> Dismiss
+                            </button>
+                        </div>`
+                }
+            }
+        ],
+        order: [[4, 'desc']] // Assuming date is the 5th column, now hidden
+    });
+
+    // Handle "Mark Resolved" button click
+    $('#reportsTable').on('click', '.resolve-btn', async function() {
+        const reportId = $(this).data('id');
+        if (!confirm('Are you sure you want to mark this report as resolved?')) return;
+        
+        try {
+            const res = await window.authenticatedFetch(`/api/main-co-admin/reports/${reportId}/resolve`, { method: 'POST' });
+            // ... (rest of your existing success/error handling for this button) ...
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            showMessage(data.message, 'success');
+            table.ajax.reload();
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        }
+    });
+    // Handle Dismiss button click
+    $('#reportsTable').on('click', '.dismiss-btn', async function() {
+        const reportId = $(this).data('id');
+        if (!confirm('Are you sure you want to dismiss this report?')) return;
+
+        try {
+            const res = await window.authenticatedFetch(`/api/main-co-admin/reports/${reportId}/dismiss`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            
+            showMessage(data.message, 'info');
+            table.ajax.reload();
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        }
+    });
+};
+</script>
+{% endblock %}

@@ -1,0 +1,1129 @@
+{% extends "base.html" %}
+
+{% block title %}Mock Test in Progress{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* Create a focused, full-screen test environment */
+    header, footer { display: none !important; }
+    main.flex-grow-1 { padding: 0 !important; margin: 0 !important; max-width: 100vw !important; }
+    
+    * {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    
+    :root {
+        --primary-color: #2563eb;
+        --primary-light: #3b82f6;
+        --success-color: #059669;
+        --warning-color: #d97706;
+        --danger-color: #dc2626;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --gray-900: #111827;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+    
+    html {
+        scroll-behavior: smooth;
+    }
+    
+    .test-container-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .test-header-sticky {
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--gray-200);
+        box-shadow: var(--shadow-sm);
+        z-index: 100;
+    }
+    
+    .test-body {
+        flex-grow: 1;
+        display: flex;
+        overflow: hidden;
+        background: var(--gray-50);
+    }
+    
+    .question-panel {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        background: white;
+        margin: 1rem;
+        margin-right: 0.5rem;
+        border-radius: 12px;
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .sidebar-panel {
+        width: 320px;
+        flex-shrink: 0;
+        overflow-y: auto;
+        background: white;
+        margin: 1rem 1rem 1rem 0.5rem;
+        border-radius: 12px;
+        box-shadow: var(--shadow-lg);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* Enhanced Timer Styling - More Compact */
+    .timer-container {
+        background: linear-gradient(135deg, var(--danger-color), #ef4444);
+        color: white;
+        padding: 0.5rem 1.25rem;
+        border-radius: 10px;
+        box-shadow: var(--shadow-md);
+        text-align: center;
+    }
+    
+    .timer-label {
+        font-size: 0.7rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        opacity: 0.9;
+        margin-bottom: 0.15rem;
+    }
+    
+    .timer-display {
+        font-size: 1.25rem;
+        font-weight: 700;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Question Header - More Compact */
+    .question-header-container {
+        background: linear-gradient(135deg, var(--gray-50), white);
+        padding: 1rem 1.25rem;
+        margin: -1.5rem -1.5rem 1.5rem -1.5rem;
+        border-bottom: 2px solid var(--gray-100);
+        border-radius: 12px 12px 0 0;
+    }
+    
+    .question-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin: 0;
+        line-height: 1.4;
+    }
+    
+    .question-subtitle {
+        color: var(--gray-500);
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-top: 0.25rem;
+    }
+    
+    /* Enhanced Form Controls - Compact */
+    .form-check {
+        background: var(--gray-50);
+        border: 2px solid var(--gray-200);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.6rem !important;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    
+    .form-check:hover {
+        border-color: var(--primary-light);
+        box-shadow: var(--shadow-sm);
+        transform: translateY(-1px);
+    }
+    
+    .form-check-input:checked + .form-check-label {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    
+    .form-check:has(.form-check-input:checked) {
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, #dbeafe, #eff6ff);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .form-check-input {
+        width: 1.1rem;
+        height: 1.1rem;
+        margin-top: 0.125rem;
+        border: 2px solid var(--gray-300);
+    }
+    
+    .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    .form-check-label {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-left: 0.65rem;
+        cursor: pointer;
+    }
+    
+    /* Textarea Styling - Compact */
+    .form-control {
+        border: 2px solid var(--gray-200);
+        border-radius: 10px;
+        padding: 0.75rem;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    
+    /* Enhanced Buttons - Compact */
+    .btn {
+        border-radius: 8px;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+        background: linear-gradient(135deg, #1d4ed8, var(--primary-color));
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, var(--success-color), #10b981);
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+        background: linear-gradient(135deg, #047857, var(--success-color));
+    }
+    
+    .btn-outline-warning {
+        border: 2px solid var(--warning-color);
+        color: var(--warning-color);
+        background: white;
+    }
+    
+    .btn-outline-warning:hover, .btn-info {
+        background: var(--warning-color);
+        color: white;
+        border-color: var(--warning-color);
+        transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+        background: var(--gray-500);
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: var(--gray-600);
+        transform: translateY(-1px);
+    }
+    
+    .btn-outline-secondary {
+        border: 2px solid var(--gray-300);
+        color: var(--gray-600);
+        background: white;
+    }
+    
+    .btn-outline-secondary:hover {
+        background: var(--gray-100);
+        border-color: var(--gray-400);
+        transform: translateY(-1px);
+    }
+    
+    .btn-sm {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    /* Question Palette - More Compact */
+    .palette-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .palette-section-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--gray-700);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 2px solid var(--gray-200);
+    }
+    
+    .palette-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+        gap: 0.45rem;
+    }
+    
+    .palette-btn {
+        width: 44px;
+        height: 44px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 2px solid transparent;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        font-size: 0.8rem;
+        position: relative;
+    }
+    
+    .palette-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    
+    /* Enhanced Status Colors */
+    .palette-btn.not-visited {
+        background: var(--gray-400);
+        color: white;
+    }
+    
+    .palette-btn.unanswered {
+        background: #fca5a5;
+        color: var(--danger-color);
+        border-color: #fca5a5;
+    }
+    
+    .palette-btn.answered {
+        background: #86efac;
+        color: var(--success-color);
+        border-color: #86efac;
+    }
+    
+    .palette-btn.review {
+        background: #a78bfa;
+        color: white;
+        border-color: #a78bfa;
+    }
+    
+    .palette-btn.current {
+        box-shadow: 0 0 0 3px var(--primary-color);
+        z-index: 10;
+        transform: scale(1.08);
+    }
+    
+    /* Legend - More Compact */
+    .palette-legend {
+        background: var(--gray-50);
+        padding: 1rem;
+        border-radius: 10px;
+        margin-top: 1rem;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    
+    .legend-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .legend-color {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        margin-right: 0.6rem;
+        flex-shrink: 0;
+    }
+    
+    /* Comprehension Passage - More Compact */
+    .comprehension-passage {
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+        border: 2px solid #0ea5e9;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.6;
+        font-size: 0.9rem;
+    }
+    
+    .sub-question-container {
+        background: white;
+        border-left: 4px solid var(--primary-color);
+        padding: 1rem;
+        margin: 0.75rem 0;
+        border-radius: 0 10px 10px 0;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    .sub-question-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: var(--gray-800);
+        margin-bottom: 0.75rem;
+        line-height: 1.4;
+    }
+    
+    /* Navigation Controls - More Compact */
+    .navigation-controls {
+        background: var(--gray-50);
+        padding: 1rem 1.25rem;
+        margin: 1.5rem -1.5rem -1.5rem -1.5rem;
+        border-top: 2px solid var(--gray-200);
+        border-radius: 0 0 12px 12px;
+    }
+    
+    /* Question Display Text - Compact */
+    #question-display-area {
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    #question-display-area .fs-5 {
+        font-size: 1rem !important;
+        font-weight: 500;
+        line-height: 1.5;
+        margin-bottom: 1rem !important;
+    }
+    
+    /* Loading Screen */
+    .loading-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 2.5rem;
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
+        text-align: center;
+        max-width: 380px;
+    }
+    
+    .loading-spinner {
+        width: 3.5rem;
+        height: 3.5rem;
+        border: 4px solid var(--gray-200);
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1.25rem;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Lock Screen Styling */
+    .lock-overlay {
+        background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.95));
+        backdrop-filter: blur(10px);
+    }
+    
+    .lock-content {
+        text-align: center;
+        color: white;
+        max-width: 500px;
+        padding: 2.5rem;
+    }
+    
+    .lock-icon {
+        font-size: 3.5rem;
+        color: var(--danger-color);
+        margin-bottom: 1.25rem;
+    }
+    
+    /* Header Title Sizing */
+    .test-header-sticky h5 {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+    
+    .test-header-sticky small {
+        font-size: 0.75rem;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .test-body {
+            flex-direction: column;
+        }
+        
+        .sidebar-panel {
+            width: 100%;
+            order: -1;
+            margin: 0.5rem;
+            max-height: 200px;
+        }
+        
+        .question-panel {
+            margin: 0.5rem;
+            padding: 1rem;
+        }
+        
+        .palette-grid {
+            grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+        }
+        
+        .palette-btn {
+            width: 38px;
+            height: 38px;
+            font-size: 0.75rem;
+        }
+        
+        .question-header-container {
+            padding: 0.85rem 1rem;
+            margin: -1rem -1rem 1rem -1rem;
+        }
+        
+        .navigation-controls {
+            padding: 0.85rem 1rem;
+            margin: 1rem -1rem -1rem -1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+
+<div id="test-loading" class="loading-container">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <h4 class="text-primary mb-2" style="font-size: 1.15rem;">Loading Your Test</h4>
+        <p class="text-muted mb-0" style="font-size: 0.875rem;">Please wait while we prepare your examination...</p>
+    </div>
+</div>
+
+<div id="test-ui" class="test-container-wrapper d-none">
+    <div class="test-header-sticky p-3">
+        <div class="container-fluid d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="text-primary fw-bold" id="testName"></h5>
+                <small class="text-muted" id="examName"></small>
+            </div>
+            <div class="timer-container">
+                <div class="timer-label">Time Remaining</div>
+                <div id="timer" class="timer-display">--:--:--</div>
+            </div>
+            <div>
+                <button class="btn btn-success" id="submitTestBtn">
+                    <i class="bi bi-check2-circle"></i>
+                    Submit Test
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-body">
+        <div class="question-panel">
+            <div id="question-area-wrapper">
+                <div class="question-header-container">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="question-title" id="questionHeader"></h4>
+                            <div class="question-subtitle">Choose the best answer from the options below</div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-warning btn-sm" id="reviewBtn">Mark for Review</button>
+                            <button class="btn btn-outline-danger btn-sm" id="reportQuestionBtn" title="Report an issue with this question">
+                                <i class="bi bi-flag-fill"></i> Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="question-display-area"></div>
+            </div>
+            <div class="navigation-controls">
+                <div class="d-flex justify-content-between align-items-center">
+                    <button class="btn btn-secondary" id="prevBtn">
+                        <i class="bi bi-arrow-left"></i>
+                        Previous
+                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary" id="clearBtn">
+                            <i class="bi bi-eraser"></i>
+                            Clear Response
+                        </button>
+                        <button class="btn btn-primary" id="nextBtn">
+                            <span class="button-text">Save & Next</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-panel">
+            <div class="p-3 flex-grow-1">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="text-primary fw-bold mb-0" style="font-size: 0.9rem;">Question Navigator</h6>
+                    <small class="text-muted" style="font-size: 0.75rem;">Click to jump</small>
+                </div>
+                <div id="palette-container"></div>
+            </div>
+            <div class="palette-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #86efac;"></div>
+                    <span>Answered</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #fca5a5;"></div>
+                    <span>Not Answered</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #a78bfa;"></div>
+                    <span>Marked for Review</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--gray-400);"></div>
+                    <span>Not Visited</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lock Overlay -->
+<div id="test-locked-overlay" class="lock-overlay d-none justify-content-center align-items-center" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1056;">
+    <div class="lock-content">
+        <i class="bi bi-shield-lock-fill lock-icon"></i>
+        <h1 class="display-4 mb-3" style="font-size: 2rem;">Test Locked</h1>
+        <p class="lead mb-3" style="font-size: 1rem;">Your test has been locked due to switching tabs multiple times.</p>
+        <p class="text-white-50" style="font-size: 0.875rem;">Please contact your organization's administrator for assistance.</p>
+    </div>
+</div>
+
+{% include 'student/_test_modals.html' %}
+{% include 'student/_report_modal.html' %}
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function () {
+    // --- 1. STATE & SETUP ---
+    const attemptId = "{{ attempt_id }}";
+    let questions = [], studentAnswers = {}, markedForReview = {}, visited = {}, currentQuestionIndex = 0;
+    let timerInterval, autoSaveTimer;
+    const questionsBySubject = {};
+
+    // Proctoring state
+    let warningCount = 0;
+    const MAX_WARNINGS = 3;
+    let isLockedOut = false;
+    let isOfficialTest = false;
+
+    // --- 2. ELEMENT CACHE & MODALS ---
+    const $loading = $('#test-loading'), $testUi = $('#test-ui');
+    const $timer = $('#timer'), $palette = $('#palette-container'), $legend = $('#palette-legend');
+    const $questionHeader = $('#questionHeader'), $questionDisplay = $('#question-display-area');
+    const $prevBtn = $('#prevBtn'), $nextBtn = $('#nextBtn'), $reviewBtn = $('#reviewBtn'), $submitTestBtn = $('#submitTestBtn'), $clearBtn = $('#clearBtn');
+    const submitModal = new bootstrap.Modal($('#submitConfirmModal')[0]),
+          timeUpModal = new bootstrap.Modal($('#timeUpModal')[0]),
+          warningModal = new bootstrap.Modal($('#warningModal')[0]);
+
+    // --- 3. SCROLL TO TOP HELPER ---
+    function scrollToQuestionTop() {
+        const questionPanel = document.querySelector('.question-panel');
+        if (questionPanel) {
+            questionPanel.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+
+    // --- 4. RENDERING & UI FUNCTIONS ---
+    const updatePaletteBtn = (idx) => {
+        const qId = questions[idx]?.id;
+        if (!qId) return;
+        const $btn = $(`.palette-btn[data-index="${idx}"]`);
+        $btn.removeClass('not-visited unanswered answered review current');
+        let statusClass = visited[qId] ? 'unanswered' : 'not-visited';
+        if (studentAnswers[qId] !== undefined && studentAnswers[qId] !== null) statusClass = 'answered';
+        if (markedForReview[qId]) statusClass = 'review';
+        $btn.addClass(statusClass);
+        if (idx === currentQuestionIndex) $btn.addClass('current');
+    };
+
+    const renderPalette = () => {
+        $palette.empty();
+        for (const subject in questionsBySubject) {
+            const $section = $(`<div class="palette-section"></div>`);
+            const $title = $(`<div class="palette-section-title">${subject}</div>`);
+            const $grid = $('<div class="palette-grid"></div>');
+            
+            questionsBySubject[subject].forEach(q => {
+                $grid.append(`<div class="palette-btn" data-index="${q.originalIndex}" title="Question ${q.originalIndex + 1}">${q.originalIndex + 1}</div>`);
+            });
+            
+            $section.append($title).append($grid);
+            $palette.append($section);
+        }
+        updateAllPaletteStates();
+    };
+
+    const updateAllPaletteStates = () => questions.forEach((q, i) => updatePaletteBtn(i));
+
+    const renderMCQForm = (q, selectedAnswer) => {
+        return (q.mcq_options || []).map(opt => {
+            const checked = selectedAnswer == opt.id ? 'checked' : '';
+            return `<div class="form-check">
+                <input class="form-check-input mcq-option" type="radio" name="mcq_${q.id}" id="opt_${opt.id}" value="${opt.id}" data-question-id="${q.id}" ${checked}>
+                <label class="form-check-label" for="opt_${opt.id}">${opt.option_text}</label>
+            </div>`;
+        }).join('');
+    };
+
+    // Fisher–Yates shuffle
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    const renderQuestion = () => {
+        const q = questions[currentQuestionIndex];
+        if (!q) return;
+
+        visited[q.id] = true;
+        $questionHeader.text(`${q.subject_name} - Question ${currentQuestionIndex + 1}`);
+        let html = '';
+
+        // --- Shuffle logic ---
+        if (q.question_type === 'MCQ' && Array.isArray(q.mcq_options) && !q._shuffled) {
+            q.mcq_options = [...q.mcq_options];
+            shuffleArray(q.mcq_options);
+            q._shuffled = true;
+        }
+
+        if (q.question_type === 'Comprehension' && Array.isArray(q.sub_questions)) {
+            q.sub_questions.forEach(subQ => {
+                if (Array.isArray(subQ.mcq_options) && !subQ._shuffled) {
+                    subQ.mcq_options = [...subQ.mcq_options];
+                    shuffleArray(subQ.mcq_options);
+                    subQ._shuffled = true;
+                }
+            });
+        }
+
+        if (q.question_type === 'Comprehension') {
+            html += `<div class="comprehension-passage">${q.comprehension_passage.passage_text}</div>`;
+            html += `<div class="fs-5 mb-4">${q.question_text}</div><form class="answer-form">`;
+
+            (q.sub_questions || []).forEach(subQ => {
+                const subAnswer = studentAnswers[q.id]?.[subQ.id] || null;
+                html += `<div class="sub-question-container">
+                         <h6 class="sub-question-title">${subQ.question_text}</h6>
+                         ${renderMCQForm(subQ, subAnswer)}
+                       </div>`;
+            });
+
+            html += '</form>';
+
+        } else if (q.question_type === 'OpenEnded') {
+            const ans = studentAnswers[q.id] || '';
+            html += `<div class="fs-5 mb-4">${q.question_text}</div>
+                     <form class="answer-form">
+                       <textarea class="form-control open-ended-answer" data-question-id="${q.id}" rows="10" placeholder="Type your answer here...">${ans}</textarea>
+                     </form>`;
+
+        } else {
+            html += `<div class="fs-5 mb-4">${q.question_text}</div>
+                     <form class="answer-form">
+                       ${renderMCQForm(q, studentAnswers[q.id])}
+                     </form>`;
+        }
+
+        $questionDisplay.html(html);
+        window.typesetMath($questionDisplay[0]);  
+
+        updateNavAndReviewButtons();
+        updateAllPaletteStates();
+        scrollToQuestionTop();
+    };
+
+    const reportModal = new bootstrap.Modal($('#reportModal')[0]);
+    const $reportForm = $('#reportForm');
+    let reportingQuestionId = null;
+
+    // Open modal
+    $(document).on('click', '#reportQuestionBtn', function () {
+        reportingQuestionId = questions?.[currentQuestionIndex]?.id || null;
+        $reportForm[0].reset();
+        reportModal.show();
+    });
+
+    // Submit report
+    $reportForm.on('submit', async function (e) {
+        e.preventDefault();
+
+        const qid = reportingQuestionId ?? questions?.[currentQuestionIndex]?.id;
+        if (!qid) {
+            console.error('No current question id to report.');
+            window.showToast?.('No question to report right now.', 'danger');
+            return;
+        }
+
+        const payload = {
+            reason: $('#reportReason').val(),
+            comments: $('#reportComments').val()
+        };
+
+        if (!payload.reason) {
+            alert('Please select a reason for the report.');
+            return;
+        }
+
+        const $btn = $(this).find('button[type="submit"]');
+        const oldText = $btn.text();
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Submitting...');
+
+        try {
+            const res = await window.authenticatedFetch(`/api/student/questions/${qid}/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+
+            window.showToast?.(data.message || 'Report submitted. Thank you!', 'success');
+            reportModal.hide();
+            $reportForm[0].reset();
+        } catch (err) {
+            console.error(err);
+            window.showToast?.(`Error: ${err.message}`, 'danger') || alert(`Error: ${err.message}`);
+        } finally {
+            $btn.prop('disabled', false).text(oldText);
+        }
+    });
+
+    const updateNavAndReviewButtons = () => {
+        $prevBtn.prop('disabled', currentQuestionIndex === 0);
+        $nextBtn.find('.button-text').html(currentQuestionIndex === questions.length - 1 ? 'Save' : 'Save & Next');
+        const isMarked = markedForReview[questions[currentQuestionIndex]?.id];
+        $reviewBtn.toggleClass('btn-info', isMarked).toggleClass('btn-outline-warning', !isMarked)
+                   .html(isMarked ? '<i class="bi bi-bookmark-check-fill"></i> Marked' : '<i class="bi bi-bookmark-star"></i> Mark for Review');
+    };
+
+    // --- 5. TIMER & SUBMISSION ---
+    const startTimer = (seconds) => {
+        let remaining = seconds;
+        timerInterval = setInterval(() => {
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                $timer.text("00:00:00");
+                timeUpModal.show();
+                submitTest(true);
+                return;
+            }
+            remaining--;
+            const h = String(Math.floor(remaining / 3600)).padStart(2, '0');
+            const m = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
+            const s = String(remaining % 60).padStart(2, '0');
+            $timer.text(`${h}:${m}:${s}`);
+        }, 1000);
+    };
+
+    const saveProgress = async () => {
+        const q = questions[currentQuestionIndex];
+        if (!q) return;
+
+        if (q.question_type === 'MCQ') {
+            const val = $(`input[name="mcq_${q.id}"]:checked`).val();
+            studentAnswers[q.id] = val ? parseInt(val) : undefined;
+        } else if (q.question_type === 'OpenEnded') {
+            const val = $(`.open-ended-answer[data-question-id="${q.id}"]`).val();
+            studentAnswers[q.id] = val || undefined;
+        } else if (q.question_type === 'Comprehension') {
+            let subAnswers = {};
+            (q.sub_questions || []).forEach(subQ => {
+                const val = $(`input[name="mcq_${subQ.id}"]:checked`).val();
+                if (val) subAnswers[subQ.id] = parseInt(val);
+            });
+            studentAnswers[q.id] = Object.keys(subAnswers).length ? subAnswers : undefined;
+        }
+
+        updatePaletteBtn(currentQuestionIndex);
+        try {
+            await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/save-response`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question_id: q.id,
+                    response_data: studentAnswers[q.id],
+                    is_marked_for_review: !!markedForReview[q.id]
+                })
+            });
+        } catch (err) {
+            console.error("Save failed:", err);
+        }
+    };
+
+    const submitTest = async (isAutoSubmit = false) => {
+        clearInterval(timerInterval);
+        $prevBtn.prop('disabled', true);
+        $nextBtn.prop('disabled', true);
+        $reviewBtn.prop('disabled', true);
+        $clearBtn.prop('disabled', true);
+        $submitTestBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Submitting...');
+
+        if (!isAutoSubmit) $('#confirmSubmitBtn').prop('disabled', true);
+        else $('#timeUpModal .modal-body').html('<p>Submitting your answers...</p>');
+
+        await saveProgress();
+
+        try {
+            const res = await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/submit`, { method: 'POST' });
+            if (!res.ok) throw new Error((await res.json()).message || 'Failed to submit.');
+
+            const redirect = () => window.location.href = `/student/mock-test/result/${attemptId}`;
+
+            if (isAutoSubmit) {
+                $('#timeUpModal .modal-body').html('<p class="text-success fw-bold">Test submitted successfully!</p><p>Click OK to view your results.</p>');
+                $('#timeUpOkBtn').prop('disabled', false).on('click', redirect);
+            } else {
+                redirect();
+            }
+
+        } catch (e) {
+            const msg = `Submission Failed: ${e.message}`;
+            if (isAutoSubmit) {
+                $('#timeUpModal .modal-body').html(`<p class="text-danger">${msg}</p><p>Please refresh the page.</p>`);
+            } else {
+                alert(msg);
+                $('#confirmSubmitBtn').prop('disabled', false);
+                $submitTestBtn.prop('disabled', false).text('Submit Test');
+            }
+        }
+    };
+
+    const jumpToQuestion = async (index) => {
+        if (index < 0 || index >= questions.length) return;
+        if (currentQuestionIndex !== index) await saveProgress();
+        currentQuestionIndex = index;
+        renderQuestion();
+    };
+
+    // --- 6. PROCTORING FUNCTIONS ---
+    const showTestLockedScreen = () => {
+        clearInterval(timerInterval);
+        $testUi.addClass('d-none');
+        $('#test-locked-overlay').addClass('d-flex').removeClass('d-none');
+    };
+
+    const handleVisibilityChange = async () => {
+        if (isLockedOut || !document.hidden) return;
+
+        warningCount++;
+
+        try {
+            const response = await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/proctor-event`, {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.is_locked) {
+                isLockedOut = true;
+                document.removeEventListener("visibilitychange", handleVisibilityChange);
+                showTestLockedScreen();
+                return;
+            }
+
+            if (isOfficialTest) {
+                if (warningCount >= MAX_WARNINGS) {
+                    $('#warningMessageText').text(`Warning ${warningCount} of ${MAX_WARNINGS}. Your test will now be locked.`);
+                    warningModal.show();
+                } else {
+                    $('#warningMessageText').text(`Warning ${warningCount} of ${MAX_WARNINGS}: Leaving the test window is prohibited. Further violations will lock your test.`);
+                    warningModal.show();
+                }
+            } else {
+                $('#warningMessageText').text('You have switched tabs. In a real test, this could lead to your test being locked.');
+                warningModal.show();
+            }
+        } catch (error) {
+            console.error("Failed to report proctoring event:", error);
+        }
+    };
+
+    const lockTest = async () => {
+        isLockedOut = true;
+        clearInterval(timerInterval);
+        $testUi.addClass('d-none');
+        $('#test-locked-overlay').addClass('d-flex').removeClass('d-none');
+        try {
+            await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/lock`, {
+                method: 'POST'
+            });
+        } catch (error) {
+            console.error("Failed to lock test:", error);
+        }
+    };
+
+    // --- 7. EVENT HANDLERS ---
+    $prevBtn.on('click', () => jumpToQuestion(currentQuestionIndex - 1));
+    $nextBtn.on('click', () => {
+        if (currentQuestionIndex >= questions.length - 1) saveProgress();
+        else jumpToQuestion(currentQuestionIndex + 1);
+    });
+    $reviewBtn.on('click', () => {
+        const qId = questions[currentQuestionIndex].id;
+        markedForReview[qId] = !markedForReview[qId];
+        updateNavAndReviewButtons();
+        updatePaletteBtn(currentQuestionIndex);
+    });
+    $clearBtn.on('click', () => {
+        const qId = questions[currentQuestionIndex].id;
+        $(`input[name="mcq_${qId}"]`).prop('checked', false);
+        $(`.open-ended-answer[data-question-id="${qId}"]`).val('');
+        saveProgress();
+    });
+    $submitTestBtn.on('click', () => submitModal.show());
+    $('#confirmSubmitBtn').on('click', () => submitTest(false));
+    $palette.on('click', '.palette-btn', function () {
+        jumpToQuestion($(this).data('index'));
+    });
+    $questionDisplay.on('change keyup', 'input, textarea', () => {
+        clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(saveProgress, 1500);
+    });
+
+    // Make entire form-check clickable
+    $(document).on('click', '.form-check', function(e) {
+        if (e.target.type === 'radio' || e.target.tagName === 'LABEL') return;
+        const $radio = $(this).find('input[type="radio"]');
+        if ($radio.length) {
+            $radio.prop('checked', true).trigger('change');
+        }
+    });
+
+    // --- 8. INITIALIZATION ---
+    const initTest = async () => {
+        try {
+            const response = await window.authenticatedFetch(`/api/student/mock-test/attempts/${attemptId}/questions`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            // Handle different status scenarios
+            if (data.status === 'locked') {
+                isLockedOut = true;
+                $loading.hide();
+                showTestLockedScreen();
+                return;
+            }
+            
+            if (data.status === 'unlocked_resume') {
+                const $resumeMessage = $(`
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert" style="position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 1050; max-width: 600px; font-size: 0.875rem;">
+                        <i class="bi bi-shield-check-fill me-2"></i>
+                        <strong>Test Resumed:</strong> Your test session has been restored. You can continue from where you left off.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `);
+                $('body').prepend($resumeMessage);
+                warningCount = 0;
+            }
+
+            if (data.status !== 'in_progress' && data.status !== 'unlocked_resume') {
+                const statusMessages = {
+                    'completed': 'This test has already been completed.',
+                    'time_up': 'The time for this test has expired.',
+                    'not_found': 'Test attempt not found.',
+                    'awaiting_results': 'Test completed. Results will be available once grading is finished.'
+                };
+                
+                $loading.html(`
+                    <div class="alert alert-info m-5" style="font-size: 0.9rem;">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        ${statusMessages[data.status] || 'This test is not available.'}
+                    </div>
+                `);
+                return;
+            }
+
+            if (data.is_live_test && data.live_end_time) {
+                const now = new Date();
+                const endTime = new Date(data.live_end_time);
+                
+                if (now > endTime) {
+                    $loading.html(`
+                        <div class="alert alert-warning m-5" style="font-size: 0.9rem;">
+                            <i class="bi bi-clock-fill me-2"></i>
+                            The time for this live test has ended. Your responses have been automatically submitted.
+                        </div>
+                    `);
+                    return;
+                }
+            }
+
+            isOfficialTest = data.mock_test_status === 'active';
+            questions = data.questions || [];
+
+            questions.forEach((q, index) => {
+                if (q.student_response) studentAnswers[q.id] = q.student_response;
+                if (q.is_marked_for_review) markedForReview[q.id] = true;
+                const subject = q.subject_name || 'General';
+                if (!questionsBySubject[subject]) questionsBySubject[subject] = [];
+                questionsBySubject[subject].push({ ...q, originalIndex: index });
+            });
+
+            $('#testName').text(data.mock_test_title);
+            $('#examName').text(`Part of: ${data.exam_name}`);
+            renderPalette();
+            renderQuestion();
+            startTimer(data.remaining_seconds);
+            $loading.addClass('d-none');
+            $testUi.removeClass('d-none').addClass('d-flex');
+
+            if (!isLockedOut) {
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+            }
+            
+        } catch (err) {
+            $loading.html(`<div class="alert alert-danger m-5" style="font-size: 0.9rem;">Error loading test: ${err.message}</div>`);
+        }
+    };
+
+    initTest();
+});
+</script>
+{% endblock %}

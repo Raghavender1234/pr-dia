@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Organization Reports Queue{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h2>Organization Reports Queue</h2>
+    <p class="text-muted">Review organizations reported by users for systemic issues like spam or inappropriate content.</p>
+    <div id="reportMessage" class="my-3"></div>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="orgReportsTable" class="table table-hover" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    const showMessage = (msg, type = 'success') => {
+        $('#reportMessage').html(`<div class="alert alert-${type}">${msg}</div>`);
+    };
+
+    const table = $('#orgReportsTable').DataTable({
+        ajax: {
+            url: '/api/super-admin/organization-reports',
+            dataSrc: '',
+            headers: { 'Authorization': 'Bearer ' + window.APP_CONTEXT.accessToken }
+        },
+        columns: [
+            { data: 'organization_name', title: 'Organization' },
+            { data: 'reason', title: 'Reason' },
+            { data: 'comments', title: 'Comments', defaultContent: '<em>N/A</em>' },
+            { data: 'reporter_email', title: 'Reported By' },
+            { data: 'reported_at', title: 'Date', render: data => new Date(data).toLocaleString() },
+            {
+                data: 'report_id',
+                title: 'Actions',
+                orderable: false,
+                render: (id, type, row) => `
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-success resolve-btn" data-id="${id}" title="Mark as Resolved (e.g., after warning)">Resolve</button>
+                        <button class="btn btn-sm btn-danger suspend-btn" data-id="${id}" data-name="${row.organization_name}" title="Suspend this organization's account">Suspend Org</button>
+                    </div>`
+            }
+        ],
+        order: [[4, 'desc']]
+    });
+
+    // Handle Resolve button click
+    $('#orgReportsTable').on('click', '.resolve-btn', async function() {
+        const reportId = $(this).data('id');
+        if (!confirm('Are you sure you want to mark this report as resolved?')) return;
+        
+        try {
+            const res = await window.authenticatedFetch(`/api/super-admin/organization-reports/${reportId}/resolve`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            showMessage(data.message, 'success');
+            table.ajax.reload();
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        }
+    });
+
+    // Handle Suspend button click
+    $('#orgReportsTable').on('click', '.suspend-btn', async function() {
+        const reportId = $(this).data('id');
+        const orgName = $(this).data('name');
+        if (!confirm(`WARNING: Are you sure you want to SUSPEND the organization "${orgName}"? This will deactivate their account and all their users.`)) return;
+
+        try {
+            const res = await window.authenticatedFetch(`/api/super-admin/organization-reports/${reportId}/suspend`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+            showMessage(data.message, 'warning');
+            table.ajax.reload();
+        } catch (err) {
+            showMessage(err.message, 'danger');
+        }
+    });
+};
+</script>
+{% endblock %}

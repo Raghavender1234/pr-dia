@@ -1,0 +1,76 @@
+<div class="row g-3">
+    <div class="col-md-6 mb-3">
+        <label for="questionType" class="form-label fw-bold">Question Type <span class="text-danger">*</span></label>
+        <select class="form-select" id="questionType">
+            <option value="" disabled selected>--- Select Type ---</option>
+            <option value="MCQ">MCQ (Multiple Choice)</option>
+            <option value="Comprehension">Comprehension (Passage + Sub-Questions)</option>
+            <option value="OpenEnded">Open Ended (Essay/Code)</option>
+        </select>
+    </div>
+    <div class="col-md-6 mb-3">
+        <label for="difficultyLevel" class="form-label fw-bold">Difficulty Level <span class="text-danger">*</span></label>
+        <select class="form-select" id="difficultyLevel">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label for="questionText" class="form-label fw-bold">Question Text / Comprehension Title <span class="text-danger">*</span></label>
+    <div id="questionText"></div>
+</div>
+
+<div id="mcqSection" class="form-section card card-body mb-3 border-light shadow-sm">
+    <h6 class="text-secondary mb-3 border-bottom pb-2">MCQ Details</h6>
+    <div class="mb-3"> 
+        <label for="mcqParentComprehension" class="form-label">Parent Comprehension (Optional)</label>
+        <select class="form-select form-select-sm" id="mcqParentComprehension"></select>
+    </div>
+    <label class="form-label">Options: <span class="text-danger">*</span> <small class="text-muted">(Select one correct answer)</small></label>
+    <div id="mcqOptionsContainer">
+        {% for i in range(4) %}
+        <div class="mcq-option-item input-group mb-2">
+            <div class="input-group-text">
+                <input class="form-check-input mt-0" type="radio" name="correct_option_main">
+            </div>
+            <input type="text" class="form-control mcq-option-text" placeholder="Option text">
+            <button type="button" class="btn btn-outline-danger remove-mcq-option-btn">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-success mt-2 align-self-start" id="addMcqOptionBtn">
+        <i class="bi bi-plus-circle"></i> Add Option
+    </button>
+</div>
+
+<div id="comprehensionSection" class="form-section card card-body mb-3 border-light shadow-sm">
+    <h6 class="text-secondary mb-3 border-bottom pb-2">Comprehension Passage <span class="text-danger">*</span></h6>
+    <div class="mb-3">
+        <label for="comprehensionPassageText" class="form-label">Passage Text:</label>
+        <div id="comprehensionPassageText"></div>
+    </div>
+    <hr>
+    <h6 class="text-secondary mb-2">Sub-Questions for this Comprehension</h6>
+    <div id="subQuestionsContainer"></div>
+    <button type="button" class="btn btn-sm btn-outline-primary mt-2 align-self-start" id="addSubQuestionBtn">
+        <i class="bi bi-plus-square-dotted"></i> Add Sub-Question
+    </button>
+</div>
+
+<div id="openEndedSection" class="form-section card card-body mb-3 border-light shadow-sm">
+    <h6 class="text-secondary mb-3 border-bottom pb-2">Open Ended Details</h6>
+    <div class="mb-3">
+        <label for="openEndedSampleAnswer" class="form-label">Sample Answer (for AI validation):</label>
+        <div id="openEndedSampleAnswer"></div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label for="explanationText" class="form-label fw-bold">Explanation / Trick <small class="text-muted">(Optional)</small></label>
+    <div id="explanationText"></div>
+</div>

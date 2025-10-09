@@ -1,0 +1,1073 @@
+{% extends "base.html" %}
+
+{% block title %}Super Admin Dashboard - DIA{% endblock %}
+
+{% block head_extra %}
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+:root {
+  /* Primary Colors - Deep Blue to Purple */
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --primary-dark: #5a67d8;
+  --primary-light: #e6fffa;
+  
+  /* Accent Colors */
+  --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ffa726 100%);
+  --info-gradient: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  
+  /* Background System */
+  --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  
+  /* Text Colors */
+  --text-primary: #2d3748;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  --text-white: #ffffff;
+  
+  /* Shadows */
+  --shadow-soft: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-medium: 0 20px 40px -12px rgba(0, 0, 0, 0.15);
+  --shadow-hard: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+}
+
+/* Reset and Base */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-primary);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.container-fluid {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--radius-xl);
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-medium);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.dashboard-header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Ccircle cx='49' cy='49' r='2'/%3E%3Ccircle cx='29' cy='29' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  animation: float 30s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0% { transform: rotate(0deg) translate(-50%, -50%); }
+  100% { transform: rotate(360deg) translate(-50%, -50%); }
+}
+
+.dashboard-header h1 {
+  color: var(--text-white);
+  font-weight: 800;
+  font-size: 2.75rem;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-header p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.125rem;
+  margin: 0;
+  font-weight: 400;
+  position: relative;
+  z-index: 1;
+}
+
+/* Stat Cards */
+.stat-card {
+  background: var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  height: 100%;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-hard);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.stat-card:hover::before {
+  transform: translateX(100%);
+}
+
+.stat-card-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.stat-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  color: white;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.stat-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 50%);
+  border-radius: inherit;
+}
+
+.stat-card.primary .stat-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-card.success .stat-icon {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stat-card.warning .stat-icon {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.stat-card.danger .stat-icon {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffa726 100%);
+}
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--text-primary), #667eea);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Quick Links */
+.quick-link {
+  background: var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  height: 100%;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(20px);
+  position: relative;
+  overflow: hidden;
+}
+
+.quick-link::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.quick-link:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: var(--shadow-hard);
+  text-decoration: none;
+  color: inherit;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.quick-link:hover::before {
+  opacity: 1;
+}
+
+.quick-link-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.quick-link-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.quick-link-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 50%);
+  border-radius: inherit;
+}
+
+.quick-link.primary .quick-link-icon {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.quick-link.warning .quick-link-icon {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.quick-link-info h6 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+.quick-link-info small {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+  background: var(--bg-glass);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(20px);
+  height: 100%;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium);
+}
+
+.card-header {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.05));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.75rem 2rem;
+  position: relative;
+}
+
+.card-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 2rem;
+  right: 2rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent);
+}
+
+.card-header h5 {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+}
+
+.card-header .bi {
+  margin-right: 0.75rem;
+  color: #667eea;
+  font-size: 1.25rem;
+}
+
+.card-body {
+  padding: 2rem;
+}
+
+/* Chart Container */
+.chart-container {
+  position: relative;
+  height: 350px;
+  width: 100%;
+  padding: 1.5rem;
+}
+
+#userRolesChart {
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+}
+
+/* Activity Container */
+.activity-container {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0;
+  position: relative;
+}
+
+.activity-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.activity-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.activity-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 3px;
+}
+
+.activity-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+}
+
+.activity-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.activity-item {
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.activity-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.activity-item:hover {
+  background: rgba(102, 126, 234, 0.05);
+  transform: translateX(4px);
+}
+
+.activity-item:hover::before {
+  opacity: 1;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item div {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.activity-item small {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* Organizations Table */
+.table-responsive {
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  overflow: hidden;
+}
+
+.organizations-table {
+  margin: 0;
+  background: transparent;
+}
+
+.organizations-table th {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.05));
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  border: none;
+  padding: 1.25rem 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+}
+
+.organizations-table td {
+  vertical-align: middle;
+  font-size: 0.9rem;
+  border: none;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 500;
+}
+
+.organizations-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.organizations-table tbody tr:hover {
+  background: rgba(102, 126, 234, 0.05);
+  transform: scale(1.01);
+}
+
+.organizations-table .fw-medium {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.organizations-table .text-muted {
+  color: var(--text-muted) !important;
+  font-size: 0.8125rem;
+}
+
+/* Loading States */
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border-radius: var(--radius-lg);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-left: 3px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Badges */
+.badge {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.025em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.badge.bg-light {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.badge.bg-success {
+  background: linear-gradient(135deg, #4facfe, #00f2fe) !important;
+  color: white !important;
+}
+
+.badge.bg-danger {
+  background: linear-gradient(135deg, #ff6b6b, #ffa726) !important;
+  color: white !important;
+}
+
+/* Buttons */
+.btn-outline-primary {
+  border: 2px solid #667eea;
+  color: #667eea;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  background: transparent;
+  backdrop-filter: blur(10px);
+}
+
+.btn-outline-primary:hover {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-color: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.btn-sm {
+  padding: 0.5rem 1.25rem;
+  font-size: 0.8125rem;
+}
+
+/* Alert Messages */
+.alert {
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.75rem;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft);
+}
+
+.alert-danger {
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 167, 38, 0.1));
+  color: #e53e3e;
+  border-left: 4px solid #ff6b6b;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(0, 242, 254, 0.1));
+  color: #38a169;
+  border-left: 4px solid #4facfe;
+}
+
+.alert-info {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  color: #667eea;
+  border-left: 4px solid #667eea;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-card,
+.quick-link,
+.dashboard-card {
+  animation: fadeInUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) backwards;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.1s; }
+.stat-card:nth-child(2) { animation-delay: 0.2s; }
+.stat-card:nth-child(3) { animation-delay: 0.3s; }
+.stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 2rem 1.5rem;
+    border-radius: var(--radius-lg);
+  }
+  
+  .dashboard-header h1 {
+    font-size: 2.25rem;
+  }
+  
+  .stat-card,
+  .quick-link {
+    padding: 1.5rem;
+  }
+  
+  .stat-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+  }
+  
+  .stat-value {
+    font-size: 2rem;
+  }
+  
+  .chart-container {
+    height: 280px;
+    padding: 1rem;
+  }
+  
+  .activity-container {
+    max-height: 320px;
+  }
+  
+  .card-header,
+  .card-body {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .container-fluid {
+    padding: 1rem !important;
+  }
+  
+  .dashboard-header {
+    padding: 1.5rem 1rem;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 1.875rem;
+  }
+  
+  .dashboard-header p {
+    font-size: 1rem;
+  }
+  
+  .stat-card,
+  .quick-link {
+    padding: 1.25rem;
+  }
+  
+  .stat-card-content,
+  .quick-link-content {
+    gap: 1rem;
+  }
+  
+  .stat-icon,
+  .quick-link-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.25rem;
+  }
+  
+  .stat-value {
+    font-size: 1.75rem;
+  }
+  
+  .quick-link-info h6 {
+    font-size: 1rem;
+  }
+  
+  .chart-container {
+    padding: 0.75rem;
+    height: 250px;
+  }
+  
+  .activity-item {
+    padding: 1rem 1.5rem;
+  }
+  
+  .organizations-table th,
+  .organizations-table td {
+    padding: 1rem 1.5rem;
+    font-size: 0.8125rem;
+  }
+  
+  .card-header,
+  .card-body {
+    padding: 1.25rem;
+  }
+}
+
+/* Enhanced Glass Effect */
+@supports (backdrop-filter: blur(20px)) {
+  .stat-card,
+  .quick-link,
+  .dashboard-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <div class="dashboard-header">
+        <h1>Super Admin Dashboard</h1>
+        <p>Welcome, <strong>{{ g.user_context.user_name or 'Super Admin' }}</strong>. Here's a global overview of the DIA platform.</p>
+    </div>
+
+    <div id="superAdminMessage"></div>
+
+    <!-- Top stats -->
+    <div class="row g-4 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="stat-card primary">
+                <div class="stat-card-content">
+                    <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalUsersCount">—</div>
+                        <div class="stat-label">Total Users</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="stat-card success">
+                <div class="stat-card-content">
+                    <div class="stat-icon"><i class="bi bi-building-fill"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalOrganizationsCount">—</div>
+                        <div class="stat-label">Organizations</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="stat-card primary">
+                <div class="stat-card-content">
+                    <div class="stat-icon"><i class="bi bi-journal-check"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="activePlansCount">—</div>
+                        <div class="stat-label">Active Plans</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="stat-card warning">
+                <div class="stat-card-content">
+                    <div class="stat-icon"><i class="bi bi-question-circle-fill"></i></div>
+                    <div class="stat-info">
+                        <div class="stat-value" id="totalQuestionsCount">—</div>
+                        <div class="stat-label">Total Questions</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="row g-4 mb-4">
+        <div class="col-sm-6 col-lg-6">
+            <a href="{{ url_for('frontend.approval_queue_page') }}" class="quick-link primary">
+                <div class="quick-link-content">
+                    <div class="quick-link-icon"><i class="bi bi-patch-check-fill"></i></div>
+                    <div class="quick-link-info">
+                        <h6>Approval Queue</h6>
+                        <small>Review pending organizations and manage approval requests</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-sm-6 col-lg-6">
+            <a href="{{ url_for('frontend.organization_reports_page') }}" class="quick-link warning">
+                <div class="quick-link-content">
+                    <div class="quick-link-icon"><i class="bi bi-flag-fill"></i></div>
+                    <div class="quick-link-info">
+                        <h6>Organization Reports</h6>
+                        <small>View and manage reported organization issues</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Charts + Activity -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5><i class="bi bi-bar-chart-line-fill"></i> User Roles Distribution</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="chart-container" id="userRolesChartLoading">
+                        <div class="loading-container"><div class="loading-spinner"></div></div>
+                    </div>
+                    <canvas id="userRolesChart" style="display:none;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <h5><i class="bi bi-activity"></i> Recent Activity</h5>
+                </div>
+                <div class="position-relative">
+                    <div id="activityLogLoading" class="loading-container" style="position: absolute; inset: 0; z-index: 10; background: rgba(255, 255, 255, 0.9);">
+                        <div class="loading-spinner"></div>
+                    </div>
+                    <div class="activity-container">
+                        <ul id="activityLog" class="activity-list"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organizations table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="dashboard-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="bi bi-building-check"></i> Recently Joined Organizations</h5>
+                    <a href="{{ url_for('frontend.org_user_global_management') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-gear-fill me-1"></i>Manage All
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div id="organizationsTableLoading" class="loading-container">
+                        <div class="loading-spinner"></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table organizations-table" id="organizationsTable" style="display:none;">
+                            <thead>
+                                <tr>
+                                    <th>Organization</th>
+                                    <th>Plan</th>
+                                    <th>Status</th>
+                                    <th>Users</th>
+                                    <th>Joined</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+// Clean, working JavaScript logic
+window.pageInit = function() {
+    const showMsg = (txt, type = 'danger') => { 
+        document.getElementById('superAdminMessage').innerHTML = `<div class="alert alert-${type}">${txt}</div>`; 
+    };
+
+    // Helper to fade out loading spinners
+    const hideLoading = (elementId) => {
+        const el = document.getElementById(elementId);
+        if(el) el.style.display = 'none';
+    };
+
+    function toTitleCase(str) {
+        return str.replace(/_/g, ' ').replace(/\w\S*/g, function(txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+        });
+    }
+
+    // Load Stats
+    window.authenticatedFetch('/api/super-admin/dashboard/summary')
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load summary stats')))
+        .then(data => {
+            document.getElementById('totalUsersCount').textContent = data.total_users;
+            document.getElementById('totalOrganizationsCount').textContent = data.total_organizations;
+            document.getElementById('activePlansCount').textContent = data.active_plans;
+            document.getElementById('totalQuestionsCount').textContent = data.total_questions;
+        })
+        .catch(err => showMsg(err.message));
+
+    // User Roles Chart
+    const rolesChartCanvas = document.getElementById('userRolesChart');
+    window.authenticatedFetch('/api/super-admin/user_roles')
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load user roles')))
+        .then(data => {
+            hideLoading('userRolesChartLoading');
+            rolesChartCanvas.style.display = 'block';
+            new Chart(rolesChartCanvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'User Count',
+                        data: data.counts,
+                        backgroundColor: [
+                            'rgb(37, 99, 235)', // Blue
+                            'rgb(5, 150, 105)', // Green
+                            'rgb(217, 119, 6)', // Orange
+                            'rgb(220, 38, 38)'  // Red
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { 
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                font: {
+                                    family: 'Inter',
+                                    size: 12
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            hideLoading('userRolesChartLoading');
+            showMsg(err.message);
+        });
+
+    // Activity Feed
+    const activityUl = document.getElementById('activityLog');
+    window.authenticatedFetch('/api/super-admin/activity?limit=8')
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load activity')))
+        .then(data => {
+            hideLoading('activityLogLoading');
+            if (!data.length) {
+                activityUl.innerHTML = '<li class="activity-item text-center text-muted">No recent activity</li>';
+                return;
+            }
+            data.forEach(a => {
+                const li = document.createElement('li');
+                li.className = 'activity-item';
+                li.innerHTML = `<div>${a.message}</div><small>${new Date(a.timestamp).toLocaleString()}</small>`;
+                activityUl.appendChild(li);
+            });
+        })
+        .catch(err => {
+            hideLoading('activityLogLoading');
+            activityUl.innerHTML = `<li class="activity-item text-danger">${err.message}</li>`;
+        });
+
+    // Organizations Table
+    const orgsTableLoading = document.getElementById('organizationsTableLoading');
+    const orgsTable = document.getElementById('organizationsTable');
+    const orgsTbody = orgsTable.querySelector('tbody');
+    window.authenticatedFetch('/api/super-admin/organizations?limit=5')
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('Failed to load organizations')))
+        .then(data => {
+            hideLoading('organizationsTableLoading');
+            if (!data.length) {
+                orgsTbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No organizations available</td></tr>';
+            } else {
+                let rows = '';
+                data.forEach(org => {
+                    const formattedStatus = toTitleCase(org.status);
+                    const statusBadge = `<span class="badge bg-${org.status === 'active' ? 'success' : 'danger'}">${formattedStatus}</span>`;
+                    const userCount = (org.current_student_count || 0) + (org.current_coadmin_count || 0);
+
+                    rows += `<tr>
+                        <td><div class="fw-medium">${org.name}</div><small class="text-muted">${org.org_code}</small></td>
+                        <td><span class="badge bg-light">${org.plan_name || 'N/A'}</span></td>
+                        <td>${statusBadge}</td>
+                        <td>${userCount}</td>
+                        <td>${new Date(org.created_at).toLocaleDateString()}</td>
+                    </tr>`;
+                });
+                orgsTbody.innerHTML = rows;
+            }
+            orgsTable.style.display = 'table';
+        })
+        .catch(err => {
+            hideLoading('organizationsTableLoading');
+            showMsg(err.message);
+        });
+};
+</script>
+{% endblock %}

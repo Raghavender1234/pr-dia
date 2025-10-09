@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% set show_navbar = false %}
+
+{% block title %}
+    {% if organization %}
+        Welcome to {{ organization.name }}
+    {% else %}
+        DIA - Your Ultimate Exam Prep Platform
+    {% endif %}
+{% endblock %}
+
+{# This block is intentionally left empty to hide the main navbar on this page #}
+{% block navbar %}{% endblock %}
+
+{% block content %}
+{# This parameter is used to make the buttons subdomain-aware #}
+{% set org_param = {'org': organization.subdomain} if organization else {} %}
+
+<!-- Hero Section -->
+<div class="hero-section position-relative overflow-hidden">
+    <div class="hero-background"></div>
+    <div class="container-fluid px-0">
+        <div class="row min-vh-100 align-items-center justify-content-center">
+            <div class="col-12">
+                <div class="text-center py-5">
+                    {% if organization %}
+                        {# --- ORGANIZATION-SPECIFIC VIEW --- #}
+                        <div class="org-logo-container mb-4">
+                            <img src="{{ organization.logo_url or url_for('static', filename='images/org-logo.png') }}" 
+                                 alt="{{ organization.name }} Logo" 
+                                 class="org-logo animate-fade-in">
+                        </div>
+                        <h1 class="display-3 fw-bold text-white mb-3 animate-slide-up">
+                            Welcome to <span class="text-gradient">{{ organization.name }}</span>
+                        </h1>
+                        <p class="lead text-light opacity-90 col-lg-8 mx-auto mb-5 animate-slide-up-delay">
+                            Your dedicated space for academic excellence. Access all your exams and learning materials 
+                            provided by {{ organization.name }}.
+                        </p>
+                    {% else %}
+                        {# --- GLOBAL/MAIN SITE VIEW --- #}
+                        <div class="hero-logo-container mb-4">
+                            <img src="{{ url_for('static', filename='images/hero_banner.png') }}" 
+                                 class="hero-logo animate-fade-in" 
+                                 alt="Welcome to DIA">
+                        </div>
+                        <h1 class="display-2 fw-bold text-white mb-3 animate-slide-up">
+                            Master Your Exams with <span class="text-gradient">DIA</span>
+                        </h1>
+                        <p class="lead text-light opacity-90 col-lg-8 mx-auto mb-5 animate-slide-up-delay">
+                            The ultimate platform for students and organizations, powered by AI to help you achieve your goals.
+                        </p>
+                    {% endif %}
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-3 d-sm-flex justify-content-sm-center animate-slide-up-delay-2">
+                        {% if g.user_context.get('is_logged_in') %}
+                            <a href="{{ url_for(g.user_context['dashboard_url'], **org_param) }}" 
+                               class="btn btn-hero-primary btn-lg px-5 py-3">
+                                <i class="fas fa-tachometer-alt me-2"></i>Go to Your Dashboard
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('frontend.register', **org_param) }}" 
+                               class="btn btn-hero-primary btn-lg px-5 py-3">
+                                <i class="fas fa-rocket me-2"></i>Get Started for Free
+                            </a>
+                            <a href="{{ url_for('frontend.login', **org_param) }}" 
+                               class="btn btn-hero-secondary btn-lg px-5 py-3">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- Scroll Indicator -->
+                    <div class="scroll-indicator animate-bounce-delay">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# The rest of your marketing content for the global page... #}
+{% if not organization %}
+    <!-- Features Section -->
+    <div class="features-section py-5">
+        <div class="container">
+            <div class="row justify-content-center mb-5">
+                <div class="col-lg-8 text-center">
+                    <h2 class="display-5 fw-bold mb-3">Why Choose DIA?</h2>
+                    <p class="lead text-muted">Discover the features that make DIA the perfect choice for your exam preparation journey.</p>
+                </div>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">AI-Powered Learning</h4>
+                        <p class="text-muted">Advanced AI algorithms adapt to your learning style and provide personalized study plans.</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">Progress Tracking</h4>
+                        <p class="text-muted">Monitor your improvement with detailed analytics and performance insights.</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">Multi-Tenant Support</h4>
+                        <p class="text-muted">Perfect for organizations with dedicated spaces for different institutions.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="stats-section py-5">
+        <div class="container">
+            <div class="row text-center">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-item">
+                        <h3 class="display-4 fw-bold text-primary mb-2">10K+</h3>
+                        <p class="text-muted">Active Students</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-item">
+                        <h3 class="display-4 fw-bold text-primary mb-2">500+</h3>
+                        <p class="text-muted">Organizations</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-item">
+                        <h3 class="display-4 fw-bold text-primary mb-2">95%</h3>
+                        <p class="text-muted">Success Rate</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <div class="stat-item">
+                        <h3 class="display-4 fw-bold text-primary mb-2">24/7</h3>
+                        <p class="text-muted">Support</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+<style>
+/* Hero Section Styles */
+.hero-section {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    position: relative;
+}
+
+.hero-background {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="30" cy="30" r="1" fill="rgba(255,255,255,0.05)"/><circle cx="70" cy="70" r="1" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+    opacity: 0.2;
+    pointer-events: none;
+    z-index: 0;
+}
+.hero-section .container-fluid {
+    position: relative;
+    z-index: 1;
+}
+
+
+/* Make org logo stand out */
+.org-logo {
+    max-height: 250px; /* bigger logo */
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    padding: 25px 40px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    animation: fadeIn 1s ease-out;
+}
+
+.hero-logo {
+    max-height: 220px;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+}
+
+.text-gradient {
+    background: linear-gradient(45deg, #4facfe, #00f2fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Primary Hero Button */
+.btn-hero-primary {
+    background: linear-gradient(45deg, #007bff, #0056d2);
+    border: none;
+    color: white;
+    font-weight: 600;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+}
+.btn-hero-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(0, 123, 255, 0.5);
+    color: white;
+}
+
+/* Secondary Hero Button */
+.btn-hero-secondary {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.25);
+    color: white;
+    font-weight: 600;
+    border-radius: 50px;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+}
+.btn-hero-secondary:hover {
+    background: rgba(255,255,255,0.25);
+    transform: translateY(-3px);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+</style>
+
+
+{% endblock %}

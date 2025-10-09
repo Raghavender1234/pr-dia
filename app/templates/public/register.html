@@ -1,0 +1,527 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Your Account - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root {
+    --primary: #667eea;
+    --primary-2: #764ba2;
+    --border: #e2e8f0;
+    --muted: #6b7280;
+  }
+
+  /* Base */
+  * { transition: none !important; } /* kill global animations */
+  body {
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+    overflow-x: hidden;
+  }
+
+  /* Wrapper/Layout (kept simple) */
+  .auth-layout { min-height: 100vh; padding: 2rem 0; }
+  .auth-card {
+    max-width: 1200px; margin: 0 auto;
+    border-radius: 24px; overflow: hidden;
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(255,255,255,0.2);
+    /* removed backdrop-filter + big box-shadow + entrance anim */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  /* LEFT IMAGE PANEL — keep as-is, no animations */
+  .bg-register-image,
+  .auth-image-section {
+    background: url('/static/images/register-image.jpg') center/cover no-repeat;
+    position: relative;
+    min-height: 100vh; /* ensures image is visible */
+  }
+  /* subtle overlay only (no moving dots/gradients) */
+  .auth-image-section::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(102,126,234,.35), rgba(118,75,162,.35));
+  }
+
+  /* Optional text overlay (kept simple) */
+  .text-overlay { position: relative; z-index: 1; color: #fff; text-align: center; padding: 2rem; }
+  .text-overlay h2 { font-size: 2.25rem; font-weight: 800; margin-bottom: .75rem; text-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .text-overlay p { font-size: 1rem; opacity: .95; }
+
+  /* RIGHT FORM PANEL — keep clean, no animations */
+  .inner-form-container {
+    background: #fff; border-radius: 20px;
+    padding: 2rem; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,.06);
+  }
+
+  /* Titles / colors */
+  .card-title, .text-primary { color: var(--primary) !important; }
+  .card-title { font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 1.25rem; }
+
+  /* Toggle (no scale/hover animations) */
+  .user-type-toggle {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 16px; padding: .5rem; margin-bottom: 1.25rem;
+  }
+  .btn-check:checked + .btn-outline-primary {
+    background: var(--primary); color: #fff; border-color: var(--primary);
+  }
+  .btn-outline-primary {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: .875rem 1.25rem; font-weight: 600; background: #fff; color: var(--primary);
+  }
+
+  /* Forms */
+  .form-label {
+    color: #4a5568; font-weight: 600; margin-bottom: .5rem; font-size: .9rem;
+    text-transform: uppercase; letter-spacing: .4px;
+  }
+  .form-control, .form-select {
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 1rem 1.25rem; font-size: 1rem; background: #fff; margin-bottom: 1rem;
+    box-shadow: none;
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+    background: #fff;
+  }
+
+  /* Validation (keep minimal) */
+  .form-control.is-valid { border-color: #10b981; }
+  .form-control.is-invalid { border-color: #ef4444; }
+
+  /* Buttons (no fancy glints/scale) */
+  .btn { border-radius: 16px; padding: 1rem 2rem; font-weight: 600; letter-spacing: .3px; border: none; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { filter: brightness(.97); color: #fff; }
+  .btn-danger { background: #ea4335; color: #fff; }
+  .btn-danger:hover { filter: brightness(.97); color: #fff; }
+  .btn:disabled { opacity: .7; }
+
+  /* Divider */
+  .divider { position: relative; text-align: center; margin: 1.25rem 0; }
+  .divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border); }
+  .divider small { background: #fff; padding: 0 .6rem; color: var(--muted); position: relative; }
+
+  /* Alerts (no slide-in) */
+  .alert { border: none; border-left: 4px solid transparent; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+  .alert-success { background: #ecfdf5; color: #065f46; border-left-color: #10b981; }
+  .alert-danger  { background: #fef2f2; color: #7f1d1d; border-left-color: #ef4444; }
+  .alert-info    { background: #eff6ff; color: #1e3a8a; border-left-color: #3b82f6; }
+  .alert-warning { background: #fffbeb; color: #92400e; border-left-color: #f59e0b; }
+
+  /* Links */
+  .auth-links { text-align: center; margin-top: 1rem; }
+  .auth-links a { color: var(--primary); text-decoration: none; }
+  .auth-links a:hover { text-decoration: underline; }
+
+  /* Sections (no entrance animation) */
+  .form-section { opacity: 1; transform: none; }
+
+  /* Password strength (kept simple) */
+  .password-strength { height: 4px; border-radius: 2px; margin-top: .5rem; background: #e5e7eb; overflow: hidden; }
+  .password-strength-bar { height: 100%; width: 0%; background: #ef4444; }
+  .password-strength.medium .password-strength-bar { width: 66%; background: #f59e0b; }
+  .password-strength.strong .password-strength-bar { width: 100%; background: #10b981; }
+
+  /* Remove unused/heavy effects outright */
+  .auth-layout::before,
+  .auth-image-section::after,
+  .floating-shapes,
+  .shake { display: none !important; }
+
+  /* Responsive */
+  @media (max-width: 992px) {
+    .auth-card { margin: 1rem; border-radius: 20px; }
+    .inner-form-container { padding: 1.5rem; }
+    .card-title { font-size: 1.8rem; }
+    .bg-register-image { min-height: 280px; } /* show image area on tablets if needed */
+  }
+  @media (max-width: 576px) {
+    .inner-form-container { padding: 1.25rem; }
+    .btn { padding: .9rem 1.25rem; font-size: 1rem; }
+    .text-overlay h2 { font-size: 1.75rem; }
+    .text-overlay p { font-size: .95rem; }
+    .bg-register-image { min-height: 220px; } /* ensure visible on phones if you unhide the column */
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+
+<div class="container-fluid register-container">
+  <div class="row g-0 h-100">
+    <div class="col-md-6 col-lg-7 d-none d-md-block bg-register-image"></div>
+    <div class="col-md-6 col-lg-5 d-flex align-items-center justify-content-center bg-light">
+      <div class="card shadow-lg border-0 my-5" style="width: 100%; max-width: 500px;">
+        <div class="card-body p-4 p-lg-5">
+          {% if g.current_organization %}
+            <h2 class="text-center text-primary mb-3">Join {{ g.current_organization.name }}</h2>
+            <p class="text-center text-muted mb-4">Create your student account to get started.</p>
+
+            <div id="registrationMessage" role="status" aria-live="polite"></div>
+
+            <form id="studentRegisterForm" novalidate>
+              <div class="row g-3">
+                <!-- Hidden pre-filled org code (server-provided) -->
+                <input type="hidden" name="organization_code" id="studentOrgCode" value="{{ g.current_organization.code }}">
+
+                <div class="col-md-6 form-floating">
+                  <input type="text" class="form-control" id="studentFirstName" name="first_name" placeholder="First Name" required>
+                  <label for="studentFirstName">First Name</label>
+                </div>
+
+                <div class="col-md-6 form-floating">
+                  <input type="text" class="form-control" id="studentLastName" name="last_name" placeholder="Last Name" required>
+                  <label for="studentLastName">Last Name</label>
+                </div>
+
+                <div class="col-12 form-floating">
+                  <input type="email" class="form-control" id="studentEmail" name="email" placeholder="Email Address" required>
+                  <label for="studentEmail">Email Address</label>
+                </div>
+
+                <div class="col-12 form-floating">
+                  <input type="password" class="form-control" id="studentPassword" name="password" placeholder="Password" required>
+                  <label for="studentPassword">Password</label>
+                </div>
+
+                <div class="col-12 form-floating">
+                  <input type="password" class="form-control" id="studentConfirmPassword" name="confirm_password" placeholder="Confirm Password" required>
+                  <label for="studentConfirmPassword">Confirm Password</label>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100 mt-4 py-2">Create My Account</button>
+            </form>
+          {% else %}
+            <h2 class="text-center text-primary mb-3">Create an Account</h2>
+
+            <!-- Google Sign-In Button -->
+            <div class="d-grid mb-3" id="googleSignInContainer">
+              <a href="{{ url_for('auth_api.google_login') }}" class="btn btn-danger">
+                <i class="bi bi-google me-2"></i>Sign In with Google
+              </a>
+            </div>
+
+            <div class="text-center my-3">
+              <small class="text-muted">OR</small>
+            </div>
+
+            <div class="d-flex justify-content-center mb-4">
+              <div class="btn-group w-100" role="group" id="userTypeToggle">
+                <input type="radio" class="btn-check" name="userType" id="typeStudent" value="student" autocomplete="off" checked>
+                <label class="btn btn-outline-primary" for="typeStudent"><i class="bi bi-person-fill me-2"></i>I am a Student</label>
+
+                <input type="radio" class="btn-check" name="userType" id="typeOrg" value="organization" autocomplete="off">
+                <label class="btn btn-outline-primary" for="typeOrg"><i class="bi bi-building-fill me-2"></i>I am an Organization</label>
+              </div>
+            </div>
+
+            <div id="registrationMessage" role="status" aria-live="polite"></div>
+
+            <!-- Student Form (global) -->
+            <div id="studentForm" class="form-section">
+              <form id="studentRegisterForm" novalidate>
+                <div class="row g-3">
+                  <div class="col-md-6 form-floating">
+                    <input type="text" class="form-control" id="studentFirstName" name="first_name" placeholder="First Name" required>
+                    <label for="studentFirstName">First Name</label>
+                  </div>
+
+                  <div class="col-md-6 form-floating">
+                    <input type="text" class="form-control" id="studentLastName" name="last_name" placeholder="Last Name" required>
+                    <label for="studentLastName">Last Name</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="email" class="form-control" id="studentEmail" name="email" placeholder="Email Address" required>
+                    <label for="studentEmail">Email Address</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="password" class="form-control" id="studentPassword" name="password" placeholder="Password" required>
+                    <label for="studentPassword">Password</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="password" class="form-control" id="studentConfirmPassword" name="confirm_password" placeholder="Confirm Password" required>
+                    <label for="studentConfirmPassword">Confirm Password</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="text" class="form-control" id="studentOrgCode" name="organization_code" placeholder="Organization Code (Optional)">
+                    <label for="studentOrgCode">Organization Code (Optional)</label>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mt-4 py-2">Create Student Account</button>
+              </form>
+            </div>
+
+            <!-- Organization Form (global) -->
+            <div id="organizationForm" class="form-section" style="display:none;">
+              <form id="orgRegisterForm" novalidate>
+                <div class="row g-3">
+                  <div class="col-12 form-floating">
+                    <input type="text" class="form-control" id="orgName" name="organization_name" placeholder="Full Organization Name" required>
+                    <label for="orgName">Full Organization Name</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="text" class="form-control" id="orgCode" name="code" placeholder="Create a Unique Organization Code" required>
+                    <label for="orgCode">Create a Unique Organization Code</label>
+                  </div>
+
+                  <hr class="my-3">
+                  <p class="text-muted small mb-1">Administrator Details</p>
+
+                  <div class="col-12 form-floating">
+                    <input type="email" class="form-control" id="orgEmail" name="email" placeholder="Your Administrator Email" required>
+                    <label for="orgEmail">Your Administrator Email</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="password" class="form-control" id="orgPassword" name="password" placeholder="Administrator Password" required>
+                    <label for="orgPassword">Administrator Password</label>
+                  </div>
+
+                  <div class="col-12 form-floating">
+                    <input type="password" class="form-control" id="orgConfirmPassword" name="confirm_password" placeholder="Confirm Administrator Password" required>
+                    <label for="orgConfirmPassword">Confirm Administrator Password</label>
+                  </div>
+
+                  <hr class="my-3">
+                  <div class="col-12 form-floating">
+                    <select class="form-select" id="orgPlan" name="plan" required>
+                      <option disabled selected value="">Loading plans...</option>
+                    </select>
+                    <label for="orgPlan">Select Your Subscription Plan</label>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 mt-4 py-2">Register & Proceed to Payment</button>
+              </form>
+            </div>
+          {% endif %}
+
+          <div class="text-center mt-4">
+            <small class="text-muted">Already have an account? <a href="{{ url_for('frontend.login', **org_param) }}">Log In</a></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+$(function() {
+  // Shared helpers
+  const $registrationMessage = $('#registrationMessage');
+
+  const showMessage = (message, type = 'danger') => {
+    $registrationMessage.html(`<div class="alert alert-${type}" tabindex="-1">${message}</div>`);
+    $registrationMessage.find('.alert').focus();
+  };
+
+  const toggleButtonSpinner = ($btn, originalText, show) => {
+    $btn.prop('disabled', show);
+    if (show) {
+      $btn.data('original-text', originalText);
+      $btn.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Please wait...');
+    } else {
+      $btn.html($btn.data('original-text') || originalText);
+    }
+  };
+
+  // Safely parse JSON (handles non-JSON server responses)
+  const safeJson = async (response) => {
+    const text = await response.text();
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (e) {
+      return { message: (text || 'Server error') };
+    }
+  };
+
+  // Validate passwords only if confirm field exists
+  const validatePasswords = ($form) => {
+    const $pwd = $form.find('input[name="password"]');
+    const $confirm = $form.find('input[name="confirm_password"]');
+    if ($pwd.length && $confirm.length) {
+      const password = $pwd.val() || '';
+      const confirm = $confirm.val() || '';
+      if (password !== confirm) throw new Error('Passwords do not match.');
+      if (password.length < 6) throw new Error('Password must be at least 6 characters long.');
+    }
+  };
+
+  // ---------- Student registration (works in both org-specific and global views) ----------
+  $('#studentRegisterForm').on('submit', async function (e) {
+    e.preventDefault();
+    const $btn = $(this).find('button[type="submit"]');
+    const originalText = $btn.text().trim();
+    toggleButtonSpinner($btn, originalText, true);
+
+    try {
+      validatePasswords($(this));
+      const payload = Object.fromEntries(new FormData(this).entries());
+      // Remove confirm before sending
+      delete payload.confirm_password;
+
+      const response = await fetch('/api/auth/register-student', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await safeJson(response);
+      if (!response.ok) throw new Error(data.message || 'Registration failed.');
+
+      showMessage((data.message || 'Registration successful.') + ' You can now log in.', 'success');
+      $(this)[0].reset();
+    } catch (err) {
+      showMessage(err.message || 'An error occurred.', 'danger');
+    } finally {
+      toggleButtonSpinner($btn, originalText, false);
+    }
+  });
+
+  // ===========================
+  // Conditional JS for global registration page only
+  // (if g.current_organization is not set)
+  // ===========================
+  {% if not g.current_organization %}
+  const $studentForm = $('#studentForm');
+  const $orgForm = $('#organizationForm');
+  const $userTypeToggle = $('#userTypeToggle input[name="userType"]');
+  const $googleSignInContainer = $('#googleSignInContainer');
+
+  // Toggle between student and organization forms
+  const showCorrectForm = () => {
+    const selectedType = $userTypeToggle.filter(':checked').val();
+    if (selectedType === 'student') {
+      $studentForm.show().addClass('active');
+      $orgForm.hide().removeClass('active');
+      $googleSignInContainer.show();
+    } else {
+      $studentForm.hide().removeClass('active');
+      $orgForm.show().addClass('active');
+      $googleSignInContainer.hide();
+    }
+  };
+
+  $userTypeToggle.on('change', showCorrectForm);
+  showCorrectForm();
+
+  // Populate plans dropdown only if the select exists
+  const populatePlansDropdown = async () => {
+    const $select = $('#orgPlan');
+    if ($select.length === 0) return;
+    try {
+      const response = await fetch('/api/public/plans');
+      const json = await safeJson(response);
+      const plans = json.plans || json;
+
+      if (!Array.isArray(plans) || !response.ok) {
+        throw new Error('Could not load subscription plans.');
+      }
+
+      $select.empty().append('<option disabled selected value="">Select a plan</option>');
+      plans.forEach(plan => {
+        const optionText = `${plan.name} - ₹${plan.price} / month`;
+        $select.append(new Option(optionText, plan.id));
+      });
+    } catch (error) {
+      console.error('Plan loading error:', error);
+      $select.html('<option disabled selected value="">Could not load plans</option>');
+    }
+  };
+
+  // Organization registration + Razorpay subscription flow
+  $('#orgRegisterForm').on('submit', async function (e) {
+    e.preventDefault();
+    const $btn = $(this).find('button[type="submit"]');
+    const originalText = $btn.text().trim();
+    toggleButtonSpinner($btn, originalText, true);
+
+    try {
+      validatePasswords($(this));
+
+      const payload = {
+        organization_name: $('#orgName').val(),
+        code: $('#orgCode').val(),
+        email: $('#orgEmail').val(),
+        password: $('#orgPassword').val(),
+        plan_id: parseInt($('#orgPlan').val())
+      };
+
+      const response = await fetch('/api/auth/register-organization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await safeJson(response);
+      if (!response.ok) throw new Error(data.message || 'Organization registration failed.');
+
+      // Build Razorpay options — server must return razorpay_key_id and subscription_id
+      const options = {
+        key: data.razorpay_key_id,
+        subscription_id: data.subscription_id,
+        name: data.org_name || payload.organization_name || "Your App Name",
+        description: `Subscription for ${data.org_name || payload.organization_name}`,
+        handler: function (razorpayResponse) {
+          verifyPayment(razorpayResponse);
+        },
+        prefill: {
+          name: payload.organization_name,
+          email: payload.email
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      showMessage(err.message || 'An error occurred.', 'danger');
+      toggleButtonSpinner($btn, originalText, false);
+    }
+  });
+
+  // Verify payment on server
+  const verifyPayment = async (paymentResponse) => {
+    showMessage('Verifying payment, please wait...', 'info');
+    try {
+      const response = await fetch('/api/payment/verify-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentResponse)
+      });
+
+      const data = await safeJson(response);
+      if (!response.ok) throw new Error(data.message || 'Payment verification failed.');
+
+      showMessage(`${data.message || 'Payment verified successfully.'} Redirecting you to login...`, 'success');
+      $('#orgRegisterForm').find('input, select, button').prop('disabled', true);
+
+      setTimeout(() => { window.location.href = '/login'; }, 2500);
+    } catch (err) {
+      showMessage(`Payment verification failed: ${err.message || 'unknown error'}. Please contact support.`, 'danger');
+      toggleButtonSpinner($('#orgRegisterForm button[type="submit"]'), 'Register & Proceed to Payment', false);
+    }
+  };
+
+  // Initialize
+  populatePlansDropdown();
+  {% endif %}
+});
+</script>
+{% endblock %}

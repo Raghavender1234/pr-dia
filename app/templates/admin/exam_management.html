@@ -1,0 +1,699 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Exams - DIA{% endblock %}
+
+{% block head_extra %}
+<style>
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --card-hover-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+    --border-radius: 12px;
+    --transition: all 0.2s ease;
+}
+
+body {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    min-height: 100vh;
+    margin: 0;
+}
+
+.breadcrumb {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.page-header {
+    background: var(--primary-gradient);
+    color: white;
+    padding: 2.5rem 0;
+    margin: -2rem -15px 3rem -15px;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+    opacity: 0.3;
+}
+
+.page-header .container-fluid {
+    position: relative;
+    z-index: 1;
+}
+
+.card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: var(--transition);
+    background: white;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+}
+
+.card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+}
+
+.form-control,
+.form-select {
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    padding: 0.75rem 1rem;
+    transition: var(--transition);
+    background: #fff;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+}
+
+.btn {
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: var(--transition);
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.btn-outline-secondary:hover {
+    background: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+.btn-outline-info:hover {
+    background: #0dcaf0;
+    border-color: #0dcaf0;
+    color: white;
+}
+
+.btn-outline-warning:hover {
+    background: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+.btn-outline-danger:hover {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.table {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+.table thead th {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: none;
+    color: #495057;
+    font-weight: 600;
+    padding: 1rem;
+}
+
+.table tbody td {
+    padding: 1rem;
+    border-color: #f8f9fa;
+    vertical-align: middle;
+}
+
+.table tbody tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.modal-content {
+    border-radius: var(--border-radius);
+    border: none;
+    box-shadow: var(--card-shadow);
+}
+
+.modal-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+}
+
+.alert {
+    border-radius: 8px;
+    border: none;
+    padding: 1rem 1.5rem;
+}
+
+.alert-success {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    color: #155724;
+}
+
+.alert-danger {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    color: #721c24;
+}
+
+.alert-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    color: #856404;
+}
+
+.stats-card {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    background: white;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-hover-shadow);
+}
+
+.stats-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.stats-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.no-exams-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.no-exams-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 0.5rem 0.75rem !important;
+    margin: 0 2px !important;
+    border-radius: 6px !important;
+}
+
+.dataTables_wrapper .dataTables_info {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    padding: 0.25rem 0.5rem;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    padding: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="page-wrapper">
+    <div class="container-fluid">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{{ g.user_context.dashboard_url or url_for('frontend.index', **org_param) }}">
+                        Dashboard
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">
+                    Exam Management
+                </li>
+            </ol>
+        </nav>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="container-fluid">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h1 class="h2 mb-2">
+                            <i class="bi bi-mortarboard-fill me-3"></i>
+                            Exam Management
+                        </h1>
+                        <p class="lead mb-0 opacity-90">
+                            Create, update, and manage the exams for your organization
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="d-flex justify-content-end gap-3">
+                            <div class="stats-card">
+                                <div class="stats-number" id="totalExams">0</div>
+                                <div class="stats-label">Total Exams</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Messages -->
+        <div id="pageMessage" class="mb-4"></div>
+
+        <!-- Main Content -->
+        <div class="row">
+            <!-- Left: Create/Edit Form -->
+            <div class="col-lg-4 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 id="examFormTitle">
+                            <i class="bi bi-plus-circle-fill me-2 text-primary"></i>
+                            Create New Exam
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <form id="examForm" novalidate>
+                            <input type="hidden" id="examId">
+                            <div class="form-floating mb-3">
+                                <input type="text" class="form-control" id="examName" placeholder="Exam Name" required>
+                                <label for="examName">Exam Name <span class="text-danger">*</span></label>
+                            </div>
+                            <div class="form-floating mb-3">
+                                <textarea class="form-control" id="examDescription" placeholder="Description" style="height: 100px"></textarea>
+                                <label for="examDescription">Description (Optional)</label>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="isFreeExam">
+                                    <label class="form-check-label" for="isFreeExam">
+                                        <i class="bi bi-gift-fill me-1"></i> Free Exam
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="input-group mb-4">
+                                <span class="input-group-text">
+                                    <i class="bi bi-currency-rupee"></i>
+                                </span>
+                                <input type="number" class="form-control" id="examPrice" min="0" step="0.01" value="0.00" required>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" id="examSubmitBtn">
+                                    <span class="spinner-border spinner-border-sm d-none me-2"></span>
+                                    <span class="button-text">Create Exam</span>
+                                </button>
+                                <button type="button" class="btn btn-secondary d-none" id="cancelEditBtn">
+                                    <i class="bi bi-x-circle me-2"></i>Cancel Edit
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Exams Table -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="bi bi-table me-2 text-success"></i>
+                            Existing Exams
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="no-exams-state" class="no-exams-state d-none">
+                            <i class="bi bi-journal-plus"></i>
+                            <h5>No Exams Created Yet</h5>
+                            <p>Use the form to create your first exam and start managing educational content.</p>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="examsTable"></table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div class="modal fade" id="deleteExamConfirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            Confirm Exam Archival
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-3">Are you sure you want to archive exam: <strong id="deleteExamName"></strong>?</p>
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            <small>This will hide the exam from students. You can restore it later from the Super Admin Archive page.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="bi bi-x-circle me-2"></i>Cancel
+                        </button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteExamBtn">
+                            <i class="bi bi-archive-fill me-2"></i>Archive Exam
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(function() {
+    const $form = $('#examForm');
+    const $table = $('#examsTable');
+    const $examId = $('#examId');
+    const $examName = $('#examName');
+    const $examDescription = $('#examDescription');
+    const $examPrice = $('#examPrice');
+    const $isFreeExam = $('#isFreeExam');
+    const $submitBtn = $('#examSubmitBtn');
+    const $cancelBtn = $('#cancelEditBtn');
+    const $formTitle = $('#examFormTitle');
+    const $deleteExamName = $('#deleteExamName');
+    const $noExamsState = $('#no-exams-state');
+    const $pageMessage = $('#pageMessage');
+    const $totalExams = $('#totalExams');  // NEW: top counter
+
+    const deleteModal = new bootstrap.Modal($('#deleteExamConfirmModal')[0]);
+
+    let examsDataTable;
+    let examToDeleteId = null;
+
+    const showMessage = (msg, type = 'danger') => {
+        const icon = type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill';
+        $pageMessage.html(`
+            <div class="alert alert-${type} alert-dismissible fade show">
+                <i class="bi bi-${icon} me-2"></i>
+                ${msg}
+                <button class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        $pageMessage[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const toggleButtonSpinner = ($btn, show) => {
+        $btn.prop('disabled', show);
+        $btn.find('.spinner-border').toggleClass('d-none', !show);
+    };
+
+    const resetForm = () => {
+        $form[0].reset();
+        $form.removeClass('was-validated');
+        $examId.val('');
+        $formTitle.html('<i class="bi bi-plus-circle-fill me-2 text-primary"></i>Create New Exam');
+        $submitBtn.find('.button-text').text('Create Exam');
+        $cancelBtn.addClass('d-none');
+        $isFreeExam.prop('checked', false).trigger('change');
+    };
+
+    $isFreeExam.on('change', function() {
+        const isFree = $(this).is(':checked');
+        $examPrice.prop('disabled', isFree);
+        if (isFree) {
+            $examPrice.val('0.00');
+        }
+    });
+
+    // NEW: update top counter
+    const updateStats = (data) => {
+        $totalExams.text(data.length);
+    };
+
+    const initExamsTable = () => {
+        examsDataTable = $table.DataTable({
+            responsive: true,
+            processing: true,
+            pageLength: 10,
+            ajax: (data, callback, settings) => {
+                (async () => {
+                    try {
+                        const res = await window.authenticatedFetch('/api/main-co-admin/exams');
+                        const json = await res.json();
+                        if (!res.ok) throw new Error(json.message);
+
+                        $noExamsState.toggleClass('d-none', json.length > 0);
+                        updateStats(json);  // NEW: update count
+                        callback({ data: json });
+                    } catch (err) {
+                        showMessage(`Could not load exams: ${err.message}`, 'danger');
+                        callback({ data: [] });
+                    }
+                })();
+                return { abort: () => {} };
+            },
+            columns: [
+                { 
+                    data: 'name', 
+                    title: 'Exam Name',
+                    render: (data) => `<strong>${data}</strong>`
+                },
+                { 
+                    data: 'description', 
+                    title: 'Description',
+                    render: (data) => data || '<em class="text-muted">No description</em>'
+                },
+                { 
+                    data: 'price', 
+                    title: 'Pricing',
+                    render: (data, type, row) => {
+                        if (row.is_free) {
+                            return '<span class="badge bg-success">Free</span>';
+                        }
+                        return `<span class="badge bg-secondary">₹${parseFloat(data).toFixed(2)}</span>`;
+                    },
+                    className: 'text-center'
+                },
+                { 
+                    data: 'created_at', 
+                    title: 'Created',
+                    render: (data) => new Date(data).toLocaleDateString('en-IN', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    })
+                },
+                {
+                    data: 'id',
+                    title: 'Actions',
+                    orderable: false,
+                    render: (id, type, row) => {
+                        const subjectsUrl = `/admin/exams/${id}/subjects`;
+                        const studyPlanUrl = `{{ url_for('frontend.study_plan_editor', exam_id=0) }}`.replace('0', id);
+                        return `
+                            <div class="btn-group" style="gap: 0.25rem;">
+                                <a href="${subjectsUrl}" class="btn btn-sm btn-outline-secondary" title="Manage Subjects">
+                                    <i class="bi bi-book"></i>
+                                </a>
+                                <a href="${studyPlanUrl}" class="btn btn-sm btn-outline-info" title="Study Plan">
+                                    <i class="bi bi-calendar-week"></i>
+                                </a>                                
+                                <button class="btn btn-sm btn-outline-warning edit-exam-btn" data-id="${id}" title="Edit Exam">
+                                    <i class="bi bi-pencil-fill"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger delete-exam-btn" data-id="${id}" data-name="${row.name}" title="Archive Exam">
+                                    <i class="bi bi-archive-fill"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                }            
+            ],
+            order: [[3, 'desc']],
+            language: {
+                emptyTable: "No exams found for your organization",
+                info: "Showing _START_ to _END_ of _TOTAL_ exams",
+                infoEmpty: "No exams available",
+                search: "Search exams:",
+                lengthMenu: "Show _MENU_ exams per page",
+                processing: '<div class="text-center"><div class="spinner-border text-primary"><span class="visually-hidden">Loading...</span></div></div>'
+            }
+        });
+    };
+
+    $form.on('submit', async function(e) {
+        e.preventDefault();
+
+        if (!$examName.val().trim()) {
+            $form.addClass('was-validated');
+            $examName.focus();
+            return;
+        }
+
+        toggleButtonSpinner($submitBtn, true);
+        const id = $examId.val();
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/main-co-admin/exams/${id}` : '/api/main-co-admin/exams';
+
+        const payload = {
+            name: $examName.val().trim(),
+            description: $examDescription.val().trim(),
+            is_free: $isFreeExam.is(':checked'),
+            price: $isFreeExam.is(':checked') ? 0.00 : parseFloat($examPrice.val())
+        };
+
+        try {
+            const response = await window.authenticatedFetch(url, {
+                method,
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            showMessage(data.message, 'success');
+            examsDataTable.ajax.reload();
+            resetForm();
+        } catch (err) {
+            showMessage(err.message);
+        } finally {
+            toggleButtonSpinner($submitBtn, false);
+        }
+    });
+
+    $table.on('click', '.edit-exam-btn', async function() {
+        const id = $(this).data('id');
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/exams/${id}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            $examId.val(data.id);
+            $examName.val(data.name);
+            $examDescription.val(data.description || '');
+            $isFreeExam.prop('checked', data.is_free).trigger('change');
+            $examPrice.val(parseFloat(data.price).toFixed(2));
+
+            $formTitle.html('<i class="bi bi-pencil-square me-2 text-warning"></i>Edit Exam');
+            $submitBtn.find('.button-text').text('Update Exam');
+            $cancelBtn.removeClass('d-none');
+
+            $form[0].scrollIntoView({ behavior: 'smooth' });
+        } catch (err) {
+            showMessage(`Failed to load exam: ${err.message}`);
+        } finally {
+            $btn.prop('disabled', false);
+        }
+    });
+
+    $cancelBtn.on('click', function() {
+        resetForm();
+        $form[0].scrollIntoView({ behavior: 'smooth' });
+    });
+
+    $table.on('click', '.delete-exam-btn', function() {
+        examToDeleteId = $(this).data('id');
+        $deleteExamName.text($(this).data('name'));
+        deleteModal.show();
+    });
+
+    $('#confirmDeleteExamBtn').on('click', async function() {
+        if (!examToDeleteId) return;
+
+        const $btn = $(this);
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/exams/${examToDeleteId}`, { 
+                method: 'DELETE' 
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage(data.message, 'success');
+                examsDataTable.ajax.reload();
+                deleteModal.hide();
+                examToDeleteId = null;
+            } else {
+                showMessage(data.message, 'danger');
+            }
+        } catch (err) {
+            showMessage(`Archive failed: ${err.message}`);
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    });
+
+    $examName.on('input', function() {
+        if ($(this).val().trim()) {
+            $form.removeClass('was-validated');
+        }
+    });
+
+    initExamsTable();
+});
+</script>
+{% endblock %}

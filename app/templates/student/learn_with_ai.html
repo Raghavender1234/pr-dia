@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Learn with AI - DIA{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-5">
+    {% if g.user_context.is_premium %}
+    <!-- Premium User View -->
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="text-center mb-4">
+                <h1 class="display-5 text-primary"><i class="bi bi-stars"></i> AI Tutor</h1>
+                <p class="lead text-muted">Set the context for your learning session.</p>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-body p-4 p-lg-5">
+                    <form id="aiTutorSetupForm">
+                        <div class="mb-4">
+                            <label for="aiExamSelect" class="form-label fs-5 fw-bold">1. Choose Your Exam</label>
+                            <select id="aiExamSelect" class="form-select form-select-lg" required aria-label="Exam select">
+                                <option value="" selected disabled>Loading your exams...</option>
+                            </select>
+                        </div>
+                        <div class="mb-4" id="aiSubjectContainer" style="display: none;">
+                            <label for="aiSubjectSelect" class="form-label fs-5 fw-bold">2. Choose a Subject</label>
+                            <select id="aiSubjectSelect" class="form-select form-select-lg" required aria-label="Subject select"></select>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="startLearningBtn" disabled>
+                                <span class="spinner-border spinner-border-sm d-none me-2" id="startSpinner" role="status" aria-hidden="true"></span>
+                                <span class="button-text"><i class="bi bi-chat-dots-fill me-2"></i>Start Learning Session</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Quick action: daily current affairs -->
+                    <hr class="my-4">
+                    <div class="d-grid">
+                        <button class="btn btn-outline-info btn-lg" id="generateCurrentAffairsBtn">
+                            <i class="bi bi-newspaper me-2"></i>Generate Today’s Current Affairs MCQs
+                        </button>
+                    </div>
+                    <small class="text-muted d-block mt-2">Auto-focuses the selected exam/subject if chosen above.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Current Affairs -->
+    <div class="modal fade" id="currentAffairsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title"><i class="bi bi-newspaper me-2"></i>Current Affairs MCQs</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="ca-loading" class="text-center py-5">
+                        <div class="spinner-border text-info" role="status"></div>
+                        <p class="mt-2">Generating questions…</p>
+                    </div>
+                    <div id="ca-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- Non-Premium User View (Upsell) -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8 text-center">
+            <h1 class="display-4 text-purple"><i class="bi bi-stars"></i></h1>
+            <h2 class="display-5 text-primary fw-bold">Unlock Your AI-Powered Tutor</h2>
+            <p class="lead text-muted">Subscribe to our premium plan for personalized, AI-driven exam learning. Unlimited Generate, Validate & AI Chat for one month.</p>
+
+            <div class="card shadow-sm my-5">
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-md-6 text-start p-3">
+                            <h5 class="fw-bold"><i class="bi bi-chat-quote-fill me-2 text-info"></i>Conversational Learning</h5>
+                            <p class="small">Chat with your AI tutor for the topics you’re studying and get step-by-step explanations.</p>
+                        </div>
+                        <div class="col-md-6 text-start p-3 border-start">
+                            <h5 class="fw-bold"><i class="bi bi-magic me-2 text-success"></i>AI-Generated Practice</h5>
+                            <p class="small">Turn concepts into fresh practice questions instantly—every day.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="subscribeMessage"></div>
+            <button class="btn btn-lg btn-warning" id="subscribeBtn">
+                <span class="spinner-border spinner-border-sm d-none"></span>
+                <span class="button-text">Subscribe Now for ₹499/month</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+window.pageInit = function () {
+  const isPremium = ({{ g.user_context.is_premium|tojson }}) === true || ("{{ g.user_context.is_premium }}" === "True");
+
+  // ---------- Premium-only setup ----------
+  if (isPremium) {
+    const $examSelect       = $('#aiExamSelect');
+    const $subjectContainer = $('#aiSubjectContainer');
+    const $subjectSelect    = $('#aiSubjectSelect');
+    const $startBtn         = $('#startLearningBtn');
+
+    const $caBtn            = $('#generateCurrentAffairsBtn');
+    const caModal           = new bootstrap.Modal(document.getElementById('currentAffairsModal'));
+    const $caLoading        = $('#ca-loading');
+    const $caContent        = $('#ca-content');
+
+    let examData = [];
+
+    async function loadContextOptions() {
+      try {
+        const response = await window.authenticatedFetch('/api/student/ai-tutor/context-options');
+        const json = await response.json();
+        if (!response.ok) throw new Error(json.message || 'Failed to load context options');
+        examData = json;
+
+        $examSelect.empty().append('<option value="" selected disabled>-- Select an Exam --</option>');
+        examData.forEach(exam => $examSelect.append(new Option(exam.exam_name, exam.exam_id)));
+      } catch (err) {
+        $('#aiTutorSetupForm').html(
+          `<div class="alert alert-danger">Could not load your exam data: ${err.message}</div>`
+        );
+      }
+    }
+    loadContextOptions();
+
+    $examSelect.on('change', function () {
+      const examId = $(this).val();
+      const selected = examData.find(e => String(e.exam_id) === String(examId));
+      $subjectSelect.empty().append('<option value="" selected disabled>-- Select a Subject --</option>');
+
+      if (selected && Array.isArray(selected.subjects) && selected.subjects.length) {
+        selected.subjects.forEach(sub => {
+          const opt = new Option(sub.subject_name, sub.subject_id);
+          $(opt).data('topicId', sub.default_topic_id);
+          $subjectSelect.append(opt);
+        });
+        $subjectContainer.slideDown();
+      } else {
+        $subjectContainer.slideUp();
+      }
+      $startBtn.prop('disabled', true);
+    });
+
+    $subjectSelect.on('change', function () {
+      $startBtn.prop('disabled', !$(this).val());
+    });
+
+    $('#aiTutorSetupForm').on('submit', function (e) {
+      e.preventDefault();
+      const examId    = $examSelect.val();
+      const subjectId = $subjectSelect.val();
+      const topicId   = $subjectSelect.find('option:selected').data('topicId') || '';
+      window.location.href = `/student/ai-chat?exam_id=${encodeURIComponent(examId)}&subject_id=${encodeURIComponent(subjectId)}&topic_id=${encodeURIComponent(topicId)}`;
+    });
+
+    // Daily current affairs
+    $caBtn.on('click', async function() {
+      const examId    = $examSelect.val() || (examData[0]?.exam_id || '');
+      const subjectId = $subjectSelect.val() || '';
+      $caContent.empty(); $caLoading.show(); caModal.show();
+
+    try {
+      const res = await window.authenticatedFetch('/api/ai/current-affairs', {
+        method: 'POST',
+        body: JSON.stringify({ exam_id: examId, subject_id: subjectId })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Failed to generate current affairs');
+
+      $caContent.empty();
+      const block = document.createElement('div');
+      block.className = 'mt-2';
+
+      if (json.available === false) {
+        // No CA for this exam
+        block.innerHTML = `<div class="alert alert-warning">${json.message}</div>`;
+      } else {
+        // Show generated text
+        block.textContent = json.generated || 'No content returned.';
+        if (window.typesetMath) window.typesetMath(block);
+      }
+      $caContent.append(block);
+    } catch (err) {
+      $caContent.html(`<div class="alert alert-danger">${err.message}</div>`);
+    } finally {
+      $caLoading.hide();
+    }
+    });
+  }
+
+  // ---------- Non-premium: Razorpay subscribe ----------
+$('#subscribeBtn').on('click', async function () {
+  const $btn = $(this);
+  const $spinner = $btn.find('.spinner-border');
+  const $text = $btn.find('.button-text');
+
+  $spinner.removeClass('d-none');
+  $text.text('Redirecting to Payment...');
+  $btn.prop('disabled', true);
+
+  try {
+    // 1) Create an order on the server
+    const orderRes  = await window.authenticatedFetch('/api/payment/create-ai-subscription-order', {
+      method: 'POST'
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) throw new Error(orderData.message || 'Unable to create order');
+
+    const options = {
+      key:       orderData.razorpay_key_id,   // from your API
+      amount:    orderData.amount,
+      currency:  'INR',
+      name:      'DIA AI Tutor',
+      description: 'Monthly AI subscription',
+      order_id:  orderData.order_id,
+      prefill:   orderData.prefill || {},     // optional if you return it
+      notes:     orderData.notes || {},
+      theme:     { color: '#0d6efd' },
+
+      handler: async function (response) {
+        // 2) Verify on the server
+        try {
+          const verifyRes = await window.authenticatedFetch('/api/payment/verify-ai-subscription', {
+            method: 'POST',
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_signature:  response.razorpay_signature
+            })
+          });
+          const verifyData = await verifyRes.json();
+          if (!verifyRes.ok) throw new Error(verifyData.message || 'Payment verification failed');
+
+          window.showToast('Payment successful! Upgrading your account…', 'success');
+          // 3) Reload so server-side g.user_context sees the new premium status
+          setTimeout(() => window.location.reload(), 700);
+
+        } catch (err) {
+          window.showToast(`Verification error: ${err.message}`, 'danger');
+          $btn.prop('disabled', false);
+        }
+      },
+
+      modal: {
+        ondismiss: function () {
+          window.showToast('Payment cancelled.', 'warning');
+          $btn.prop('disabled', false);
+          $spinner.addClass('d-none');
+          $text.text('Subscribe Now for ₹499/month');
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  } catch (err) {
+    window.showToast(`Payment error: ${err.message}`, 'danger');
+    $btn.prop('disabled', false);
+  } finally {
+    $spinner.addClass('d-none');
+    $text.text('Subscribe Now for ₹499/month');
+  }
+});
+};
+</script>
+{% endblock %}

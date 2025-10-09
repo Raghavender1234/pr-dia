@@ -1,0 +1,56 @@
+<!-- Submit Confirmation Modal -->
+<div class="modal fade" id="submitConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Finish & Submit Test?</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to submit your test?</p>
+                <p class="text-muted small">You will not be able to change your answers after submitting.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Continue Test</button>
+                <button type="button" class="btn btn-success" id="confirmSubmitBtn">
+                    <span class="spinner-border spinner-border-sm d-none"></span>
+                    <span class="button-text">Yes, Submit Now</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Time Up Modal -->
+<div class="modal fade" id="timeUpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Time's Up!</h5>
+            </div>
+            <div class="modal-body">
+                <p>Your time for this test has expired. Your test will now be submitted automatically with the answers you have saved.</p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-danger" id="timeUpOkBtn">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Warning Modal -->
+<div class="modal fade" id="warningModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning border-3">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Warning</h5>
+            </div>
+            <div class="modal-body">
+                <p id="warningMessageText"></p>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-warning" data-bs-dismiss="modal">I Understand</button>
+            </div>
+        </div>
+    </div>
+</div>

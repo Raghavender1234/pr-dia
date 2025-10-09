@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Pricing Plans{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4 fw-bold">Find the Right Plan for Your Institution</h1>
+        <p class="lead text-muted">Simple, transparent pricing that scales with your needs. No hidden fees.</p>
+        <p class="text-muted"><small>Prices are listed in INR. USD ($) pricing is available for non-Indian customers.</small></p>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+        <!-- Plan 1: Basic -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-light">
+                <div class="card-header text-center bg-white py-4">
+                    <h4 class="my-0 fw-normal">Basic</h4>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <h1 class="card-title pricing-card-title text-center mb-4">&#8377;2000<small class="text-muted fw-light">/mo</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>2</strong> Co-Admins</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Up to <strong>20</strong> Students</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Exam & Content Management</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Community Forum</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Email Support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plan 2: Pro -->
+        <div class="col">
+            <div class="card h-100 shadow border-primary">
+                <div class="card-header text-center bg-primary text-white py-4">
+                    <h4 class="my-0 fw-normal">Pro</h4>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <h1 class="card-title pricing-card-title text-center mb-4">&#8377;5000<small class="text-muted fw-light">/mo</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>5</strong> Co-Admins</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Up to <strong>100</strong> Students</li>
+                        <li class="mb-3"><i class="bi bi-patch-check-fill text-primary me-2"></i>Verification Badge</li>
+                        <li class="mb-3"><i class="bi bi-box-arrow-up-right text-primary me-2"></i>Special Sub-domains</li>
+                        <li class="mb-3"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Dedicated ML Study Plans</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Priority Email Support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plan 3: Business -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-light">
+                <div class="card-header text-center bg-white py-4">
+                    <h4 class="my-0 fw-normal">Business</h4>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <h1 class="card-title pricing-card-title text-center mb-4">&#8377;8000<small class="text-muted fw-light">/mo</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>10</strong> Co-Admins</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Up to <strong>200</strong> Students</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>All Pro Features</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Advanced Content Management</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Custom Branding</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Phone & Email Support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plan 4: Enterprise -->
+        <div class="col">
+            <div class="card h-100 shadow-sm border-light">
+                <div class="card-header text-center bg-white py-4">
+                    <h4 class="my-0 fw-normal">Enterprise</h4>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <h1 class="card-title pricing-card-title text-center mb-4">Contact Us</h1>
+                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1">
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Custom</strong> Co-Admins</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i><strong>Custom</strong> Student Limits</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>All Business Features</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>Dedicated Account Manager</li>
+.
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>On-premise Options</li>
+                        <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i>24/7 Priority Support</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-5">
+        <h4 class="fw-bold">AI Tutor & Assistant</h4>
+        <p class="lead text-muted">The AI Tutor for students and AI Assistant for admins are available as a premium add-on subscription for any plan.</p>
+    </div>
+
+</div>
+{% endblock %}

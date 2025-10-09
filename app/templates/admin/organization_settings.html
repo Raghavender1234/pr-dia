@@ -1,0 +1,956 @@
+{% extends "base.html" %}
+
+{% block title %}Organization Settings - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<!-- CKEditor 5 CDN -->
+<script src="https://cdn.ckeditor.com/ckeditor5/35.1.0/classic/ckeditor.js"></script>
+<style>
+    .settings-nav {
+        border-bottom: 2px solid #e9ecef;
+        margin-bottom: 2rem;
+    }
+    
+    .settings-nav .nav-link {
+        color: #6c757d;
+        font-weight: 500;
+        padding: 1rem 1.5rem;
+        border: none;
+        background: none;
+        transition: all 0.3s ease;
+        border-bottom: 3px solid transparent;
+    }
+    
+    .settings-nav .nav-link:hover {
+        color: #495057;
+        background-color: rgba(0,123,255,0.1);
+    }
+    
+    .settings-nav .nav-link.active {
+        color: #007bff;
+        border-bottom-color: #007bff;
+        background-color: rgba(0,123,255,0.05);
+    }
+    
+    .tab-pane {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .settings-card {
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+    }
+    
+    .settings-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    
+    .section-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem 0.5rem 0 0;
+        margin: -1rem -1rem 1.5rem -1rem;
+    }
+    
+    .section-header h5 {
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .upload-area {
+        border: 2px dashed #e9ecef;
+        border-radius: 0.5rem;
+        padding: 1.5rem;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-area:hover {
+        border-color: #007bff;
+        background: rgba(0,123,255,0.05);
+    }
+    
+    .action-buttons {
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        text-align: center;
+    }
+    
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .quick-action-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .quick-action-card:hover {
+        border-color: #007bff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-1">Organization Settings</h1>
+                    <p class="text-muted mb-0">Manage your organization's branding, content, and configuration</p>
+                </div>
+                <div class="stats-card">
+                    <div class="fw-bold">{{ g.current_organization.name if g.current_organization else 'Your Organization' }}</div>
+                    <small>Settings Dashboard</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsMessage"></div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+        <div class="quick-action-card" data-tab="branding">
+            <i class="bi bi-palette-fill text-primary fs-1 mb-2"></i>
+            <h6>Branding & Assets</h6>
+            <small class="text-muted">Logo, favicon & page images</small>
+        </div>
+        <div class="quick-action-card" data-tab="general">
+            <i class="bi bi-gear-fill text-success fs-1 mb-2"></i>
+            <h6>General Settings</h6>
+            <small class="text-muted">Contact info, social links & navigation</small>
+        </div>
+        <div class="quick-action-card" data-tab="contact">
+            <i class="bi bi-telephone-fill text-warning fs-1 mb-2"></i>
+            <h6>Contact Details</h6>
+            <small class="text-muted">Address, phone & email info</small>
+        </div>
+        <div class="quick-action-card" data-tab="faq">
+            <i class="bi bi-question-circle-fill text-info fs-1 mb-2"></i>
+            <h6>FAQ Management</h6>
+            <small class="text-muted">Questions & answers</small>
+        </div>
+        <div class="quick-action-card" data-tab="content">
+            <i class="bi bi-file-richtext-fill text-secondary fs-1 mb-2"></i>
+            <h6>Page Content</h6>
+            <small class="text-muted">About, privacy & terms pages</small>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs settings-nav" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="branding-tab" data-bs-toggle="tab" data-bs-target="#branding" type="button" role="tab">
+                <i class="bi bi-palette-fill me-2"></i>Branding & Assets
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">
+                <i class="bi bi-gear-fill me-2"></i>General Settings
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact" type="button" role="tab">
+                <i class="bi bi-telephone-fill me-2"></i>Contact Details
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="faq-tab" data-bs-toggle="tab" data-bs-target="#faq" type="button" role="tab">
+                <i class="bi bi-question-circle-fill me-2"></i>FAQ Management
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab">
+                <i class="bi bi-file-richtext-fill me-2"></i>Page Content
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="settingsTabContent">
+        
+        <!-- Branding & Assets Tab -->
+        <div class="tab-pane fade show active" id="branding" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card settings-card">
+                        <div class="card-body p-4">
+                            <div class="section-header">
+                                <h5><i class="bi bi-image me-2"></i>Organization Logo</h5>
+                            </div>
+                            <form id="logoUploadForm">
+                                <div class="upload-area">
+                                    <i class="bi bi-cloud-upload fs-1 text-muted mb-3"></i>
+                                    <div class="mb-3">
+                                        <input class="form-control" type="file" id="logoFile" accept="image/*">
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">
+                                        <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                        <i class="bi bi-upload me-2"></i>Upload Logo
+                                    </button>
+                                </div>
+                                <small class="text-muted">Recommended: PNG/JPG, 200x60px, max 2MB</small>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-4">
+                    <div class="card settings-card">
+                        <div class="card-body p-4">
+                            <div class="section-header">
+                                <h5><i class="bi bi-bookmark-star me-2"></i>Favicon</h5>
+                            </div>
+                            <form id="faviconUploadForm">
+                                <div class="upload-area">
+                                    <i class="bi bi-bookmark fs-1 text-muted mb-3"></i>
+                                    <div class="mb-3">
+                                        <input class="form-control" type="file" id="faviconFile" accept="image/x-icon,image/png">
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">
+                                        <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                        <i class="bi bi-upload me-2"></i>Upload Favicon
+                                    </button>
+                                </div>
+                                <small class="text-muted">Recommended: ICO/PNG, 32x32px</small>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-4">
+                    <div class="card settings-card">
+                        <div class="card-body p-4">
+                            <div class="section-header">
+                                <h5><i class="bi bi-door-open me-2"></i>Login Page Background</h5>
+                            </div>
+                            <form id="loginImageUploadForm">
+                                <div class="upload-area">
+                                    <i class="bi bi-image fs-1 text-muted mb-3"></i>
+                                    <div class="mb-3">
+                                        <input class="form-control" type="file" id="loginImageFile" accept="image/*">
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">
+                                        <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                        <i class="bi bi-upload me-2"></i>Upload Image
+                                    </button>
+                                </div>
+                                <small class="text-muted">Recommended: JPG/PNG, 1920x1080px</small>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 mb-4">
+                    <div class="card settings-card">
+                        <div class="card-body p-4">
+                            <div class="section-header">
+                                <h5><i class="bi bi-person-plus me-2"></i>Register Page Background</h5>
+                            </div>
+                            <form id="registerImageUploadForm">
+                                <div class="upload-area">
+                                    <i class="bi bi-image fs-1 text-muted mb-3"></i>
+                                    <div class="mb-3">
+                                        <input class="form-control" type="file" id="registerImageFile" accept="image/*">
+                                    </div>
+                                    <button class="btn btn-primary" type="submit">
+                                        <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                        <i class="bi bi-upload me-2"></i>Upload Image
+                                    </button>
+                                </div>
+                                <small class="text-muted">Recommended: JPG/PNG, 1920x1080px</small>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- General Settings Tab -->
+        <div class="tab-pane fade" id="general" role="tabpanel">
+            <div class="card settings-card">
+                <div class="card-body p-4">
+                    <div class="section-header">
+                        <h5><i class="bi bi-gear me-2"></i>General Configuration</h5>
+                    </div>
+                    <form id="textSettingsForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contactEmail" class="form-label fw-bold">Public Contact Email</label>
+                                    <input type="email" class="form-control" id="contactEmail" placeholder="support@myorg.com">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="footerText" class="form-label fw-bold">Custom Footer Text</label>
+                                    <textarea class="form-control" id="footerText" rows="2" placeholder="© 2025 My Organization. All rights reserved."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="mt-4 mb-3 fw-bold text-primary">
+                            <i class="bi bi-share me-2"></i>Social Media Links
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white"><i class="bi bi-twitter"></i></span>
+                                    <input type="url" class="form-control" id="linkTwitter" placeholder="https://twitter.com/myorg">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white"><i class="bi bi-linkedin"></i></span>
+                                    <input type="url" class="form-control" id="linkLinkedin" placeholder="https://linkedin.com/company/myorg">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white"><i class="bi bi-facebook"></i></span>
+                                    <input type="url" class="form-control" id="linkFacebook" placeholder="https://facebook.com/myorg">
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-primary text-white"><i class="bi bi-instagram"></i></span>
+                                    <input type="url" class="form-control" id="linkInstagram" placeholder="https://instagram.com/myorg">
+                                </div>
+                            </div>
+                        </div>
+
+                        <h6 class="mt-4 mb-3 fw-bold text-primary">
+                            <i class="bi bi-compass me-2"></i>Navigation Menu Titles
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="aboutUsTitle" class="form-label">About Us</label>
+                                <input type="text" class="form-control" id="aboutUsTitle" value="About Us">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="contactTitle" class="form-label">Contact</label>
+                                <input type="text" class="form-control" id="contactTitle" value="Contact">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="faqTitle" class="form-label">FAQ</label>
+                                <input type="text" class="form-control" id="faqTitle" value="FAQ">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="privacyPolicyTitle" class="form-label">Privacy Policy</label>
+                                <input type="text" class="form-control" id="privacyPolicyTitle" value="Privacy Policy">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="termsOfServiceTitle" class="form-label">Terms of Service</label>
+                                <input type="text" class="form-control" id="termsOfServiceTitle" value="Terms of Service">
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Note:</strong> The navigation titles above control how menu items are displayed. Contact and FAQ page content is managed in their respective tabs.
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                <i class="bi bi-check2-circle me-2"></i>Save All Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Details Tab -->
+        <div class="tab-pane fade" id="contact" role="tabpanel">
+            <div class="card settings-card">
+                <div class="card-body p-4">
+                    <div class="section-header">
+                        <h5><i class="bi bi-building me-2"></i>Organization Contact Information</h5>
+                    </div>
+                    <p class="text-muted mb-4">Configure your organization's contact details that will be displayed on the Contact page.</p>
+                    
+                    <form id="contactInfoForm">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="contactAddress" class="form-label fw-bold">
+                                        <i class="bi bi-geo-alt me-2"></i>Organization Address
+                                    </label>
+                                    <textarea class="form-control" id="contactAddress" rows="4" placeholder="123 Innovation Drive&#10;HITEC City, Hyderabad, Telangana&#10;500081, India"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="contactPhone" class="form-label fw-bold">
+                                        <i class="bi bi-telephone me-2"></i>Phone Number
+                                    </label>
+                                    <input type="tel" class="form-control" id="contactPhone" placeholder="(+91) 000 000 0000">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="generalEmail" class="form-label fw-bold">
+                                        <i class="bi bi-envelope me-2"></i>General Contact Email
+                                    </label>
+                                    <input type="email" class="form-control" id="generalEmail" placeholder="contact@example.com">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="supportEmail" class="form-label fw-bold">
+                                        <i class="bi bi-headset me-2"></i>Support Email
+                                    </label>
+                                    <input type="email" class="form-control" id="supportEmail" placeholder="support@example.com">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button type="submit" class="btn btn-warning btn-lg me-3">
+                                <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                <i class="bi bi-check2-circle me-2"></i>Save Contact Information
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resetContactInfo">
+                                <i class="bi bi-arrow-clockwise me-2"></i>Reset to Default
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAQ Management Tab -->
+        <div class="tab-pane fade" id="faq" role="tabpanel">
+            <div class="card settings-card">
+                <div class="card-body p-4">
+                    <div class="section-header">
+                        <h5><i class="bi bi-chat-quote me-2"></i>Frequently Asked Questions</h5>
+                    </div>
+                    <p class="text-muted mb-4">Manage the FAQ items that will appear on your organization's FAQ page.</p>
+                    
+                    <div class="action-buttons">
+                        <button type="button" class="btn btn-success me-2" id="addFaqItem">
+                            <i class="bi bi-plus-circle me-2"></i>Add New FAQ
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary me-2" id="resetFaqToDefault">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Reset to Default FAQs
+                        </button>
+                        <button type="button" class="btn btn-primary" id="saveFaqs">
+                            <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                            <i class="bi bi-save me-2"></i>Save All FAQs
+                        </button>
+                    </div>
+
+                    <div id="faqContainer" class="mt-4">
+                        <!-- FAQ items will be dynamically loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content Tab -->
+        <div class="tab-pane fade" id="content" role="tabpanel">
+            <div class="card settings-card">
+                <div class="card-body p-4">
+                    <div class="section-header">
+                        <h5><i class="bi bi-file-text me-2"></i>Public Page Content Management</h5>
+                    </div>
+                    
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> This section is for managing custom content on your About Us, Privacy Policy, and Terms of Service pages. Contact and FAQ pages are managed in their dedicated tabs.
+                    </div>
+                    
+                    <form id="publicPagesForm">
+                        <div class="mb-4">
+                            <label for="about_html" class="form-label fw-bold">
+                                <i class="bi bi-building me-2"></i>About Us Page Content
+                            </label>
+                            <textarea name="about_html" id="about_html" class="form-control" rows="8"></textarea>
+                        </div>
+                        <div class="mb-4">
+                            <label for="privacy_policy_html" class="form-label fw-bold">
+                                <i class="bi bi-shield-check me-2"></i>Privacy Policy Content
+                            </label>
+                            <textarea name="privacy_policy_html" id="privacy_policy_html" class="form-control" rows="8"></textarea>
+                        </div>
+                        <div class="mb-4">
+                            <label for="tos_html" class="form-label fw-bold">
+                                <i class="bi bi-file-text me-2"></i>Terms of Service Content
+                            </label>
+                            <textarea name="tos_html" id="tos_html" class="form-control" rows="8"></textarea>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button type="submit" class="btn btn-info btn-lg">
+                                <span class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                <i class="bi bi-save me-2"></i>Save Page Content
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    // --- CACHE SELECTORS ---
+    const $textForm = $('#textSettingsForm');
+    const $publicPagesForm = $('#publicPagesForm');
+    const $contactInfoForm = $('#contactInfoForm');
+    
+    // --- FAQ MANAGEMENT VARIABLES ---
+    let faqItems = [];
+    let faqCounter = 0;
+    // --- CKEDITOR SETUP ---
+    let editors = {};
+    const editorIds = ['about_html', 'privacy_policy_html', 'tos_html'];
+    let editorsReady = 0;
+
+    // Initialize CKEditor for each textarea
+    editorIds.forEach(id => {
+        ClassicEditor
+            .create(document.querySelector(`#${id}`), {
+                toolbar: ['heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', '|', 'outdent', 'indent', '|', 'blockQuote', 'insertTable', 'mediaEmbed', 'undo', 'redo'],
+                heading: {
+                    options: [
+                        { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
+                        { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
+                        { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
+                        { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
+                    ]
+                }
+            })
+            .then(editor => {
+                editors[id] = editor;
+                editorsReady++;
+                
+                // Load data once all editors are ready
+                if (editorsReady === editorIds.length) {
+                    setTimeout(loadSettings, 500);
+                }
+            })
+            .catch(error => {
+                console.error(`Error initializing editor for ${id}:`, error);
+                window.showToast(`Failed to initialize editor for ${id}`, 'danger');
+            });
+    });
+
+    // --- FAQ MANAGEMENT FUNCTIONS ---
+    function renderFaqItem(item, index) {
+        return `
+            <div class="faq-item card mb-3" data-index="${index}">
+                <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                    <h6 class="mb-0 text-primary">
+                        <i class="bi bi-question-circle me-2"></i>FAQ #${index + 1}
+                        <span class="badge bg-secondary ms-2">${item.category}</span>
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-faq" data-index="${index}">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-bold">Category</label>
+                            <select class="form-select faq-category" data-index="${index}">
+                                <option value="General" ${item.category === 'General' ? 'selected' : ''}>General</option>
+                                <option value="Students" ${item.category === 'Students' ? 'selected' : ''}>Students</option>
+                                <option value="Parents" ${item.category === 'Parents' ? 'selected' : ''}>Parents</option>
+                                <option value="Technical" ${item.category === 'Technical' ? 'selected' : ''}>Technical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-9 mb-3">
+                            <label class="form-label fw-bold">Question</label>
+                            <input type="text" class="form-control faq-question" data-index="${index}" value="${item.question}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Answer</label>
+                        <textarea class="form-control faq-answer" data-index="${index}" rows="4">${item.answer}</textarea>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderAllFaqs() {
+        const container = $('#faqContainer');
+        if (faqItems.length === 0) {
+            container.html(`
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-question-circle fs-1 mb-3"></i>
+                    <h5>No FAQ items yet</h5>
+                    <p>Click "Add New FAQ" to get started or "Reset to Default FAQs" to load the template.</p>
+                </div>
+            `);
+        } else {
+            container.html(faqItems.map(renderFaqItem).join(''));
+        }
+    }
+
+    function addNewFaq() {
+        const newFaq = {
+            question: "New FAQ Question",
+            answer: "Answer to the new FAQ question.",
+            category: "General"
+        };
+        faqItems.push(newFaq);
+        renderAllFaqs();
+        // Scroll to the new FAQ
+        setTimeout(() => {
+            const newFaqElement = $(`.faq-item[data-index="${faqItems.length - 1}"]`);
+            newFaqElement[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            newFaqElement.find('.faq-question').focus().select();
+        }, 100);
+    }
+
+    function removeFaq(index) {
+        faqItems.splice(index, 1);
+        renderAllFaqs();
+    }
+
+    function updateFaqFromForm() {
+        $('.faq-item').each(function() {
+            const index = $(this).data('index');
+            if (faqItems[index]) {
+                faqItems[index].category = $(this).find('.faq-category').val();
+                faqItems[index].question = $(this).find('.faq-question').val();
+                faqItems[index].answer = $(this).find('.faq-answer').val();
+            }
+        });
+    }
+    // --- HELPER FUNCTIONS ---
+    function toggleButtonSpinner($btn, show) {
+        $btn.prop('disabled', show);
+        $btn.find('.spinner-border').toggleClass('d-none', !show);
+    }
+
+    // --- API LOGIC ---
+    
+    // 1. Function to load all current settings and populate the forms
+    async function loadSettings() {
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/settings');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            // Load text-based settings
+            $('#contactEmail').val(data.contact_email || '');
+            $('#footerText').val(data.footer_text || '');
+            $('#linkTwitter').val(data.social_links?.twitter || '');
+            $('#linkLinkedin').val(data.social_links?.linkedin || '');
+            $('#linkFacebook').val(data.social_links?.facebook || '');
+            $('#linkInstagram').val(data.social_links?.instagram || '');
+
+            // Load navigation titles
+            $('#aboutUsTitle').val(data.page_titles?.about || 'About Us');
+            $('#privacyPolicyTitle').val(data.page_titles?.privacy || 'Privacy Policy');
+            $('#termsOfServiceTitle').val(data.page_titles?.terms || 'Terms of Service');
+            $('#faqTitle').val(data.page_titles?.faq || 'FAQ');
+            $('#contactTitle').val(data.page_titles?.contact || 'Contact');
+
+            // Load contact information
+            $('#contactAddress').val(data.contact_data?.address || '');
+            $('#generalEmail').val(data.contact_data?.general_email || '');
+            $('#supportEmail').val(data.contact_data?.support_email || '');
+            $('#contactPhone').val(data.contact_data?.phone || '');
+
+            faqItems = data.faq_data || [];
+            renderAllFaqs();
+
+            // Load page content into editors
+            editorIds.forEach(id => {
+                if (editors[id] && data[id]) {
+                    editors[id].setData(data[id]);
+                }
+            });
+
+        } catch (err) {
+            window.showToast(`Error loading settings: ${err.message}`, 'danger');
+        }
+    }
+
+    // 2. Generic function to handle all file uploads
+    async function handleAssetUpload(formId, assetType) {
+        const form = document.getElementById(formId);
+        const fileInput = form.querySelector('input[type="file"]');
+        const $btn = $(form).find('button[type="submit"]');
+
+        if (fileInput.files.length === 0) {
+            window.showToast('Please select a file first.', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('asset_file', fileInput.files[0]);
+        formData.append('asset_type', assetType);
+
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/asset-upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast(data.message, 'success');
+        } catch (err) {
+            window.showToast(`Upload failed: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+            form.reset(); // Clear the file input
+        }
+    }
+
+    // 3. Function to save all the text-based settings
+    async function saveTextSettings() {
+        const $btn = $textForm.find('button[type="submit"]');
+        const payload = {
+            contact_email: $('#contactEmail').val(),
+            footer_text: $('#footerText').val(),
+            social_links: {
+                twitter: $('#linkTwitter').val(),
+                linkedin: $('#linkLinkedin').val(),
+                facebook: $('#linkFacebook').val(),
+                instagram: $('#linkInstagram').val(),
+            },
+            page_titles: {
+                about: $('#aboutUsTitle').val(),
+                privacy: $('#privacyPolicyTitle').val(),
+                terms: $('#termsOfServiceTitle').val(),
+                faq: $('#faqTitle').val(),
+                contact: $('#contactTitle').val(),
+            }
+        };
+
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/settings', {
+                method: 'PUT',
+                body: payload
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast(data.message, 'success');
+        } catch (err) {
+            window.showToast(`Failed to save settings: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    }
+
+    // 4. Function to save contact information
+    async function saveContactInfo() {
+        const $btn = $contactInfoForm.find('button[type="submit"]');
+        const payload = {
+            contact_info: {
+                address: $('#contactAddress').val(),
+                general_email: $('#generalEmail').val(),
+                support_email: $('#supportEmail').val(),
+                phone: $('#contactPhone').val()
+            }
+        };
+
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/contact-info', {
+                method: 'PUT',
+                body: payload
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast(data.message, 'success');
+        } catch (err) {
+            window.showToast(`Failed to save contact info: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    }
+
+    // 5. Function to save FAQ items
+    async function saveFaqs() {
+        const $btn = $('#saveFaqs');
+        
+        // Update FAQ items from form before saving
+        updateFaqFromForm();
+
+        const payload = {
+            faq_items: faqItems
+        };
+
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/faq-items', {
+                method: 'PUT',
+                body: payload
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast(data.message, 'success');
+        } catch (err) {
+            window.showToast(`Failed to save FAQ items: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    }
+
+    // 6. Function to save public page content
+    async function savePublicPageContent() {
+        const $btn = $publicPagesForm.find('button[type="submit"]');
+        const payload = {};
+        
+        // Get content from all editors
+        editorIds.forEach(id => {
+            if (editors[id]) {
+                payload[id] = editors[id].getData();
+            }
+        });
+
+        toggleButtonSpinner($btn, true);
+
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/public-content', {
+                method: 'PUT',
+                body: payload
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            window.showToast(data.message, 'success');
+        } catch (err) {
+            window.showToast(`Failed to save page content: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
+    }
+
+    // --- EVENT LISTENERS ---
+    
+    // File upload forms
+    $('#logoUploadForm').on('submit', (e) => { e.preventDefault(); handleAssetUpload('logoUploadForm', 'logo'); });
+    $('#faviconUploadForm').on('submit', (e) => { e.preventDefault(); handleAssetUpload('faviconUploadForm', 'favicon'); });
+    $('#loginImageUploadForm').on('submit', (e) => { e.preventDefault(); handleAssetUpload('loginImageUploadForm', 'login_image'); });
+    $('#registerImageUploadForm').on('submit', (e) => { e.preventDefault(); handleAssetUpload('registerImageUploadForm', 'register_image'); });
+    
+    // Settings forms
+    $textForm.on('submit', (e) => { e.preventDefault(); saveTextSettings(); });
+    $contactInfoForm.on('submit', (e) => { e.preventDefault(); saveContactInfo(); });
+    $publicPagesForm.on('submit', (e) => { e.preventDefault(); savePublicPageContent(); });
+
+    $('#resetContactInfo').on('click', async () => {
+    if (confirm('Are you sure you want to reset contact information to default values?')) {
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/reset-contact', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            $('#contactAddress').val(data.contact_data.address || '');
+            $('#generalEmail').val(data.contact_data.general_email || '');
+            $('#supportEmail').val(data.contact_data.support_email || '');
+            $('#contactPhone').val(data.contact_data.phone || '');
+
+            window.showToast('Contact information reset to defaults', 'success');
+        } catch (err) {
+            window.showToast(`Failed to reset contact info: ${err.message}`, 'danger');
+        }
+    }
+});
+
+async function resetFaqToDefault() {
+    if (confirm('Are you sure you want to reset all FAQs to the default template?')) {
+        try {
+            const res = await window.authenticatedFetch('/api/main-co-admin/organization/reset-faq', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            faqItems = data.faq_data || [];
+            renderAllFaqs();
+
+            window.showToast('FAQs reset to default template', 'success');
+        } catch (err) {
+            window.showToast(`Failed to reset FAQs: ${err.message}`, 'danger');
+        }
+    }
+}
+
+    // FAQ management buttons
+    $('#addFaqItem').on('click', addNewFaq);
+    $('#resetFaqToDefault').on('click', resetFaqToDefault);
+    $('#saveFaqs').on('click', saveFaqs);
+
+    // Dynamic FAQ event listeners (using event delegation)
+    $(document).on('click', '.remove-faq', function() {
+        const index = $(this).data('index');
+        if (confirm('Are you sure you want to remove this FAQ item?')) {
+            removeFaq(index);
+            window.showToast('FAQ item removed', 'info');
+        }
+    });
+
+    // Update FAQ items when form fields change (using event delegation)
+    $(document).on('change keyup', '.faq-category, .faq-question, .faq-answer', function() {
+        updateFaqFromForm();
+    });
+
+    // Quick action navigation
+    $('.quick-action-card').on('click', function() {
+        const tabName = $(this).data('tab');
+        $(`#${tabName}-tab`).tab('show');
+    });
+
+    // --- INITIAL LOAD (only if editors not ready yet) ---
+    if (editorsReady === 0) {
+        loadSettings();
+    }
+};
+</script>
+{% endblock %}

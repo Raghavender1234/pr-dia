@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}My Organizations - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+    --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --card-shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --border-radius: 12px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .page-header {
+    background: var(--primary-gradient);
+    border-radius: var(--border-radius);
+    color: white;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(30%, -30%);
+  }
+
+  .page-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 150px;
+    height: 150px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
+    transform: translate(-30%, 30%);
+  }
+
+  .page-header h1, .page-header p {
+    position: relative;
+    z-index: 2;
+  }
+
+  .org-card {
+    transition: var(--transition);
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    position: relative;
+    background: white;
+  }
+
+  .org-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to bottom, #e9ecef, #dee2e6);
+    transition: var(--transition);
+  }
+
+  .org-card:not(.active-org):hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-shadow-hover);
+  }
+
+  .org-card:not(.active-org):hover::before {
+    background: var(--primary-gradient);
+  }
+
+  .org-card.active-org {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid #28a745;
+  }
+
+  .org-card.active-org::before {
+    background: var(--success-gradient);
+    width: 6px;
+  }
+
+  .org-card-content {
+    padding: 1.5rem;
+  }
+
+  .org-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .org-code {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: 'Courier New', monospace;
+  }
+
+  .active-badge {
+    background: var(--success-gradient);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3);
+  }
+
+  .btn-group-modern {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .btn-modern {
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .btn-view-exams {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+  }
+
+  .btn-view-exams:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(79, 172, 254, 0.4);
+    color: white;
+  }
+
+  .btn-switch {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+
+  .btn-switch:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.4);
+    color: white;
+  }
+
+  .btn-portal {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+  }
+
+  .btn-portal:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 107, 107, 0.4);
+    color: white;
+  }
+
+  .btn-portal:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+
+  .btn-active {
+    background: var(--success-gradient);
+    color: white;
+    cursor: default;
+  }
+
+  .btn-join-org {
+    background: var(--success-gradient);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+
+  .btn-join-org:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(86, 171, 47, 0.4);
+    color: white;
+  }
+
+  .loading-spinner {
+    width: 3rem;
+    height: 3rem;
+    border: 4px solid #f3f4f6;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+  }
+
+  .empty-state-icon {
+    font-size: 4rem;
+    color: #9ca3af;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h4 {
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: #6b7280;
+    margin-bottom: 2rem;
+  }
+
+  .breadcrumb-modern {
+    background: white;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .breadcrumb-modern .breadcrumb {
+    margin: 0;
+  }
+
+  .alert-modern {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    border-left: 4px solid;
+  }
+
+  .alert-success.alert-modern {
+    border-left-color: #28a745;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  }
+
+  .alert-danger.alert-modern {
+    border-left-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .stat-card {
+    flex: 1;
+    min-width: 200px;
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-label {
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .org-description {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 768px) {
+    .page-header {
+      padding: 1.5rem;
+      text-align: center;
+    }
+    
+    .org-card-content {
+      padding: 1rem;
+    }
+    
+    .btn-group-modern {
+      justify-content: center;
+    }
+    
+    .org-title {
+      font-size: 1.1rem;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="breadcrumb-modern">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('frontend.student_dashboard', **org_param) }}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">My Organizations</li>
+        </ol>
+    </nav>
+
+    <div class="page-header text-center">
+        <h1 class="h2 mb-3">
+            <i class="bi bi-building-gear me-2"></i>
+            My Organization Memberships
+        </h1>
+        <p class="lead mb-4">Manage your organization memberships and access exclusive content. Switch between organizations to view their specific exams and resources.</p>
+        <a href="{{ url_for('frontend.browse_all_exams', **org_param) }}" class="btn-join-org">
+            <i class="bi bi-building-add"></i>
+            Join Another Organization
+        </a>
+    </div>
+
+    <div id="pageMessage" class="mb-4"></div>
+
+    <div id="stats-container" class="stats-row d-none">
+        <div class="stat-card">
+            <div class="stat-number" id="total-orgs">0</div>
+            <div class="stat-label">Total Organizations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number" id="active-org-count">1</div>
+            <div class="stat-label">Active Organization</div>
+        </div>
+    </div>
+
+    <div id="loading-state" class="text-center py-5">
+        <div class="loading-spinner mx-auto mb-3"></div>
+        <p class="text-muted">Loading your organizations...</p>
+    </div>
+
+    <div id="error-state" class="alert alert-danger alert-modern d-none"></div>
+
+    <div id="no-data-state" class="empty-state d-none">
+        <div class="empty-state-icon">
+            <i class="bi bi-building-x"></i>
+        </div>
+        <h4>You Haven't Joined Any Organizations Yet</h4>
+        <p>Organizations provide access to exclusive exams and learning materials. Join one using an organization code or browse public content.</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{{ url_for('frontend.browse_all_exams', **org_param) }}" class="btn-modern btn-view-exams">
+                <i class="bi bi-search"></i>
+                Browse Public Exams
+            </a>
+            <a href="{{ url_for('frontend.browse_all_exams', **org_param) }}" class="btn-modern btn-switch">
+                <i class="bi bi-building-add"></i>
+                Find Organizations
+            </a>
+        </div>
+    </div>
+
+    <div id="orgs-container" class="d-none">
+        <!-- Organization cards will be dynamically inserted here -->
+    </div>
+</div>
+{% endblock %}
+{% block body_extra %}
+<script>
+window.pageInit = function () {
+    const $loading = $('#loading-state');
+    const $container = $('#orgs-container');
+
+    const fetchMemberships = async () => {
+        $loading.show();
+        $container.addClass('d-none').empty();
+
+        try {
+            const res = await window.authenticatedFetch('/api/student/organization-memberships');
+            const memberships = await res.json();
+            if (!res.ok) throw new Error(memberships.message || 'Unable to fetch memberships');
+
+            if (!memberships.length) {
+                $('#no-data-state').removeClass('d-none');
+                return;
+            }
+
+            $('#total-orgs').text(memberships.length);
+            $('#stats-container').removeClass('d-none');
+
+            memberships.forEach(m => {
+                let portalBtn = '';
+                if (m.subdomain) {
+                    const { protocol } = window.location;
+                    const mainDomain = "{{ server_name }}"; 
+                    const portalUrl = `${protocol}//${m.subdomain}.${mainDomain}`;
+                    
+                    portalBtn = `<a href="${portalUrl}" class="btn-modern btn-portal"><i class="bi bi-box-arrow-up-right me-1"></i>Enter Portal</a>`;
+                }
+                
+                // This builds the correct link for "View Exams"
+                const viewExamsUrl = `{{ url_for('frontend.student_my_exams') }}?org_id=${m.organization_id}`;
+
+                const cardHtml = `
+                    <div class="col-md-6">
+                        <div class="card org-card ${m.is_active ? 'active-org' : ''}">
+                            <div class="card-body org-card-content">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h5 class="org-title">${m.organization_name} <span class="org-code">${m.organization_code}</span></h5>
+                                        ${m.is_active ? '<span class="active-badge">Active</span>' : ''}
+                                    </div>
+                                    <div class="btn-group-modern">
+                                        ${portalBtn}
+                                        <a href="${viewExamsUrl}" class="btn-modern btn-view-exams">
+                                            <i class="bi bi-journal-text"></i> View Exams
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                $container.append(cardHtml);
+            });
+
+            $container.removeClass('d-none');
+        } catch (err) {
+            $('#error-state').text(err.message).removeClass('d-none');
+        } finally {
+            $loading.hide();
+        }
+    };
+
+    fetchMemberships();
+};
+</script>
+{% endblock %}

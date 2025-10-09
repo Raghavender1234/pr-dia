@@ -1,0 +1,1122 @@
+{% extends "base.html" %}
+
+{% block title %}My Study Plan - {{ organization.name }}{% endblock %}
+
+{% block head_extra %}
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+  <style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --card-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        --hover-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        --border-radius: 1.5rem;
+    }
+
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .fc { /* FullCalendar custom styling */ background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 1.5rem; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.1); } .fc .fc-daygrid-day.fc-day-today { background-color: rgba(102, 126, 234, 0.15); } .fc-event { cursor: pointer;}
+    .page-header {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .page-header h1 {
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .exam-selector {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .exam-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid rgba(0,0,0,0.05);
+        border-radius: 1rem;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .exam-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--primary-gradient);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
+    }
+
+    .exam-card:hover::before {
+        transform: scaleY(1);
+    }
+
+    .exam-card:hover {
+        transform: translateX(8px);
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .exam-card.selected {
+        background: var(--primary-gradient);
+        color: white;
+        transform: translateX(8px);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .plan-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .plan-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--primary-gradient);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+
+    .plan-card:hover::before {
+        transform: scaleX(1);
+    }
+
+    .plan-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .task-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-radius: 1rem;
+        margin-bottom: 0.75rem;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid rgba(0,0,0,0.05);
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .task-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 4px;
+        background: var(--success-gradient);
+        transform: scaleY(0);
+        transition: transform 0.3s ease;
+    }
+
+    .task-item:hover::before {
+        transform: scaleY(1);
+    }
+
+    .task-item:hover {
+        transform: translateX(8px);
+        background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .task-item i {
+        font-size: 1.1rem;
+        color: #667eea;
+        margin-right: 0.75rem;
+        transition: color 0.3s ease;
+    }
+
+    .task-item:hover i {
+        color: #764ba2;
+    }
+
+    .task-item.completed {
+        opacity: 0.8;
+        background: linear-gradient(135deg, #e8f5e8 0%, #d4f5d4 100%);
+    }
+
+    .task-item.completed i {
+        color: #28a745;
+    }
+
+    .section-title {
+        font-size: 1.4rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        color: #2c3e50;
+    }
+
+    .section-title i {
+        margin-right: 0.75rem;
+        font-size: 1.5rem;
+        background: var(--primary-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .btn-custom {
+        background: var(--primary-gradient);
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-custom::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-custom:hover::before {
+        left: 100%;
+    }
+
+    .btn-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-secondary-custom {
+        background: var(--secondary-gradient);
+        border: none;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+        color: white;
+        transition: all 0.3s ease;
+    }
+
+    .btn-secondary-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(240, 147, 251, 0.4);
+        color: white;
+    }
+
+    .dropdown-menu {
+        border: none;
+        border-radius: 1rem;
+        box-shadow: var(--card-shadow);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        padding: 0.5rem;
+    }
+
+    .dropdown-item {
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.25rem;
+        transition: all 0.3s ease;
+    }
+
+    .dropdown-item:hover {
+        background: var(--primary-gradient);
+        color: white;
+        transform: translateX(5px);
+    }
+
+    .alert-info {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border: 1px solid rgba(33, 150, 243, 0.3);
+        border-radius: 1rem;
+        padding: 1rem 1.5rem;
+        color: #1565c0;
+        margin-bottom: 1.5rem;
+    }
+
+    .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3rem;
+    }
+
+    .loading-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        padding: 3rem;
+        text-align: center;
+        box-shadow: var(--card-shadow);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .task-day-badge {
+        background: var(--success-gradient);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-right: 0.75rem;
+    }
+
+    .progress-indicator {
+        height: 6px;
+        background: #e9ecef;
+        border-radius: 3px;
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+    }
+
+    .progress-bar-custom {
+        height: 100%;
+        background: var(--success-gradient);
+        border-radius: 3px;
+        transition: width 0.5s ease;
+        width: 0%;
+    }
+
+    .fade-transition {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.3s ease;
+    }
+
+    .fade-transition.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .exam-info-badge {
+        background: var(--primary-gradient);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.9rem;
+        margin-left: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 1.5rem;
+        }
+        
+        .plan-card {
+            padding: 1.5rem;
+        }
+        
+        .task-item {
+            padding: 0.75rem 1rem;
+        }
+        
+        .section-title {
+            font-size: 1.2rem;
+        }
+        
+        .exam-info-badge {
+            margin-left: 0;
+            margin-top: 0.5rem;
+        }
+    }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="page-header text-center mb-5">
+        <h1 class="display-5 fw-bold">My Study Plan</h1>
+        <p class="lead text-muted">Your personalized exam preparation roadmap</p>
+    </div>
+
+    <!-- Exam Selection -->
+    <div class="exam-selector">
+        <h5 class="section-title"><i class="bi bi-book"></i>Select Your Exam</h5>
+        <div id="exam-list" class="row">
+            <!-- Exam cards will be populated here -->
+        </div>
+    </div>
+
+    <!-- Current Exam Info -->
+    <div id="current-exam-info" class="d-none">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h4 id="current-exam-name">Exam Name</h4>
+                <small class="text-muted">Organization: <span id="current-exam-org">N/A</span></small>
+            </div>
+            <span class="exam-info-badge" id="current-exam-badge">Selected Exam</span>
+        </div>
+
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-custom active" id="btn-ai-plan">AI Personalized Plan</button>
+                <button type="button" class="btn btn-secondary-custom" id="btn-org-plan">Organization Plan</button>
+            </div>
+        </div>
+        <p class="text-center">
+            Currently viewing: <strong id="current-plan-label">AI Personalized Plan</strong>
+        </p>
+
+        <!-- View Toggle Buttons -->
+        <div class="d-flex justify-content-center mb-4">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary active" id="btn-dashboard-view">Dashboard</button>
+                <button type="button" class="btn btn-outline-primary" id="btn-calendar-view">Calendar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="study-plan-loading" class="loading-container d-none">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-3">Analyzing your performance to build your personalized study plan...</p>
+    </div>
+
+    <!-- Dashboard View (Original Content) -->
+    <div id="dashboard-view" class="d-none">
+        <!-- Motivational Message -->
+        <div class="alert alert-info" id="reminder-container"></div>
+        
+        <!-- Study Streak & Analytics Overview -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="plan-card">
+                    <h6 class="section-title"><i class="bi bi-fire"></i>Study Streak</h6>
+                    <div id="study-streak"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="plan-card">
+                    <h6 class="section-title"><i class="bi bi-graph-up"></i>Performance</h6>
+                    <div id="performance-overview"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="plan-card">
+                    <h6 class="section-title"><i class="bi bi-clock"></i>Study Time</h6>
+                    <div id="study-time-info"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Insights -->
+        <div id="progress-insights" class="mb-4"></div>
+
+        <!-- Today's Focus Tasks -->
+        <div class="plan-card">
+            <h5 class="section-title"><i class="bi bi-list-check"></i>Today's Focus</h5>
+            <div class="progress-indicator">
+                <div class="progress-bar-custom" id="task-progress"></div>
+            </div>
+            <div id="todays-focus-list"></div>
+        </div>
+
+        <!-- Analytics Dashboard -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="plan-card">
+                    <h6 class="section-title"><i class="bi bi-trophy"></i>Strengths</h6>
+                    <div id="strengths-list"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="plan-card">
+                    <h6 class="section-title"><i class="bi bi-target"></i>Areas for Improvement</h6>
+                    <div id="improvement-areas"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Milestones -->
+        <div class="plan-card mt-4">
+            <h6 class="section-title"><i class="bi bi-flag"></i>Upcoming Milestones</h6>
+            <div id="milestones-list"></div>
+        </div>
+
+        <!-- Personalization Info -->
+        <div class="plan-card mt-4">
+            <h6 class="section-title"><i class="bi bi-person-gear"></i>Your Learning Profile</h6>
+            <div id="personalization-info"></div>
+        </div>
+    </div>
+
+    <!-- Calendar View -->
+    <div id="calendar-view" class="d-none">
+        <div id='calendar'></div>
+    </div>
+</div>
+
+<!-- Task Modal -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="taskModalTitle">Task Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="taskModalBody">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+window.pageInit = function() {
+    let currentExamId = null;
+    let currentStudyPlan = null;
+    let completedTasks = 0;
+    let totalTasks = 0;
+    let currentMode = 'ai'; // 'ai' or 'org'
+    let availableExams = [];
+    let allPlans = [];
+    let calendar;
+    let currentView = 'dashboard'; // 'dashboard' or 'calendar'
+    const taskModal = new bootstrap.Modal($('#taskModal')[0]);
+
+    // Initialize Calendar
+    const initCalendar = () => {
+        const calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listWeek'
+            },
+            events: [], // Start with no events
+            eventClick: function(info) {
+                // Show a modal with task details
+                $('#taskModalTitle').text(`Day ${info.event.extendedProps.day}: ${info.event.title}`);
+                $('#taskModalBody').html(`
+                    <p><strong>Type:</strong> ${info.event.extendedProps.type || 'Study Task'}</p>
+                    <p><strong>Estimated Time:</strong> ${info.event.extendedProps.estimated_time} minutes</p>
+                    <p><strong>Priority:</strong> ${info.event.extendedProps.priority || 'Medium'}</p>
+                    ${info.event.extendedProps.topic ? `<p><strong>Topic:</strong> ${info.event.extendedProps.topic}</p>` : ''}
+                    <p><strong>Status:</strong> ${info.event.extendedProps.is_complete ? 'Completed' : 'Pending'}</p>
+                `);
+                taskModal.show();
+            }
+        });
+        calendar.render();
+    };
+
+    // Update Calendar with Tasks
+    const updateCalendar = (studyPlan) => {
+        if (!calendar) return;
+
+        const events = [];
+        
+        // Add today's focus tasks
+        if (studyPlan.todays_focus) {
+            studyPlan.todays_focus.forEach(task => {
+                events.push({
+                    title: task.task,
+                    start: new Date().toISOString().split('T')[0], // Today
+                    color: task.is_complete ? '#28a745' : '#667eea',
+                    extendedProps: {
+                        ...task,
+                        day: 1
+                    }
+                });
+            });
+        }
+
+        // Add all tasks if available
+        if (studyPlan.all_tasks) {
+            studyPlan.all_tasks.forEach(task => {
+                const startDate = new Date();
+                startDate.setDate(startDate.getDate() + (task.day || 1) - 1);
+                
+                events.push({
+                    title: task.task,
+                    start: startDate.toISOString().split('T')[0],
+                    color: task.is_complete ? '#28a745' : '#667eea',
+                    extendedProps: task
+                });
+            });
+        }
+
+        calendar.removeAllEvents();
+        calendar.addEventSource(events);
+    };
+
+    // Load available exams on page load
+    const loadExams = async () => {
+        try {
+            const response = await window.authenticatedFetch('/api/student/study-plan/student-exams');
+            const data = await response.json();
+            
+            if (data.success) {
+                availableExams = data.exams;
+                populateExamList(availableExams);
+            } else {
+                $('#exam-list').html('<div class="alert alert-warning">No exams available.</div>');
+            }
+        } catch (error) {
+            console.error('Error loading exams:', error);
+            $('#exam-list').html('<div class="alert alert-danger">Error loading exams.</div>');
+        }
+    };
+
+    const populateExamList = (exams) => {
+        const examList = $('#exam-list');
+        examList.empty();
+        
+        if (exams.length === 0) {
+            examList.html('<div class="col-12"><div class="alert alert-info">No exams available.</div></div>');
+            return;
+        }
+
+        exams.forEach(exam => {
+            const examCard = $(`
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="exam-card" data-exam-id="${exam.id}">
+                        <h6 class="mb-2">${exam.name}</h6>
+                        <small class="text-muted">${exam.organization}</small>
+                        ${exam.description ? `<p class="mt-2 mb-1 small">${exam.description}</p>` : ''}
+                        ${exam.has_organization_plan ? '<span class="badge bg-primary">Organization Plan Available</span>' : ''}
+                    </div>
+                </div>
+            `);
+            examList.append(examCard);
+        });
+    };
+
+    const selectExam = (examId) => {
+        currentExamId = examId;
+        const selectedExam = availableExams.find(e => e.id === examId);
+        
+        // Update UI
+        $('.exam-card').removeClass('selected');
+        $(`.exam-card[data-exam-id="${examId}"]`).addClass('selected');
+        
+        // Show exam info
+        $('#current-exam-name').text(selectedExam.name);
+        $('#current-exam-org').text(selectedExam.organization);
+        $('#current-exam-badge').text(selectedExam.name);
+        $('#current-exam-info').removeClass('d-none');
+        
+        // Toggle organization plan button based on availability
+        if (selectedExam.has_organization_plan) {
+            $('#btn-org-plan').show();
+        } else {
+            $('#btn-org-plan').hide();
+            if (currentMode === 'org') {
+                currentMode = 'ai';
+                $('#btn-ai-plan').addClass('active');
+                $('#btn-org-plan').removeClass('active');
+                $('#current-plan-label').text('AI Personalized Plan');
+            }
+        }
+        
+        // Load the study plan
+        loadPlan();
+    };
+
+    const populateStudyPlan = (plan) => {
+        // Check if this is an organization plan
+        const isOrgPlan = plan.plan_type === 'organization';
+        
+        // Update calendar
+        updateCalendar(plan);
+        
+        // Reminder message
+        $('#reminder-container').html(plan.reminder_message);
+
+        // Study streak - handle empty data gracefully
+        if (plan.study_streak && plan.study_streak.current_streak !== undefined) {
+            $('#study-streak').html(`
+                <h4 class="text-primary">${plan.study_streak.current_streak}</h4>
+                <small class="text-muted">Current Streak</small>
+                <p class="mt-2">${plan.study_streak.message}</p>
+            `);
+        } else {
+            $('#study-streak').html(`
+                <h4 class="text-muted">-</h4>
+                <small class="text-muted">No streak data</small>
+                <p class="mt-2">${isOrgPlan ? 'Organization plan focused on curriculum' : 'Start studying to build your streak!'}</p>
+            `);
+        }
+
+        // Performance overview - handle organization plans
+        if (plan.analytics && plan.analytics.overall_performance > 0) {
+            $('#performance-overview').html(`
+                <h4 class="text-success">${plan.analytics.overall_performance}%</h4>
+                <small class="text-muted">Overall Accuracy</small>
+                <p class="mt-2">Difficulty: ${plan.analytics.difficulty_level}</p>
+                ${plan.analytics.exam_specific_score ? `<small class="text-info">Latest Score: ${plan.analytics.exam_specific_score}%</small>` : ''}
+            `);
+        } else if (isOrgPlan && plan.analytics && plan.analytics.completion_percentage !== undefined) {
+            $('#performance-overview').html(`
+                <h4 class="text-info">${plan.analytics.completion_percentage}%</h4>
+                <small class="text-muted">Plan Completion</small>
+                <p class="mt-2">${plan.analytics.completed_tasks}/${plan.analytics.total_tasks} tasks completed</p>
+            `);
+        } else {
+            $('#performance-overview').html(`
+                <h4 class="text-muted">-</h4>
+                <small class="text-muted">${isOrgPlan ? 'Curriculum Plan' : 'No performance data yet'}</small>
+                <p class="mt-2">Complete assessments to see your progress</p>
+            `);
+        }
+
+        // Study time info
+        if (plan.analytics) {
+            $('#study-time-info').html(`
+                <h4 class="text-info">${plan.analytics.recommended_study_time}</h4>
+                <small class="text-muted">Recommended Daily</small>
+                ${plan.personalization && plan.personalization.optimal_study_time && plan.personalization.optimal_study_time.length > 0 ? 
+                    `<p class="mt-2">Best times: ${plan.personalization.optimal_study_time.join(', ')}</p>` : 
+                    `<p class="mt-2">${isOrgPlan ? 'Follow your class schedule' : 'Study at your preferred time'}</p>`
+                }
+            `);
+        }
+
+        // Progress insights - handle empty arrays
+        if (plan.progress_insights && plan.progress_insights.length > 0) {
+            const insightsHtml = plan.progress_insights.map(insight => `
+                <div class="alert alert-${getInsightType(insight.type)} mb-2">
+                    <strong>${insight.message}</strong>
+                    ${insight.action ? `<br><small>${insight.action}</small>` : ''}
+                </div>
+            `).join('');
+            $('#progress-insights').html(insightsHtml);
+        } else {
+            $('#progress-insights').html('');
+        }
+
+        // Today's focus tasks
+        populateTasks(plan.todays_focus || []);
+
+        // Strengths
+        if (plan.analytics && plan.analytics.strengths && plan.analytics.strengths.length > 0) {
+            const strengthsHtml = plan.analytics.strengths.map(strength => `
+                <div class="task-item">
+                    <i class="bi bi-check-circle text-success"></i>
+                    <span>${strength}</span>
+                </div>
+            `).join('');
+            $('#strengths-list').html(strengthsHtml);
+        } else {
+            $('#strengths-list').html('<div class="alert alert-info">Complete more assessments to identify your strengths.</div>');
+        }
+
+        // Improvement areas
+        if (plan.analytics && plan.analytics.improvement_areas && plan.analytics.improvement_areas.length > 0) {
+            const improvementHtml = plan.analytics.improvement_areas.map(area => `
+                <div class="task-item">
+                    <i class="bi bi-arrow-up-circle text-warning"></i>
+                    <span>${area}</span>
+                </div>
+            `).join('');
+            $('#improvement-areas').html(improvementHtml);
+        } else {
+            $('#improvement-areas').html('<div class="alert alert-info">Complete more assessments to identify improvement areas.</div>');
+        }
+
+        // Milestones
+        if (plan.next_milestones && plan.next_milestones.length > 0) {
+            const milestonesHtml = plan.next_milestones.map(milestone => `
+                <div class="task-item">
+                    <div class="w-100">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><strong>${milestone.title}</strong></span>
+                            <span class="task-day-badge">${milestone.progress}${milestone.target ? `/${milestone.target}` : '%'}</span>
+                        </div>
+                        <small class="text-muted">${milestone.description}</small>
+                        ${milestone.target ? `
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar" role="progressbar" 
+                                     style="width: ${(milestone.progress / milestone.target * 100)}%"></div>
+                            </div>
+                        ` : ''}
+                        ${milestone.reward ? `<small class="text-success">🎁 ${milestone.reward}</small>` : ''}
+                    </div>
+                </div>
+            `).join('');
+            $('#milestones-list').html(milestonesHtml);
+        } else {
+            $('#milestones-list').html('<div class="alert alert-info">Keep studying to unlock milestones!</div>');
+        }
+
+        // Personalization info
+        if (plan.personalization && plan.plan_type !== 'organization') {
+            $('#personalization-info').html(`
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Learning Velocity:</strong><br>
+                        <span class="text-${plan.analytics.learning_velocity >= 0 ? 'success' : 'warning'}">
+                            ${plan.analytics.learning_velocity >= 0 ? '+' : ''}${plan.analytics.learning_velocity}%
+                        </span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Avg. Question Time:</strong><br>
+                        <span>${Math.round(plan.personalization.question_pace)}s</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Retention Rate:</strong><br>
+                        <span class="text-info">${plan.personalization.retention_rate}%</span>
+                    </div>
+                </div>
+            `);
+        } else {
+            $('#personalization-info').html('<div class="alert alert-info">Complete more assessments to see your personalized learning insights.</div>');
+        }
+    };
+
+    const populateTasks = (tasks) => {
+        totalTasks = tasks.length;
+        completedTasks = tasks.filter(task => task.is_complete).length;
+        
+        updateProgressBar();
+        
+        const focusList = $('#todays-focus-list');
+        focusList.empty();
+        
+        if (tasks.length === 0) {
+            focusList.html(`
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    ${currentMode === 'org' ? 'No tasks available in the organization plan.' : 'No tasks for today. Check back tomorrow!'}
+                </div>
+            `);
+            return;
+        }
+        
+        tasks.forEach(task => {
+            const taskHtml = `
+                <div class="task-item ${task.is_complete ? 'completed' : ''}" data-task-id="${task.id}">
+                    <input class="form-check-input" type="checkbox" ${task.is_complete ? 'checked' : ''}>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="task-text">${task.task}</span>
+                            <div class="task-meta">
+                                <span class="task-day-badge">${task.estimated_time}min</span>
+                                <small class="text-muted ms-2">${task.priority} priority</small>
+                            </div>
+                        </div>
+                        ${task.topic ? `<small class="text-muted">Topic: ${task.topic}</small>` : ''}
+                        ${task.difficulty ? `<small class="text-muted ms-2">Difficulty: ${task.difficulty}</small>` : ''}
+                        ${task.type ? `<small class="text-muted ms-2">Type: ${task.type}</small>` : ''}
+                        ${task.exam_specific ? `<small class="text-success ms-2">📋 Exam-specific</small>` : ''}
+                    </div>
+                </div>
+            `;
+            focusList.append(taskHtml);
+        });
+    };
+
+    const updateProgressBar = () => {
+        const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks * 100) : 0;
+        $('#task-progress').css('width', `${progressPercent}%`);
+    };
+
+    const getInsightType = (type) => {
+        switch (type) {
+            case 'positive':
+            case 'success':
+            case 'achievement':
+                return 'success';
+            case 'warning':
+            case 'caution':
+                return 'warning';
+            case 'info':
+            case 'neutral':
+            case 'progress':
+                return 'info';
+            case 'danger':
+            case 'negative':
+                return 'danger';
+            case 'encouragement':
+                return 'primary';
+            default:
+                return 'secondary';
+        }
+    };
+
+    const markTaskComplete = async (taskId, isComplete) => {
+        try {
+            // Use the correct endpoint with exam_id
+            const response = await window.authenticatedFetch(`/api/student/study-plan/mark-complete/${currentExamId}/${taskId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    is_complete: isComplete,
+                    is_organization_task: currentMode === 'org'
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                console.log('Task completion updated successfully');
+                if (data.points_earned) {
+                    showNotification(`🎉 +${data.points_earned} points earned!`);
+                }
+            } else {
+                console.warn('Failed to update task completion:', data.message);
+            }
+        } catch (error) {
+            console.error('Error updating task completion:', error);
+        }
+    };
+
+    const showNotification = (message) => {
+        const notification = $(`
+            <div class="alert alert-success alert-dismissible fade show position-fixed" 
+                 style="top: 20px; right: 20px; z-index: 1050;">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        $('body').append(notification);
+
+        setTimeout(() => {
+            notification.alert('close');
+        }, 3000);
+    };
+
+    // View Toggle Event Handlers
+    $('#btn-dashboard-view').on('click', function() {
+        currentView = 'dashboard';
+        $(this).addClass('active');
+        $('#btn-calendar-view').removeClass('active');
+        $('#dashboard-view').removeClass('d-none');
+        $('#calendar-view').addClass('d-none');
+    });
+
+    $('#btn-calendar-view').on('click', function() {
+        currentView = 'calendar';
+        $(this).addClass('active');
+        $('#btn-dashboard-view').removeClass('active');
+        $('#dashboard-view').addClass('d-none');
+        $('#calendar-view').removeClass('d-none');
+        
+        // Initialize calendar if not already done
+        if (!calendar) {
+            initCalendar();
+        }
+        // Update calendar with current plan data
+        if (currentStudyPlan) {
+            updateCalendar(currentStudyPlan);
+        }
+    });
+
+    // Plan Mode Button Event Handlers
+    $('#btn-ai-plan').on('click', function() {
+        if (currentMode !== 'ai') {
+            currentMode = 'ai';
+            $(this).addClass('active');
+            $('#btn-org-plan').removeClass('active');
+            $('#current-plan-label').text('AI Personalized Plan');
+            loadPlan();
+        }
+    });
+
+    $('#btn-org-plan').on('click', function() {
+        if (currentMode !== 'org') {
+            currentMode = 'org';
+            $(this).addClass('active');
+            $('#btn-ai-plan').removeClass('active');
+            $('#current-plan-label').text('Organization Plan');
+            loadPlan();
+        }
+    });
+
+    // Load study plan for selected exam
+    const loadPlan = async () => {
+        if (!currentExamId) {
+            console.error('No exam selected');
+            return;
+        }
+
+        // Fix: Use the correct endpoint with exam_id
+        const endpoint = currentMode === 'ai'
+            ? `/api/student/study-plan/generate-advanced/${currentExamId}`
+            : `/api/student/study-plan/generate-advanced/${currentExamId}`;
+
+        $('#study-plan-loading').removeClass('d-none');
+        $('#dashboard-view').addClass('d-none');
+        $('#calendar-view').addClass('d-none');
+
+        try {
+            const requestBody = currentMode === 'org' 
+                ? { use_organization_plan: true }
+                : { 
+                    study_hours_per_day: 2, 
+                    difficulty_preference: 'balanced',
+                    focus_areas: [],
+                    use_organization_plan: false
+                };
+
+            const response = await window.authenticatedFetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Failed to load study plan');
+            }
+
+            currentStudyPlan = data.study_plan;
+            populateStudyPlan(currentStudyPlan);
+
+            $('#study-plan-loading').addClass('d-none');
+            
+            // Show the appropriate view
+            if (currentView === 'dashboard') {
+                $('#dashboard-view').removeClass('d-none');
+            } else {
+                $('#calendar-view').removeClass('d-none');
+            }
+
+        } catch (error) {
+            console.error('Error loading plan:', error);
+            $('#study-plan-loading').html(`
+                <div class="alert alert-danger">
+                    Error loading study plan: ${error.message}. Please try again later.
+                </div>
+            `);
+        }
+    };
+    
+    const loadPlansForExam = async () => {
+        if (!currentExamId) return;
+
+        $('#study-plan-loading').removeClass('d-none');
+        $('#dashboard-view').addClass('d-none');
+        $('#calendar-view').addClass('d-none');
+
+        try {
+            // ✅ Call the NEW, simpler API endpoint
+            const response = await window.authenticatedFetch(`/api/student/study-plan/all-plans-for-exam/${currentExamId}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            allPlans = data; // The API now returns a simple array of plans
+
+            // ✅ This logic now works correctly
+            const personalPlan = allPlans.find(p => p.type === 'personal');
+            const officialPlan = allPlans.find(p => p.type === 'official');
+
+            // Show/hide the toggle button based on whether BOTH plans exist
+            if (personalPlan && officialPlan) {
+                $('#btn-org-plan').show(); // Using your button IDs from the new file
+            } else {
+                $('#btn-org-plan').hide();
+            }
+            
+            // Display the first available plan by default
+            if (allPlans.length > 0) {
+                displayPlan(allPlans[0]);
+            }
+            
+            $('#study-plan-loading').addClass('d-none');
+            if (currentView === 'dashboard') {
+                $('#dashboard-view').removeClass('d-none');
+            } else {
+                $('#calendar-view').removeClass('d-none');
+            }
+
+        } catch (error) {
+            console.error('Error loading plans:', error);
+            $('#study-plan-loading').html(`
+                <div class="alert alert-danger">
+                    Error loading study plan: ${error.message}. Please try again later.
+                </div>
+            `);
+        }
+    };
+
+    // This function now just displays a plan, it doesn't fetch it
+    const displayPlan = (plan) => {
+        currentStudyPlan = plan;
+        populateStudyPlan(plan);
+    };
+
+    // Event listener for exam selection
+    $(document).on('click', '.exam-card', function() {
+        const examId = parseInt($(this).data('exam-id'));
+        selectExam(examId);
+    });
+
+    // Event listener for checkbox task completion
+    $(document).on('change', '#todays-focus-list .form-check-input', function() {
+        const $taskItem = $(this).closest('.task-item');
+        const taskId = $taskItem.data('task-id');
+        const isComplete = this.checked;
+
+        $taskItem.toggleClass('completed', isComplete);
+
+        if (isComplete) {
+            completedTasks++;
+        } else {
+            completedTasks--;
+        }
+
+        updateProgressBar();
+        markTaskComplete(taskId, isComplete);
+        
+        // Update calendar if in calendar view
+        if (currentStudyPlan) {
+            updateCalendar(currentStudyPlan);
+        }
+    });
+
+    // Initialize on page load
+    loadExams();
+};
+</script>
+{% endblock %}

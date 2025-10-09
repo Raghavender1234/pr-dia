@@ -1,0 +1,657 @@
+{% extends 'base.html' %}
+
+{% block title %}All Notifications{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-bell-fill me-2"></i>All My Notifications</h2>
+        <button id="markAllReadBtn" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-check2-circle me-1"></i> Mark All as Read
+        </button>
+    </div>
+
+    <div id="notifications-list-container" class="list-group shadow-sm">
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul id="pagination-controls" class="pagination justify-content-center">
+        </ul>
+    </nav>
+</div>
+
+<!-- Reply Modal -->
+<div class="modal fade" id="replyModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="replyModalTitle">Reply to Notification</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="replyForm">
+                    <input type="hidden" id="replyNotificationId">
+                    <div class="mb-3">
+                        <label for="replyMessage" class="form-label">Your Reply:</label>
+                        <textarea class="form-control" id="replyMessage" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Reply</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Threaded notification styles */
+.notification-thread {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.notification-main {
+    padding: 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.notification-main.unread {
+    background: #e3f2fd;
+    border-left: 4px solid #2196F3;
+}
+
+.notification-replies {
+    background: #fff;
+}
+
+.reply-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-left: 20px;
+    border-left: 3px solid #e0e0e0;
+    position: relative;
+}
+
+.reply-item:last-child {
+    border-bottom: none;
+}
+
+.reply-item.my-reply {
+    background: #f1f8e9;
+    border-left-color: #4caf50;
+    margin-right: 20px;
+    margin-left: 40px;
+}
+
+.reply-item.their-reply {
+    background: #fff3e0;
+    border-left-color: #ff9800;
+}
+
+.reply-author {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reply-author .badge {
+    font-size: 0.75rem;
+}
+
+.reply-content {
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.reply-timestamp {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.notification-actions {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.thread-toggle {
+    cursor: pointer;
+    padding: 8px 15px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    color: #495057;
+    transition: all 0.2s;
+}
+
+.thread-toggle:hover {
+    background: #e9ecef;
+}
+
+.thread-toggle.expanded {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.replies-count {
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    gap: 15px;
+}
+
+.notification-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    color: #212529;
+}
+
+.notification-timestamp {
+    font-size: 0.875rem;
+    color: #6c757d;
+    white-space: nowrap;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.notification-message {
+    color: #495057;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+.reply-thread-indicator {
+    position: absolute;
+    left: -3px;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, #e0e0e0, transparent);
+}
+
+.quick-reply-form {
+    margin-top: 10px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+
+.quick-reply-textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+@media (max-width: 768px) {
+    .reply-item {
+        margin-left: 10px;
+    }
+    
+    .reply-item.my-reply {
+        margin-left: 20px;
+        margin-right: 10px;
+    }
+    
+    .notification-main,
+    .notification-actions {
+        padding: 15px;
+    }
+    
+    .reply-item {
+        padding: 12px 15px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function() {
+    let currentPage = 1;
+    let unreadNotificationIds = [];
+    const currentUserId = {{ g.user_context.user_id | tojson }};
+
+    // --- Main function to load and render notifications ---
+    async function loadNotifications(page = 1) {
+        currentPage = page;
+        const listContainer = $('#notifications-list-container');
+        listContainer.html(`<div class="text-center p-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>`);
+        
+        try {
+            const response = await authenticatedFetch(`/api/notifications/?page=${page}&per_page=10&include_replies=true`);
+            const data = await response.json();
+
+            listContainer.empty();
+            unreadNotificationIds = [];
+
+            if (data.notifications.length === 0) {
+                listContainer.html('<div class="list-group-item text-center p-5 text-muted">You have no notifications.</div>');
+                return;
+            }
+
+            data.notifications.forEach(notification => {
+                renderNotificationThread(notification, listContainer);
+            });
+
+            renderPagination(data);
+
+        } catch (error) {
+            console.error("Failed to load notifications:", error);
+            listContainer.html('<div class="list-group-item text-center p-5 text-danger">Could not load notifications. Please try again.</div>');
+        }
+    }
+    
+    // --- Function to render a single notification thread ---
+    function renderNotificationThread(notification, container) {
+        if (!notification.is_read) {
+            unreadNotificationIds.push(notification.id);
+        }
+        
+        const repliesCount = notification.replies ? notification.replies.length : 0;
+        const hasReplies = repliesCount > 0;
+        const canReply = notification.sender_user_id;
+
+        const isClickable = notification.link;
+        const mainContent = `
+            <div class="notification-main ${!notification.is_read ? 'unread' : ''}">
+                <div class="notification-header">
+                    <h5 class="notification-title">${notification.title}</h5>
+                    <small class="notification-timestamp">${formatTimestamp(notification.timestamp)}</small>
+                </div>
+                <div class="notification-message"><strong>From: ${notification.sender_name || 'System'}</strong><br>${notification.message}</div>
+                ${hasReplies ? `
+                    <div class="thread-toggle" data-notification-id="${notification.id}">
+                        <i class="bi bi-chat-dots me-1"></i>
+                        <span class="replies-count">${repliesCount}</span>
+                        ${repliesCount === 1 ? 'reply' : 'replies'}
+                        <i class="bi bi-chevron-down ms-1 toggle-icon"></i>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+
+        const threadHtml = `
+            <div class="notification-thread" data-notification-id="${notification.id}">
+                ${isClickable ? `<a href="${notification.link}" class="text-decoration-none">${mainContent}</a>` : mainContent}
+                
+                ${hasReplies ? `
+                    <div class="notification-replies" style="display: none;">
+                        ${renderReplies(notification.replies)}
+                    </div>
+                ` : ''}
+                
+                ${canReply ? `
+                    <div class="notification-actions">
+                        <button class="btn btn-sm btn-outline-primary reply-btn" 
+                                data-notification-id="${notification.id}" 
+                                data-notification-title="${notification.title}">
+                            <i class="bi bi-reply me-1"></i> Reply
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary quick-reply-btn"
+                                data-notification-id="${notification.id}">
+                            <i class="bi bi-chat-square-text me-1"></i> Quick Reply
+                        </button>
+                    </div>
+                    <div class="quick-reply-form" style="display: none;" data-notification-id="${notification.id}">
+                        <div class="mb-2">
+                            <textarea class="form-control quick-reply-textarea" 
+                                     placeholder="Type your reply..." 
+                                     data-notification-id="${notification.id}"></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-primary send-quick-reply-btn" 
+                                    data-notification-id="${notification.id}">
+                                <i class="bi bi-send me-1"></i> Send
+                            </button>
+                            <button class="btn btn-sm btn-secondary cancel-quick-reply-btn" 
+                                    data-notification-id="${notification.id}">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        container.append(threadHtml);
+    }
+
+    // --- Function to render the replies within a thread ---
+    function renderReplies(replies) {
+        if (!replies || replies.length === 0) return '';
+        
+        return replies.map(reply => {
+            const isMyReply = reply.sender_user_id === currentUserId;
+            const authorName = reply.sender_name || 'Unknown User';
+            
+            return `
+                <div class="reply-item ${isMyReply ? 'my-reply' : 'their-reply'}">
+                    <div class="reply-author">
+                        <span>${authorName}</span>
+                        ${isMyReply ? '<span class="badge bg-success">You</span>' : '<span class="badge bg-primary">Them</span>'}
+                    </div>
+                    <div class="reply-content">${reply.message}</div>
+                    <div class="reply-timestamp">${formatTimestamp(reply.timestamp)}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // --- Helper function to format timestamps ---
+    function formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return date.toLocaleDateString('en-IN', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    // --- Event Handlers ---
+
+    // Toggle reply thread visibility
+    $('#notifications-list-container').on('click', '.thread-toggle', function(e) {
+        e.preventDefault();
+        const notificationId = $(this).data('notification-id');
+        const repliesContainer = $(`.notification-thread[data-notification-id="${notificationId}"] .notification-replies`);
+        const toggleIcon = $(this).find('.toggle-icon');
+        
+        if (repliesContainer.is(':visible')) {
+            repliesContainer.slideUp(300);
+            toggleIcon.removeClass('bi-chevron-up').addClass('bi-chevron-down');
+            $(this).removeClass('expanded');
+        } else {
+            repliesContainer.slideDown(300);
+            toggleIcon.removeClass('bi-chevron-down').addClass('bi-chevron-up');
+            $(this).addClass('expanded');
+        }
+    });
+
+    // Quick reply toggle
+    $('#notifications-list-container').on('click', '.quick-reply-btn', function(e) {
+        e.preventDefault();
+        const notificationId = $(this).data('notification-id');
+        const quickReplyForm = $(`.quick-reply-form[data-notification-id="${notificationId}"]`);
+        
+        if (quickReplyForm.is(':visible')) {
+            quickReplyForm.slideUp(300);
+        } else {
+            // Hide other open quick reply forms
+            $('.quick-reply-form:visible').slideUp(300);
+            quickReplyForm.slideDown(300);
+            quickReplyForm.find('textarea').focus();
+        }
+    });
+
+    // Cancel quick reply
+    $('#notifications-list-container').on('click', '.cancel-quick-reply-btn', function(e) {
+        e.preventDefault();
+        const notificationId = $(this).data('notification-id');
+        const quickReplyForm = $(`.quick-reply-form[data-notification-id="${notificationId}"]`);
+        quickReplyForm.slideUp(300);
+        quickReplyForm.find('textarea').val('');
+    });
+
+    // Send quick reply
+    $('#notifications-list-container').on('click', '.send-quick-reply-btn', async function(e) {
+        e.preventDefault();
+        const notificationId = $(this).data('notification-id');
+        const textarea = $(`.quick-reply-textarea[data-notification-id="${notificationId}"]`);
+        const message = textarea.val().trim();
+        
+        if (!message) {
+            showToast('Please enter a reply message', 'warning');
+            textarea.focus();
+            return;
+        }
+        
+        const $submitBtn = $(this);
+        const originalText = $submitBtn.html();
+        $submitBtn.prop('disabled', true).html('<div class="spinner-border spinner-border-sm me-2"></div>Sending...');
+        
+        try {
+            const response = await authenticatedFetch(`/api/notifications/${notificationId}/reply`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to send reply');
+            }
+            
+            showToast("Reply sent successfully!", "success");
+            textarea.val('');
+            $(`.quick-reply-form[data-notification-id="${notificationId}"]`).slideUp(300);
+            
+            // Refresh the current page to show the new reply
+            loadNotifications(currentPage);
+            
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'danger');
+        } finally {
+            $submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+
+    // Open reply modal
+    const replyModal = new bootstrap.Modal($('#replyModal')[0]);
+    $('#notifications-list-container').on('click', '.reply-btn', function() {
+        const notificationId = $(this).data('notification-id');
+        const notificationTitle = $(this).data('notification-title');
+        
+        $('#replyNotificationId').val(notificationId);
+        $('#replyModalTitle').text(`Reply to: "${notificationTitle}"`);
+        $('#replyForm')[0].reset();
+        replyModal.show();
+    });
+
+    // Submit reply form (modal)
+    $('#replyForm').on('submit', async function(e) {
+        e.preventDefault();
+        const notificationId = $('#replyNotificationId').val();
+        const message = $('#replyMessage').val().trim();
+        
+        if (!message) {
+            showToast('Please enter a reply message', 'warning');
+            $('#replyMessage').focus();
+            return;
+        }
+        
+        const $submitBtn = $(this).find('button[type="submit"]');
+        const originalText = $submitBtn.html();
+        $submitBtn.prop('disabled', true).html('<div class="spinner-border spinner-border-sm me-2"></div>Sending...');
+        
+        try {
+            const response = await authenticatedFetch(`/api/notifications/${notificationId}/reply`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to send reply');
+            
+            showToast("Reply sent successfully!", "success");
+            replyModal.hide();
+            loadNotifications(currentPage); // Refresh to show new reply
+        } catch (err) {
+            showToast(`Error: ${err.message}`, 'danger');
+        } finally {
+            $submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+
+    // --- Pagination Functions ---
+    function renderPagination(data) {
+        const paginationContainer = $('#pagination-controls');
+        paginationContainer.empty();
+        
+        if (data.total_pages <= 1) return;
+
+        // Previous button
+        paginationContainer.append(`
+            <li class="page-item ${!data.has_prev ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${data.page - 1}">Previous</a>
+            </li>
+        `);
+
+        // Page numbers
+        for (let i = 1; i <= data.total_pages; i++) {
+            paginationContainer.append(`
+                <li class="page-item ${i === data.page ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `);
+        }
+
+        // Next button
+        paginationContainer.append(`
+            <li class="page-item ${!data.has_next ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${data.page + 1}">Next</a>
+            </li>
+        `);
+    }
+
+    // Event listener for pagination clicks
+    $('#pagination-controls').on('click', 'a.page-link', function(e) {
+        e.preventDefault();
+        const page = $(this).data('page');
+        if (page) {
+            loadNotifications(page);
+            // Scroll to top of notifications list
+            $('html, body').animate({
+                scrollTop: $('#notifications-list-container').offset().top - 100
+            }, 300);
+        }
+    });
+
+    // Event listener for "Mark All as Read"
+    $('#markAllReadBtn').on('click', async function() {
+        if (unreadNotificationIds.length === 0) {
+            showToast("No unread notifications to mark.", "info");
+            return;
+        }
+        
+        const $btn = $(this);
+        const originalText = $btn.html();
+        $btn.prop('disabled', true).html('<div class="spinner-border spinner-border-sm me-2"></div>Marking...');
+        
+        try {
+            const response = await authenticatedFetch('/api/notifications/mark-read', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: unreadNotificationIds })
+            });
+            if (!response.ok) throw new Error("Failed to mark as read");
+            
+            showToast("Notifications marked as read.", "success");
+            
+            // Clear the unread IDs immediately
+            unreadNotificationIds = [];
+            
+            // Reload current page to show updated state
+            await loadNotifications(currentPage); 
+            
+            // Add a small delay to ensure backend is updated, then refresh the bell
+            setTimeout(() => {
+                if (window.fetchNotifications) {
+                    console.log("Calling global fetchNotifications().");
+                    window.fetchNotifications();
+                }
+                
+                // Also dispatch custom event for other listeners
+                const event = new CustomEvent('notifications-updated');
+                document.dispatchEvent(event);
+            }, 300);
+            
+        } catch (error) {
+            console.error("Mark as read error:", error);
+            showToast("An error occurred.", "danger");
+        } finally {
+            $btn.prop('disabled', false).html(originalText);
+        }
+    });
+
+    // Auto-resize textareas
+    $('#notifications-list-container').on('input', '.quick-reply-textarea', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Handle Enter key for quick replies (Shift+Enter for new line, Enter to send)
+    $('#notifications-list-container').on('keydown', '.quick-reply-textarea', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const notificationId = $(this).data('notification-id');
+            $(`.send-quick-reply-btn[data-notification-id="${notificationId}"]`).click();
+        }
+    });
+
+    // Handle Enter key in modal reply form
+    $('#replyMessage').on('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            $('#replyForm').submit();
+        }
+    });
+
+    // Close quick reply forms when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest('.quick-reply-form').length && 
+            !$(e.target).closest('.quick-reply-btn').length) {
+            $('.quick-reply-form:visible').slideUp(300);
+        }
+    });
+
+    // --- Initial Load ---
+    loadNotifications(1);
+});
+</script>
+{% endblock %}

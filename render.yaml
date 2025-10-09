@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: dia-backend
+    env: docker
+    repo: https://github.com/Raghavender1234/dia.git
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromService:
+          type: postgres
+          name: dia-db
+          property: connectionString
+      - key: RAZORPAY_KEY_ID
+        value: YOUR_RAZORPAY_KEY_ID
+      - key: RAZORPAY_KEY_SECRET
+        value: YOUR_RAZORPAY_KEY_SECRET
+      - key: OPENAI_API_KEY
+        value: YOUR_OPENAI_API_KEY
+      - key: GOOGLE_CLIENT_ID
+        value: YOUR_GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+        value: YOUR_GOOGLE_CLIENT_SECRET
+      - key: FRONTEND_URL
+        value: https://your-frontend-url.com
+      - key: S3_BUCKET
+        value: your-s3-bucket-name
+      - key: S3_REGION
+        value: your-s3-region
+      - key: AWS_ACCESS_KEY_ID
+        value: YOUR_AWS_ACCESS_KEY_ID
+      - key: AWS_SECRET_ACCESS_KEY
+        value: YOUR_AWS_SECRET_ACCESS_KEY
+
+  - type: postgres
+    name: dia-db
+    plan: free

@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - {{ super() }}{% endblock %}
+
+{% block head_extra %}
+<style>
+  :root{
+    --primary:#667eea;
+    --primary-2:#764ba2;
+    --border:#e2e8f0;
+    --muted:#6b7280;
+  }
+
+  /* Kill global animations/transitions */
+  *{ transition:none !important; }
+
+  /* Page background */
+  body{
+    min-height:100vh;
+    font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background:linear-gradient(135deg,var(--primary) 0%, var(--primary-2) 100%);
+    overflow-x:hidden;
+  }
+
+  /* Layout shell */
+  .auth-layout{ min-height:100vh; padding:2rem 0; }
+  .auth-card{
+    max-width:1000px; margin:0 auto;
+    border-radius:24px; overflow:hidden;
+    background:rgba(255,255,255,0.95);
+    border:1px solid rgba(255,255,255,0.2);
+    box-shadow:0 8px 24px rgba(0,0,0,.08); /* simple shadow */
+  }
+
+  /* LEFT image panel — keep visible, remove moving background */
+  .auth-image-section{
+    background:url('/static/images/login-image.png') center/cover no-repeat;
+    position:relative; min-height:100%;
+  }
+  .auth-image-section::before{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(135deg, rgba(102,126,234,.35), rgba(118,75,162,.35));
+  }
+
+  /* Headline/lead styles kept (no animations) */
+  .auth-image-section .display-4,
+  .auth-image-section .display-5{
+    font-weight:800; margin-bottom:1rem;
+    text-shadow:0 2px 8px rgba(0,0,0,.25);
+  }
+  .auth-image-section .lead{ font-size:1.05rem; opacity:.95; }
+
+  /* Optional gradient text rule from your CSS (kept) */
+  .auth-image-section .text-overlay h2,
+  .auth-image-section .text-overlay p{
+    background:linear-gradient(135deg,var(--primary) 0%, var(--primary-2) 100%);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; text-fill-color:transparent;
+  }
+
+  /* RIGHT form panel — clean & static */
+  .inner-form-container{
+    background:#fff; border-radius:20px;
+    padding:2rem; box-shadow:0 4px 12px rgba(0,0,0,.06);
+  }
+
+  /* Title */
+  .card-title{
+    font-size:2rem; font-weight:700;
+    background:linear-gradient(135deg,var(--primary) 0%, var(--primary-2) 100%);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; text-align:center; margin-bottom:1.25rem;
+  }
+
+  /* Forms */
+  .form-label{
+    color:#4a5568; font-weight:600; margin-bottom:.5rem;
+    font-size:.95rem; text-transform:uppercase; letter-spacing:.4px;
+  }
+  .form-control{
+    border:1px solid var(--border); border-radius:16px;
+    padding:1rem 1.25rem; font-size:1.05rem; background:#fff;
+    box-shadow:none;
+  }
+  .form-control:focus{
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(102,126,234,.15);
+    background:#fff;
+  }
+
+  /* Buttons (no hover translate/glint) */
+  .btn{
+    border-radius:16px; padding:1rem 2rem;
+    font-weight:600; font-size:1.05rem; letter-spacing:.3px; border:none;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--primary) 0%, var(--primary-2) 100%);
+    color:#fff;
+  }
+  .btn-primary:hover{ filter:brightness(.97); color:#fff; }
+  .btn-danger{
+    /* simpler "Google" red button */
+    background:#ea4335; color:#fff;
+    box-shadow:0 6px 16px rgba(234,67,53,.25);
+  }
+  .btn-danger:hover{ filter:brightness(.97); color:#fff; }
+  .btn:disabled{ opacity:.7; }
+
+  /* Divider */
+  .divider{ position:relative; text-align:center; margin:1.5rem 0; }
+  .divider::before{ content:''; position:absolute; left:0; right:0; top:50%; height:1px; background:var(--border); }
+  .divider small{ background:#fff; padding:0 .6rem; color:var(--muted); position:relative; }
+
+  /* Alerts (no slide-in) */
+  .alert{ border:none; border-left:4px solid transparent; border-radius:12px; padding:1rem; }
+  .alert-success{ background:#ecfdf5; color:#065f46; border-left-color:#10b981; }
+  .alert-danger{  background:#fef2f2; color:#7f1d1d; border-left-color:#ef4444; }
+
+  /* Links */
+  .auth-links{ text-align:center; margin-top:1rem; }
+  .auth-links a{ color:var(--primary); text-decoration:none; }
+  .auth-links a:hover{ text-decoration:underline; }
+
+  /* Remove heavy/unused effects */
+  .auth-layout::before,
+  .floating-shapes,
+  .btn::before{ display:none !important; }
+  @keyframes none{} /* neutralizer for any leftover keyframes names */
+
+  /* Responsive */
+  @media (max-width:992px){
+    .auth-card{ margin:1rem; border-radius:20px; }
+    .inner-form-container{ padding:1.5rem; }
+    .card-title{ font-size:1.8rem; }
+  }
+  @media (max-width:576px){
+    .inner-form-container{ padding:1.25rem; }
+    .btn{ padding:.9rem 1.25rem; font-size:1rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="auth-layout d-flex align-items-center justify-content-center">
+    <div class="floating-shapes"></div>
+    <div class="container">
+        <div class="row g-0 auth-card">
+        <div class="col-lg-6 d-none d-lg-flex auth-image-section text-white position-relative">
+            <div class="overlay-gradient"></div>
+            <div class="text-overlay p-4 text-center w-100">
+                <h2 class="display-5 fw-bold mb-2">Welcome to DIA</h2>
+                <p class="lead">Your personalized platform for exam preparation excellence.</p>
+            </div>
+        </div>
+            <div class="col-lg-6 bg-white p-4 d-flex flex-column justify-content-center">
+                <div class="inner-form-container">
+                    <h2 class="card-title text-center">Log In</h2>
+                    
+                    <div id="loginMessage" class="mb-3"></div>
+
+                    <div class="d-grid mb-3">
+                        <a href="{{ url_for('auth_api.google_login') }}" class="btn btn-danger">
+                            <i class="bi bi-google me-2"></i>Continue with Google
+                        </a>
+                    </div>
+                    
+                    <div class="divider">
+                        <small>OR</small>
+                    </div>
+
+                    <form id="loginForm">
+                        {% if form and form.csrf_token %}
+                            <input type="hidden" name="csrf_token" value="{{ form.csrf_token._value }}">
+                        {% endif %}
+
+                        <div class="mb-4">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" required 
+                                   placeholder="Enter your email address">
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required 
+                                   placeholder="Enter your password">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 mt-3" id="loginSubmitBtn">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                        </button>
+                    </form>
+
+                    <div class="auth-links">
+                        <p class="mt-4 mb-2">
+                            Don't have an account? 
+                            <a href="{{ url_for('frontend.register', **org_param) }}">Create Account</a>
+                        </p>
+                        <p class="mb-0">
+                            <a href="{{ url_for('frontend.password_request', **org_param) }}">
+                                <i class="bi bi-key me-1"></i>Forgot Password?
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById('loginForm');
+    const btn = document.getElementById('loginSubmitBtn');
+    const msg = document.getElementById('loginMessage');
+
+    // Enhanced button loading state
+    const setButtonLoading = (loading) => {
+        if (loading) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing In...';
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In';
+        }
+    };
+
+    // Enhanced message display
+    const showMessage = (message, type = 'danger') => {
+        msg.className = `alert alert-${type}`;
+        msg.innerHTML = `
+            <i class="bi bi-${getMessageIcon(type)} me-2"></i>
+            ${message}
+        `;
+        
+        // Scroll to message if needed
+        if (msg.offsetTop < window.scrollY) {
+            msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
+    const getMessageIcon = (type) => {
+        const icons = {
+            success: 'check-circle-fill',
+            danger: 'exclamation-triangle-fill',
+            warning: 'exclamation-circle-fill',
+            info: 'info-circle-fill'
+        };
+        return icons[type] || 'info-circle-fill';
+    };
+
+    // Form validation with visual feedback
+    const validateForm = () => {
+        const email = form.email.value.trim();
+        const password = form.password.value.trim();
+        
+        if (!email || !password) {
+            showMessage('Please fill in all required fields.', 'warning');
+            return false;
+        }
+        
+        if (!/\S+@\S+\.\S+/.test(email)) {
+            showMessage('Please enter a valid email address.', 'warning');
+            return false;
+        }
+        
+        return true;
+    };
+
+    // Enhanced form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!validateForm()) return;
+        
+        setButtonLoading(true);
+        msg.className = '';
+        msg.textContent = '';
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email: form.email.value.trim(),
+                    password: form.password.value.trim(),
+                    org_subdomain: "{{ organization.subdomain if organization else '' }}" // <-- ADD THIS LINE
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showMessage(data.message || 'Login successful! Redirecting...', 'success');
+                
+                // Determine redirect URL
+                const redirectUrl = data.redirect_url || data.dashboard_url;
+                
+                if (redirectUrl) {
+                    // Add a subtle delay for UX
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 1000);
+                } else {
+                    showMessage('Login succeeded but could not determine redirect location.', 'danger');
+                    setButtonLoading(false);
+                }
+            } else {
+                showMessage(data.message || 'Invalid credentials. Please check your email and password.', 'danger');
+                setButtonLoading(false);
+                
+                // Add shake animation to form on error
+                form.style.animation = 'shake 0.5s ease-in-out';
+                setTimeout(() => {
+                    form.style.animation = '';
+                }, 500);
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            showMessage('A network error occurred. Please check your connection and try again.', 'danger');
+            setButtonLoading(false);
+        }
+    });
+
+    // Add input validation feedback
+    const inputs = form.querySelectorAll('input[required]');
+    inputs.forEach(input => {
+        input.addEventListener('blur', () => {
+            if (input.value.trim() === '') {
+                input.style.borderColor = '#ef4444';
+            } else {
+                input.style.borderColor = '#10b981';
+            }
+        });
+        
+        input.addEventListener('focus', () => {
+            input.style.borderColor = '#667eea';
+        });
+    });
+
+    // Add CSS for shake animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %}

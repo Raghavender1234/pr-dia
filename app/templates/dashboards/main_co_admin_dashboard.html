@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Organization Dashboard - DIA{% endblock %}
+
+{% block head_extra %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    .stat-card {
+      border: none;
+      border-left: 5px solid var(--bs-primary);
+      transition: all 0.3s ease-in-out;
+    }
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+    .stat-card .bi {
+      opacity: 0.7;
+    }
+    .chart-container {
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+    .chart-container canvas {
+      max-height: 300px !important;
+    }
+    .pie-chart-container {
+      position: relative;
+      height: 280px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+{% set org_param = {'org': g.current_organization.subdomain} if g.current_organization else {} %}
+<div class="container-fluid">
+
+  <h1 class="h2 mb-2">Organization Dashboard</h1>
+  <p class="text-muted mb-4">
+    Welcome, <strong>{{ g.user_context.user_name or 'Admin' }}</strong>.
+    Manage your organization, <span class="fw-bold">{{ g.user_context.organization_name or 'Not Set' }}</span>.
+  </p>
+
+  <div id="mainCoAdminMessage"></div>
+
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3 h-100" style="border-left-color: #dc3545;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-people-fill fs-1 text-danger me-3"></i>
+                <div>
+                    <h6 class="text-uppercase text-muted small mb-1">Total Students</h6>
+                    <h4 id="totalOrgStudentsCount" class="fw-bold mb-0">—</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3 h-100" style="border-left-color: #0d6efd;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-clipboard-check-fill fs-1 text-primary me-3"></i>
+                <div>
+                    <h6 class="text-uppercase text-muted small mb-1">Exams Managed</h6>
+                    <h4 id="examsManagedCount" class="fw-bold mb-0">—</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+        <div class="card shadow-sm stat-card p-3 h-100" style="border-left-color: #198754;">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-journal-text fs-1 text-success me-3"></i>
+                <div>
+                    <h6 class="text-uppercase text-muted small mb-1">Active Mock Tests</h6>
+                    <h4 id="activeMockTestsCount" class="fw-bold mb-0">—</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-3">
+        <a href="{{ url_for('frontend.global_content_import_page') }}" class="text-decoration-none">
+            <div class="card shadow-sm stat-card p-3 h-100" style="border-left-color: #ffc107;">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-cloud-upload-fill fs-1 text-warning me-3"></i>
+                    <div>
+                        <h6 class="text-uppercase text-muted small mb-1">Quick Action</h6>
+                        <h4 class="fw-bold mb-0">Global Import</h4>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3">
+          <h5 class="mb-0"><i class="bi bi-pie-chart-fill me-2 text-primary"></i>User Roles in Your Organization</h5>
+        </div>
+        <div class="card-body">
+          <div class="pie-chart-container">
+            <canvas id="orgUserRolesChart"></canvas>
+            <div id="orgUserRolesChartLoading" class="position-absolute top-50 start-50 translate-middle">
+              <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+            </div>
+            <p id="orgUserRolesChartError" class="d-none text-danger text-center mt-3">Error loading chart.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-white py-3">
+          <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2 text-success"></i>Exam Performance Trends</h5>
+        </div>
+        <div class="card-body">
+          <div class="chart-container">
+            <canvas id="examPerformanceChart"></canvas>
+            <div id="examPerformanceChartLoading" class="position-absolute top-50 start-50 translate-middle">
+              <div class="spinner-border text-success" role="status"><span class="visually-hidden">Loading...</span></div>
+            </div>
+            <p id="examPerformanceChartError" class="d-none text-danger text-center mt-3">Error loading chart.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // The access token is now available directly from the Jinja2 context because of our fix in routes.py
+    const accessToken = "{{ g.user_context.access_token }}";
+    const chartInstances = {};
+
+    const showMsg = (txt, type = 'danger') => {
+        const container = document.getElementById('mainCoAdminMessage');
+        if (container) {
+            container.innerHTML = `<div class="alert alert-${type}">${txt}</div>`;
+        }
+    };
+
+    // This is our new, self-contained fetch function
+    const authenticatedFetch = (url, options = {}) => {
+        // If the access token isn't available, we can't make an authenticated request.
+        if (!accessToken) {
+            const errorMessage = "Authentication token not found. Cannot make API requests.";
+            showMsg(errorMessage);
+            console.error(errorMessage);
+            // Return a rejected promise to stop the function that called this
+            return Promise.reject(new Error(errorMessage));
+        }
+
+        // Add the Authorization header to any options the caller passed in
+        const newOptions = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        return fetch(url, newOptions);
+    };
+
+const loadStats = async () => {
+    try {
+        const response = await authenticatedFetch('/api/main-co-admin/organization/summary');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        const d = await response.json();
+        
+        // This line is now safely removed
+        // document.getElementById('totalOrgCoAdminsCount').textContent = d.total_co_admins;
+
+        // These lines are correct and will still work
+        document.getElementById('totalOrgStudentsCount').textContent = d.total_students;
+        document.getElementById('examsManagedCount').textContent = d.exams_managed;
+        document.getElementById('activeMockTestsCount').textContent = d.active_mock_tests;
+
+    } catch (e) {
+        showMsg(`Could not load summary statistics: ${e.message}`);
+    }
+};
+
+    const initChart = async (canvasId, url, type, chartOptions, dataProcessor) => {
+        const loadingEl = document.getElementById(`${canvasId}Loading`);
+        const errorEl = document.getElementById(`${canvasId}Error`);
+        const canvasEl = document.getElementById(canvasId);
+
+        loadingEl.style.display = 'block';
+        errorEl.classList.add('d-none');
+        canvasEl.style.display = 'none';
+
+        try {
+            const response = await authenticatedFetch(url);
+            const payload = await response.json();
+            if (!response.ok) throw new Error(payload.message || response.statusText);
+
+            if (!payload || (Array.isArray(payload) && payload.length === 0) || (payload.labels && payload.labels.length === 0)) {
+                errorEl.textContent = "No data available to display.";
+                errorEl.classList.remove('d-none');
+                return;
+            }
+
+            const chartData = dataProcessor(payload);
+            const ctx = canvasEl.getContext('2d');
+            if (chartInstances[canvasId]) {
+                chartInstances[canvasId].destroy();
+            }
+            chartInstances[canvasId] = new Chart(ctx, { type, data: chartData, options: chartOptions });
+            canvasEl.style.display = 'block';
+
+        } catch (e) {
+            errorEl.textContent = `Error: ${e.message}`;
+            errorEl.classList.remove('d-none');
+        } finally {
+            loadingEl.style.display = 'none';
+        }
+    };
+
+    // Initialize all widgets
+    loadStats();
+    
+initChart(
+    'orgUserRolesChart',
+    '/api/main-co-admin/user_roles_org',
+    'doughnut',
+    { 
+        responsive: true, 
+        maintainAspectRatio: false, 
+        plugins: { 
+            legend: { 
+                position: 'bottom',
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    font: {
+                        family: 'Inter',
+                        size: 12
+                    }
+                }
+            }
+        }
+    },
+    (apiData) => {
+        // Updated color palette to match the super admin dashboard
+        const palette = [
+            'rgb(37, 99, 235)',  // Blue
+            'rgb(5, 150, 105)',  // Green
+            'rgb(217, 119, 6)',  // Orange
+            'rgb(220, 38, 38)'   // Red
+        ];
+        return {
+            labels: apiData.labels,
+            datasets: [{ 
+                data: apiData.counts, 
+                backgroundColor: palette,
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        };
+    }
+);
+    initChart(
+        'examPerformanceChart',
+        '/api/main-co-admin/exam_performance_trends',
+        'line',
+        { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } },
+        (apiData) => ({
+            labels: apiData.labels,
+            datasets: [
+                { label: 'Average Score (%)', data: apiData.avg_scores, borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.2)', fill: true, tension: 0.3 },
+                { label: 'Pass Rate (%)', data: apiData.pass_rates, borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.2)', fill: true, tension: 0.3 }
+            ]
+        })
+    );
+});
+</script>
+{% endblock %}

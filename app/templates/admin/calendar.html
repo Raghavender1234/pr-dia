@@ -1,0 +1,957 @@
+{% extends 'base.html' %}
+
+{% block title %}Class Schedule{% endblock %}
+
+{% block head_extra %}
+    {# --- Include FullCalendar CSS --- #}
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Modern styling for the entire page */
+        .schedule-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        .calendar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Calendar styling */
+        #calendar {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* FullCalendar customizations */
+        .fc-toolbar {
+            margin-bottom: 20px !important;
+        }
+
+        .fc-toolbar-title {
+            font-size: 24px !important;
+            font-weight: 600 !important;
+            color: #2c3e50 !important;
+        }
+
+        .fc-button {
+            background-color: #f8f9fa !important;
+            border: 1px solid #dee2e6 !important;
+            color: #495057 !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .fc-button:hover {
+            background-color: #e9ecef !important;
+        }
+
+        .fc-button-active {
+            background-color: #3498db !important;
+            color: white !important;
+            border-color: #3498db !important;
+        }
+
+        .fc-event {
+            border-radius: 6px !important;
+            border: none !important;
+            padding: 5px 8px !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            cursor: pointer !important;
+        }
+
+        .fc-daygrid-event {
+            margin-bottom: 3px !important;
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease;
+            overflow: hidden;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .close-button {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+        }
+
+        .close-button:hover {
+            transform: scale(1.1);
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+            outline: none;
+        }
+
+        textarea.form-control {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .modal-footer {
+            padding: 20px 25px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        #form-error {
+            display: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .timezone-info {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #1565c0;
+        }
+
+        .selected-time-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .event-detail {
+            padding: 15px 0;
+        }
+
+        .event-detail h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .event-detail p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .event-detail strong {
+            color: #34495e;
+        }
+
+        .event-detail a {
+            color: #3498db;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .event-detail a:hover {
+            text-decoration: underline;
+        }
+
+        .row {
+            display: flex;
+            margin: 0 -10px;
+        }
+
+        .col-md-6 {
+            flex: 0 0 50%;
+            padding: 0 10px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .calendar-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+            
+            #calendar {
+                padding: 10px;
+            }
+
+            .row {
+                flex-direction: column;
+            }
+
+            .col-md-6 {
+                flex: none;
+                width: 100%;
+                padding: 0;
+                margin-bottom: 15px;
+            }
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Success message */
+        .alert-success {
+            display: none;
+            padding: 12px 15px;
+            background-color: #d4edda;
+            color: #155724;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Toast notification styles */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 2000;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideInRight 0.3s ease;
+        }
+
+        .toast.success { background-color: #28a745; }
+        .toast.danger { background-color: #dc3545; }
+        .toast.warning { background-color: #ffc107; color: #212529; }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="schedule-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-calendar-alt me-2"></i>Class Schedule
+        </h1>
+        <div class="calendar-actions">
+            <button class="btn-primary" id="createClassBtn">
+                <i class="fas fa-plus me-2"></i>Create Class
+            </button>
+        </div>
+    </div>
+
+    <!-- Timezone info -->
+    <div class="timezone-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Timezone:</strong> All times are displayed in your local timezone (<span id="userTimezone"></span>). 
+        Times are automatically converted when sharing with others in different timezones.
+    </div>
+
+    <!-- The calendar will be rendered inside this div -->
+    <div id="calendar" data-organization-id="{{ organization_id }}"></div>
+
+    <!-- Loading indicator -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p class="mt-2">Loading calendar events...</p>
+    </div>
+</div>
+
+<!-- MODAL HTML STRUCTURE -->
+<div id="createClassModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Create New Class</h2>
+            <span class="close-button">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="createClassForm">
+                <!-- Hidden fields to store the selected start time in UTC -->
+                <input type="hidden" id="classStartTimeUTC" name="scheduled_at">
+                
+                <div class="alert-success" id="form-success">
+                    Class created successfully!
+                </div>
+                
+                <div id="form-error" class="alert alert-danger" style="display: none;"></div>
+                
+                <!-- Selected time display -->
+                <div id="selectedTimeDisplay" class="selected-time-display" style="display: none;">
+                    <i class="fas fa-clock me-2"></i>
+                    <strong>Selected Time:</strong> <span id="selectedTimeText"></span>
+                    <br>
+                    <small class="text-muted">Click a different time slot on the calendar to change, or use manual input below.</small>
+                </div>
+                
+                <div class="form-group" id="manualTimeGroup">
+                    <label for="manualStartTime" class="form-label">
+                        <span id="manualTimeLabel">Start Date & Time</span>
+                        <small class="text-muted ms-2">(in your local timezone)</small>
+                    </label>
+                    <input type="datetime-local" class="form-control" id="manualStartTime" name="manual_start_time">
+                    <small class="text-muted">Or click a time slot on the calendar to select quickly.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="classTitle" class="form-label">Class Title</label>
+                    <input type="text" class="form-control" id="classTitle" name="title" required placeholder="Enter class title">
+                </div>
+                
+                <div class="form-group">
+                    <label for="classDescription" class="form-label">Description</label>
+                    <textarea class="form-control" id="classDescription" name="description" rows="3" placeholder="Enter class description (optional)"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="classMeetingLink" class="form-label">Meeting Link</label>
+                    <input type="url" class="form-control" id="classMeetingLink" name="meeting_link" placeholder="https://meet.google.com/...">
+                    <small class="text-muted">e.g., Google Meet, Zoom, or Microsoft Teams link</small>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 form-group">
+                        <label for="classRepeats" class="form-label">Repeats</label>
+                        <select class="form-control" id="classRepeats" name="repeats">
+                            <option value="none" selected>Does not repeat</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 form-group" id="repeatUntilGroup" style="display: none;">
+                        <label for="classRepeatUntil" class="form-label">Repeat Until</label>
+                        <input type="date" class="form-control" id="classRepeatUntil" name="repeat_until">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="classDuration" class="form-label">Duration (minutes)</label>
+                    <input type="number" class="form-control" id="classDuration" name="duration_minutes" value="60" min="15" step="15" required>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+            <button type="submit" form="createClassForm" class="btn-primary" id="saveClassBtn">
+                <i class="fas fa-save me-2"></i>Save Class
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div id="eventDetailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Class Details</h2>
+            <span class="close-button">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="eventDetailsContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="closeDetailsBtn">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.34/moment-timezone-with-data.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/moment-timezone@5.11.3/main.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---- ELEMENTS ----
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) return;
+
+  const organizationId = parseInt(calendarEl.dataset.organizationId, 10);
+
+  // Modals & form
+  const modal = document.getElementById('createClassModal');
+  const eventDetailsModal = document.getElementById('eventDetailsModal');
+  const form = document.getElementById('createClassForm');
+
+  // Buttons/controls
+  const createClassBtn = document.getElementById('createClassBtn');
+  const saveClassBtn = document.getElementById('saveClassBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const createCloseBtn = modal.querySelector('.close-button');
+  const detailsCloseX = eventDetailsModal.querySelector('.close-button');
+  const detailsCloseBtn = document.getElementById('closeDetailsBtn');
+
+  // Fields
+  const manualTimeInput = document.getElementById('manualStartTime');
+  const durationInput = document.getElementById('classDuration');
+  const classStartTimeUTC = document.getElementById('classStartTimeUTC');
+  const repeatsSelect = document.getElementById('classRepeats');
+  const repeatUntilGroup = document.getElementById('repeatUntilGroup');
+  const repeatUntilInput = document.getElementById('classRepeatUntil');
+  const errorDiv = document.getElementById('form-error');
+  const successDiv = document.getElementById('form-success');
+  const selectedTimeDisplay = document.getElementById('selectedTimeDisplay');
+  const selectedTimeText = document.getElementById('selectedTimeText');
+  const manualTimeLabel = document.getElementById('manualTimeLabel');
+  const loadingIndicator = document.getElementById('loadingIndicator');
+
+  // Misc
+  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTzSpan = document.getElementById('userTimezone');
+  if (userTzSpan) userTzSpan.textContent = userTz;
+
+  // ---- TIME HELPERS (no hardcoded offsets) ----
+  const parseUTCtoLocal = (utcString) => {
+    if (!utcString) return null;
+    return moment.utc(utcString).toDate();
+  };
+
+  const utcToLocalInput = (utcISOString) => {
+    if (!utcISOString) return '';
+    return moment.utc(utcISOString).local().format('YYYY-MM-DDTHH:mm');
+  };
+
+  const localInputToUTC = (localInputValue) => {
+    if (!localInputValue) return null;
+    return moment(localInputValue).toISOString();
+  };
+
+  const formatToLocalTime = (dateLike) => {
+    const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    if (Number.isNaN(d)) return 'Invalid Date';
+    return d.toLocaleString(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short',
+    });
+  };
+
+  const setMinimumDateTime = () => {
+    const nowIso = new Date().toISOString();
+    manualTimeInput.min = utcToLocalInput(nowIso);
+  };
+
+  // ---- EVENT NORMALIZATION & CONFLICT CHECK ----
+  let normalizedEvents = [];
+  const normalizeEvents = (apiEvents) => {
+    normalizedEvents = (apiEvents || []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      startUTC: e.start,
+      endUTC: e.end,
+      extendedProps: e.extendedProps,
+    }));
+  };
+
+  const hasTimeConflict = (proposedStart, proposedEnd) => {
+    const s = proposedStart.getTime();
+    const e = proposedEnd.getTime();
+    return normalizedEvents.some((ev) => {
+      const evS = new Date(ev.startUTC).getTime();
+      const evE = new Date(ev.endUTC).getTime();
+      return s < evE && e > evS;
+    });
+  };
+
+  // ---- MODAL HELPERS ----
+  const closeCreateModal = () => {
+    modal.style.display = 'none';
+    form.reset();
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    selectedTimeDisplay.style.display = 'none';
+    classStartTimeUTC.value = '';
+    saveClassBtn.disabled = false;
+  };
+
+  const openCreateModal = (selectedDate = null) => {
+    form.reset();
+    setMinimumDateTime();
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    durationInput.value = String(Math.max(15, parseInt(durationInput.value || '60', 10)));
+    repeatsSelect.value = 'none';
+    repeatUntilGroup.style.display = 'none';
+    repeatUntilInput.value = '';
+
+    if (selectedDate) {
+      classStartTimeUTC.value = selectedDate.toISOString();
+      manualTimeInput.value = utcToLocalInput(selectedDate.toISOString());
+      selectedTimeText.textContent = formatToLocalTime(selectedDate);
+      selectedTimeDisplay.style.display = 'block';
+      manualTimeLabel.textContent = 'Or adjust time manually:';
+
+      const dur = parseInt(durationInput.value || '60', 10);
+      const end = new Date(selectedDate.getTime() + dur * 60000);
+      if (hasTimeConflict(selectedDate, end)) {
+        errorDiv.textContent = 'This time overlaps with an existing class. Please choose a different time.';
+        errorDiv.style.display = 'block';
+        saveClassBtn.disabled = true;
+      } else {
+        saveClassBtn.disabled = false;
+      }
+    } else {
+      selectedTimeDisplay.style.display = 'none';
+      manualTimeLabel.textContent = 'Start Date & Time';
+      const nextHour = new Date();
+      nextHour.setMinutes(0, 0, 0);
+      nextHour.setHours(nextHour.getHours() + 1);
+      manualTimeInput.value = utcToLocalInput(nextHour.toISOString());
+      classStartTimeUTC.value = nextHour.toISOString();
+      saveClassBtn.disabled = false;
+    }
+
+    modal.style.display = 'block';
+    document.getElementById('classTitle').focus();
+  };
+
+  const closeDetailsModal = () => {
+    eventDetailsModal.style.display = 'none';
+  };
+
+  const checkManualTimeConflict = () => {
+    const localVal = manualTimeInput.value;
+    const dur = parseInt(durationInput.value || '60', 10);
+
+    if (!localVal || !dur) {
+      errorDiv.style.display = 'none';
+      saveClassBtn.disabled = false;
+      return;
+    }
+
+    const startUTC = localInputToUTC(localVal);
+    if (!startUTC) {
+      errorDiv.textContent = 'Please enter a valid date and time.';
+      errorDiv.style.display = 'block';
+      saveClassBtn.disabled = true;
+      return;
+    }
+
+    classStartTimeUTC.value = startUTC;
+    const start = new Date(startUTC);
+    const end = new Date(start.getTime() + dur * 60000);
+
+    if (selectedTimeDisplay.style.display !== 'none') {
+      selectedTimeText.textContent = formatToLocalTime(start);
+    }
+
+    if (hasTimeConflict(start, end)) {
+      errorDiv.textContent = 'This time overlaps with an existing class. Please choose a different time.';
+      errorDiv.style.display = 'block';
+      saveClassBtn.disabled = true;
+    } else {
+      errorDiv.style.display = 'none';
+      saveClassBtn.disabled = false;
+    }
+  };
+
+  // ---- LISTENERS FOR MODALS ----
+  createClassBtn.addEventListener('click', () => openCreateModal(null));
+  createCloseBtn.addEventListener('click', closeCreateModal);
+  cancelBtn.addEventListener('click', closeCreateModal);
+  detailsCloseX.addEventListener('click', closeDetailsModal);
+  detailsCloseBtn.addEventListener('click', closeDetailsModal);
+  window.addEventListener('click', (e) => {
+    if (e.target === modal) closeCreateModal();
+    if (e.target === eventDetailsModal) closeDetailsModal();
+  });
+
+  repeatsSelect.addEventListener('change', function () {
+    repeatUntilGroup.style.display = this.value === 'none' ? 'none' : 'block';
+    if (this.value !== 'none') {
+      const start = classStartTimeUTC.value ? new Date(classStartTimeUTC.value) : new Date();
+      const until = new Date(start);
+      until.setDate(until.getDate() + 30);
+      repeatUntilInput.valueAsDate = until;
+    }
+  });
+  manualTimeInput.addEventListener('input', checkManualTimeConflict);
+  manualTimeInput.addEventListener('change', checkManualTimeConflict);
+  durationInput.addEventListener('input', checkManualTimeConflict);
+  durationInput.addEventListener('change', checkManualTimeConflict);
+
+  // ---- FULLCALENDAR ----
+  if (loadingIndicator) loadingIndicator.style.display = 'block';
+
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    timeZone: userTz,
+    initialView: 'timeGridWeek',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    selectable: true,
+    editable: false,
+    nowIndicator: true,
+    dayMaxEvents: true,
+    eventDisplay: 'block',
+    displayEventEnd: true,
+    eventColor: '#3498db',
+    eventTextColor: '#ffffff',
+    height: 'auto',
+    eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
+    slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
+
+    events: async (fetchInfo, success, failure) => {
+      try {
+        if (loadingIndicator) loadingIndicator.style.display = 'block';
+        const res = await window.authenticatedFetch(`/api/classes/organization/${organizationId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const apiEvents = await res.json();
+
+        // Keep a normalized copy for conflict checks
+        normalizeEvents(apiEvents);
+
+        // Convert UTC strings to Date objects so the UI shows local times cleanly
+        const fcEvents = apiEvents.map((e) => ({
+          id: e.id,
+          title: e.title,
+          start: parseUTCtoLocal(e.start),
+          end: parseUTCtoLocal(e.end),
+          extendedProps: e.extendedProps
+        }));
+
+        success(fcEvents);
+      } catch (err) {
+        console.error('Error fetching calendar events:', err);
+        if (window.showToast) window.showToast('Failed to load calendar events. Please refresh.', 'danger');
+        failure(err);
+      } finally {
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+      }
+    },
+
+    selectAllow: (info) => {
+      const now = new Date();
+      if (info.start < now) {
+        if (window.showToast) window.showToast('Cannot schedule in the past.', 'warning');
+        return false;
+      }
+      return true;
+    },
+
+    select: (info) => {
+      const minutes = Math.max(15, Math.round((info.end - info.start) / 60000));
+      durationInput.value = String(minutes);
+      openCreateModal(info.start);
+    },
+
+    eventClick: (info) => {
+      const ev = info.event;
+      const startStr = formatToLocalTime(ev.start);
+      const endStr = ev.end ? formatToLocalTime(ev.end) : 'Not specified';
+      const joinUrl = ev.extendedProps?.class_url;
+      const meetingLink = ev.extendedProps?.meeting_link;
+      const description = ev.extendedProps?.description;
+
+      let joinBtn = '';
+      if (joinUrl) {
+        joinBtn = `<a href="${joinUrl}" class="btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:20px;">
+          <i class="fas fa-video me-2"></i>Join Class
+        </a>`;
+      }
+
+      const meetingHtml = meetingLink
+        ? `<p><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" rel="noopener">${meetingLink}</a></p>`
+        : `<p><strong>Meeting Link:</strong> Not provided</p>`;
+
+      const html = `
+        <div class="event-detail">
+          ${joinBtn}
+          <h4>${ev.title}</h4>
+          <p><strong>Start:</strong> ${startStr}</p>
+          <p><strong>End:</strong> ${endStr}</p>
+          ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
+          ${meetingHtml}
+        </div>
+      `;
+
+      document.getElementById('eventDetailsContent').innerHTML = html;
+      eventDetailsModal.style.display = 'block';
+    },
+
+    loading: (isLoading) => {
+      if (!isLoading && loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+  });
+
+  calendar.render();
+
+  // ---- FORM SUBMIT ----
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    // Determine start time (UTC ISO)
+    let startUTC = classStartTimeUTC.value;
+    if (!startUTC) {
+      startUTC = localInputToUTC(manualTimeInput.value);
+    }
+    if (!startUTC) {
+      errorDiv.textContent = 'Please enter a valid start time.';
+      errorDiv.style.display = 'block';
+      return;
+    }
+
+    const duration = parseInt(durationInput.value || '60', 10);
+    const startDate = new Date(startUTC);
+    const endDate = new Date(startDate.getTime() + duration * 60000);
+
+    // Conflict check
+    if (hasTimeConflict(startDate, endDate)) {
+      errorDiv.textContent = 'This time conflicts with an existing class. Please choose a different time.';
+      errorDiv.style.display = 'block';
+      return;
+    }
+
+    // Recurrence
+    const repeats = repeatsSelect.value; // 'none' | 'daily' | 'weekly'
+    let repeat_until = null;
+    if (repeats !== 'none') {
+      const ru = repeatUntilInput.value; // YYYY-MM-DD
+      if (!ru) {
+        errorDiv.textContent = 'Please select "Repeat Until" date.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+      // set to end of selected day in UTC
+      repeat_until = new Date(`${ru}T23:59:59Z`).toISOString();
+      if (new Date(repeat_until) <= startDate) {
+        errorDiv.textContent = '"Repeat Until" must be after the start date.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+    }
+
+    // Build payload
+    const payload = {
+      title: document.getElementById('classTitle').value,
+      description: document.getElementById('classDescription').value || '',
+      meeting_link: document.getElementById('classMeetingLink').value || '',
+      duration_minutes: duration,
+      organization_id: organizationId,
+      scheduled_at: startUTC,
+      repeats,
+      repeat_until
+    };
+
+    // Submit
+    const original = saveClassBtn.innerHTML;
+    saveClassBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+    saveClassBtn.disabled = true;
+    errorDiv.style.display = 'none';
+
+    try {
+      const res = await window.authenticatedFetch('/api/classes/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        let msg = 'Failed to create class';
+        try {
+          const data = await res.json();
+          msg = data?.error || data?.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      if (window.showToast) window.showToast(data.message || 'Class created successfully!', 'success');
+
+      // Close & refresh after a brief moment
+      setTimeout(() => {
+        closeCreateModal();
+        calendar.refetchEvents();
+      }, 800);
+    } catch (err) {
+      console.error(err);
+      errorDiv.textContent = err.message || 'Failed to create class. Please try again.';
+      errorDiv.style.display = 'block';
+      if (window.showToast) window.showToast('Failed to create class. Please try again.', 'danger');
+    } finally {
+      saveClassBtn.innerHTML = original;
+      saveClassBtn.disabled = false;
+    }
+  });
+
+  // ---- INIT ----
+  setMinimumDateTime();
+  setInterval(setMinimumDateTime, 60 * 1000);
+});
+</script>
+{% endblock %}
