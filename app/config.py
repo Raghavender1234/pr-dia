@@ -23,7 +23,7 @@ class Config:
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES_HOURS', '24')))
 
-    SERVER_NAME = os.environ.get('SERVER_NAME')
+    SERVER_NAME = os.getenv("SERVER_NAME", None)
 
     APPLICATION_ROOT = '/'
     PREFERRED_URL_SCHEME = 'https'
