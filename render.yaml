@@ -2,7 +2,7 @@ services:
   - type: web
     name: dia-backend
     env: docker
-    repo: https://github.com/Raghavender1234/dia.git
+    repo: https://github.com/Raghavender1234/pr-dia.git
     branch: main
     healthCheckPath: /
     envVars:
@@ -12,7 +12,7 @@ services:
         generateValue: true
       - key: DATABASE_URL
         fromService:
-          type: postgres
+          type: pserv
           name: dia-db
           property: connectionString
       - key: RAZORPAY_KEY_ID
@@ -36,6 +36,8 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         value: YOUR_AWS_SECRET_ACCESS_KEY
 
-  - type: postgres
-    name: dia-db
+databases:
+  - name: dia-db
     plan: free
+    type: pserv
+    environment: postgres
