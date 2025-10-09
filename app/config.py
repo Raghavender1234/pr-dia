@@ -28,6 +28,16 @@ class Config:
     APPLICATION_ROOT = '/'
     PREFERRED_URL_SCHEME = 'https'
 
+    # --- Session Cookie Settings for Production ---
+    # Ensures cookies are sent securely and are valid across all subdomains.
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    # Set the cookie domain to be valid for all subdomains of SERVER_NAME
+    # The leading dot is crucial. e.g., .example.com
+    if SERVER_NAME:
+        SESSION_COOKIE_DOMAIN = f".{SERVER_NAME}"
+
     # --- Razorpay API Keys ---
     RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
     RAZORPAY_KEY_SECRET = os.getenv('RAZORPAY_KEY_SECRET')

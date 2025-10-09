@@ -123,42 +123,98 @@
                         <p class="text-muted">Perfect for organizations with dedicated spaces for different institutions.</p>
                     </div>
                 </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">Real-Time Assessments</h4>
+                        <p class="text-muted">Take timed exams with instant feedback and comprehensive result analysis.</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">Secure Platform</h4>
+                        <p class="text-muted">Enterprise-grade security to protect your data and exam integrity.</p>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6">
+                    <div class="feature-card h-100 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-mobile-alt"></i>
+                        </div>
+                        <h4 class="fw-bold mb-3">Mobile Friendly</h4>
+                        <p class="text-muted">Study anywhere, anytime with our responsive design across all devices.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Statistics Section -->
-    <div class="stats-section py-5">
+    <!-- How It Works Section -->
+    <div class="how-it-works-section py-5 bg-light">
         <div class="container">
-            <div class="row text-center">
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-item">
-                        <h3 class="display-4 fw-bold text-primary mb-2">10K+</h3>
-                        <p class="text-muted">Active Students</p>
+            <div class="row justify-content-center mb-5">
+                <div class="col-lg-8 text-center">
+                    <h2 class="display-5 fw-bold mb-3">How It Works</h2>
+                    <p class="lead text-muted">Get started in three simple steps</p>
+                </div>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="step-card text-center">
+                        <div class="step-number">1</div>
+                        <h4 class="fw-bold mb-3">Create Your Account</h4>
+                        <p class="text-muted">Sign up in seconds and join your organization's learning space.</p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-item">
-                        <h3 class="display-4 fw-bold text-primary mb-2">500+</h3>
-                        <p class="text-muted">Organizations</p>
+                
+                <div class="col-lg-4">
+                    <div class="step-card text-center">
+                        <div class="step-number">2</div>
+                        <h4 class="fw-bold mb-3">Take Assessments</h4>
+                        <p class="text-muted">Access exams assigned by your instructors or practice with our question banks.</p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-item">
-                        <h3 class="display-4 fw-bold text-primary mb-2">95%</h3>
-                        <p class="text-muted">Success Rate</p>
+                
+                <div class="col-lg-4">
+                    <div class="step-card text-center">
+                        <div class="step-number">3</div>
+                        <h4 class="fw-bold mb-3">Track Your Progress</h4>
+                        <p class="text-muted">Review detailed analytics and improve with personalized recommendations.</p>
                     </div>
                 </div>
-                <div class="col-lg-3 col-md-6 mb-4">
-                    <div class="stat-item">
-                        <h3 class="display-4 fw-bold text-primary mb-2">24/7</h3>
-                        <p class="text-muted">Support</p>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- CTA Section -->
+    <div class="cta-section py-5 bg-primary text-white">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8 text-center">
+                    <h2 class="display-5 fw-bold mb-3">Ready to Excel in Your Exams?</h2>
+                    <p class="lead mb-4">Join thousands of students and organizations using DIA to achieve academic excellence.</p>
+                    <div class="d-grid gap-3 d-sm-flex justify-content-sm-center">
+                        <a href="{{ url_for('frontend.register') }}" class="btn btn-light btn-lg px-5 py-3">
+                            <i class="fas fa-rocket me-2"></i>Start Free Today
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 {% endif %}
+
 <style>
 /* Hero Section Styles */
 .hero-section {
@@ -174,15 +230,15 @@
     pointer-events: none;
     z-index: 0;
 }
+
 .hero-section .container-fluid {
     position: relative;
     z-index: 1;
 }
 
-
 /* Make org logo stand out */
 .org-logo {
-    max-height: 250px; /* bigger logo */
+    max-height: 250px;
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(12px);
@@ -213,6 +269,7 @@
     transition: all 0.3s ease;
     box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
 }
+
 .btn-hero-primary:hover {
     transform: translateY(-3px);
     box-shadow: 0 12px 35px rgba(0, 123, 255, 0.5);
@@ -229,9 +286,100 @@
     backdrop-filter: blur(8px);
     transition: all 0.3s ease;
 }
+
 .btn-hero-secondary:hover {
     background: rgba(255,255,255,0.25);
     transform: translateY(-3px);
+    color: white;
+}
+
+/* Feature Cards */
+.feature-card {
+    padding: 2rem;
+    background: white;
+    border-radius: 15px;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+    background: linear-gradient(45deg, #007bff, #0056d2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.feature-icon i {
+    font-size: 2rem;
+    color: white;
+}
+
+/* How It Works Section */
+.step-card {
+    padding: 2rem;
+    background: white;
+    border-radius: 15px;
+    transition: all 0.3s ease;
+}
+
+.step-number {
+    width: 60px;
+    height: 60px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(45deg, #007bff, #0056d2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+}
+
+/* Testimonials */
+.testimonial-card {
+    padding: 2rem;
+    background: white;
+    border-radius: 15px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.testimonial-card:hover {
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.testimonial-avatar {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(45deg, #007bff, #0056d2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.25rem;
+}
+
+/* Scroll Indicator */
+.scroll-indicator {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 2rem;
+    opacity: 0.7;
 }
 
 /* Animations */
@@ -239,7 +387,37 @@
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
 }
-</style>
 
+.animate-fade-in {
+    animation: fadeIn 1s ease-out;
+}
+
+.animate-slide-up {
+    animation: slideUp 0.8s ease-out;
+}
+
+.animate-slide-up-delay {
+    animation: slideUp 0.8s ease-out 0.2s both;
+}
+
+.animate-slide-up-delay-2 {
+    animation: slideUp 0.8s ease-out 0.4s both;
+}
+
+.animate-bounce-delay {
+    animation: bounce 2s infinite 1s;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0) translateX(-50%); }
+    40% { transform: translateY(-10px) translateX(-50%); }
+    60% { transform: translateY(-5px) translateX(-50%); }
+}
+</style>
 
 {% endblock %}
