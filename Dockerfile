@@ -5,11 +5,16 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Set environment variables
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=wsgi.py
 
-# Create a non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# Install system dependencies (needed for building some Python packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user (Debian-friendly)
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
