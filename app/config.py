@@ -28,15 +28,15 @@ class Config:
     APPLICATION_ROOT = '/'
     PREFERRED_URL_SCHEME = 'https'
 
-    # --- Session Cookie Settings for Production ---
-    # Ensures cookies are sent securely and are valid across all subdomains.
-    SESSION_COOKIE_SECURE = True
+    # --- Session Cookie Settings ---
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    # Set the cookie domain to be valid for all subdomains of SERVER_NAME
-    # The leading dot is crucial. e.g., .example.com
-    if SERVER_NAME:
-        SESSION_COOKIE_DOMAIN = f".{SERVER_NAME}"
+    
+    # Set secure cookies in production
+    if os.getenv('FLASK_ENV') == 'production':
+        SESSION_COOKIE_SECURE = True
+        if SERVER_NAME:
+            SESSION_COOKIE_DOMAIN = f".{SERVER_NAME}"
 
     # --- Razorpay API Keys ---
     RAZORPAY_KEY_ID = os.getenv('RAZORPAY_KEY_ID')
@@ -62,3 +62,12 @@ class Config:
     MAX_IMAGE_PDF_UPLOAD_SIZE = 20 * 1024 * 1024
     # Max size for video uploads (e.g., 500MB)
     MAX_VIDEO_UPLOAD_SIZE = 500 * 1024 * 1024
+
+    # --- Razorpay Plan Mapping ---
+    # Maps frontend plan identifiers to actual Razorpay Plan IDs
+    RAZORPAY_PLANS = {
+        '13': 'plan_RRQUYFdyhs7kEW', # Basic 1999 Plan
+        '14': 'plan_RRQaOQ8HM4krXH', # Pro 4999 Plan
+        '15': 'plan_RRQgEpIkuHHijr', # Premium 9999 Plan
+        # Add other plans here as you create them
+    }

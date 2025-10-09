@@ -36,9 +36,9 @@ razorpay_client = RazorpayClient(
 )
 
 DASHBOARD_ROUTES = {
-    'student': 'templates.student_dashboard',
-    'main_co_admin': 'templates.main_co_admin_dashboard',
-    'co_admin': 'templates.co_admin_dshboard',  # Co-admins land directly on content
+    'student': 'frontend.student_dashboard',
+    'main_co_admin': 'frontend.main_co_admin_dashboard',
+    'co_admin': 'frontend.co_admin_dashboard',
     'super_admin': 'frontend.super_admin_dashboard'
 }
 
@@ -113,23 +113,36 @@ def register_student():
 @auth_bp.route('/register-organization', methods=['POST'])
 def register_organization():
     data = request.get_json()
-    print("✅ RECEIVED REGISTRATION PAYLOAD:", data)
+    # Securely log the payload by excluding the password
+    safe_payload = data.copy()
+    safe_payload.pop('password', None) # Remove password before logging
+    print("✅ RECEIVED REGISTRATION PAYLOAD:", safe_payload)
 
     org_name = data.get('organization_name')
     org_code = data.get('code')
     admin_email = data.get('email')
     password = data.get('password')
-    razorpay_plan_id = data.get('plan_id')  # This should now be Razorpay's plan_id
+    plan_identifier = data.get('plan_id')  # This is the ID from the frontend, e.g., 13
+
+    # --- Plan ID Mapping ---
+    # Look up the actual Razorpay plan ID from the config mapping
+    # We convert the identifier to a string to ensure the dictionary lookup works
+    razorpay_plan_id = current_app.config.get('RAZORPAY_PLANS', {}).get(str(plan_identifier))
 
     print(f"  - Org Name: {org_name}")
     print(f"  - Org Code: {org_code}")
     print(f"  - Email: {admin_email}")
-    print(f"  - Razorpay Plan ID: {razorpay_plan_id}")
+    print(f"  - Frontend Plan Identifier: {plan_identifier}")
+    print(f"  - Mapped Razorpay Plan ID: {razorpay_plan_id}")
 
     # Basic validation
-    if not all([org_name, org_code, admin_email, password, razorpay_plan_id]):
+    if not all([org_name, org_code, admin_email, password, plan_identifier]):
         print("❌ FAILED at: Missing required fields check.")
         return jsonify({"message": "Missing required fields."}), 400
+
+    if not razorpay_plan_id:
+        print(f"❌ FAILED at: Plan identifier '{plan_identifier}' not found in config.")
+        return jsonify({"message": "Invalid subscription plan selected."}), 400
 
     if Organization.query.filter_by(code=org_code).first():
         return jsonify({"message": "Organization code is already taken."}), 409
