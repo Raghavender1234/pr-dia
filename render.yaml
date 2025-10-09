@@ -7,34 +7,33 @@ services:
     healthCheckPath: /
     envVars:
       - key: SECRET_KEY
-        generateValue: true
+        sync: false
       - key: JWT_SECRET_KEY
-        generateValue: true
+        sync: false
       - key: DATABASE_URL
-        fromService:
-          type: database
+        fromDatabase:
           name: dia-db
           property: connectionString
       - key: RAZORPAY_KEY_ID
-        value: YOUR_RAZORPAY_KEY_ID
+        sync: false
       - key: RAZORPAY_KEY_SECRET
-        value: YOUR_RAZORPAY_KEY_SECRET
+        sync: false
       - key: OPENAI_API_KEY
-        value: YOUR_OPENAI_API_KEY
+        sync: false
       - key: GOOGLE_CLIENT_ID
-        value: YOUR_GOOGLE_CLIENT_ID
+        sync: false
       - key: GOOGLE_CLIENT_SECRET
-        value: YOUR_GOOGLE_CLIENT_SECRET
+        sync: false
       - key: FRONTEND_URL
-        value: https://your-frontend-url.com
+        sync: false
       - key: S3_BUCKET
-        value: your-s3-bucket-name
+        sync: false
       - key: S3_REGION
-        value: your-s3-region
+        sync: false
       - key: AWS_ACCESS_KEY_ID
-        value: YOUR_AWS_ACCESS_KEY_ID
+        sync: false
       - key: AWS_SECRET_ACCESS_KEY
-        value: YOUR_AWS_SECRET_ACCESS_KEY
+        sync: false
 
 databases:
   - name: dia-db
