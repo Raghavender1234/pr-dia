@@ -77,18 +77,28 @@ def create_app(config_class=Config):
             Handles subdomain detection and sets up the global user context (g).
             This runs before every single request.
             """
-            from .frontend.routes import get_user_context # Import locally to avoid circular dependency
+            from .frontend.routes import get_user_context  # Import locally to avoid circular dependency
             
             g.user_context = get_user_context()
             g.current_organization = None
-            
-            host = request.host.split(':')[0]
-            server_name = current_app.config['SERVER_NAME'].split(':')[0]
 
+            # Extract host from the request (without port)
+            host = request.host.split(':')[0]
+            server_name_config = current_app.config.get("SERVER_NAME")
+
+            # If SERVER_NAME is set (e.g., .pr-dia.com), use it, otherwise fall back to request.host
+            if server_name_config:
+                server_name = server_name_config.split(":")[0]
+            else:
+                server_name = host
+
+            # Subdomain detection: check if host ends with the server_name
             if host != server_name and host.endswith(server_name):
                 subdomain = host[:-len(server_name)].strip('.')
                 if subdomain:
-                    g.current_organization = Organization.query.filter_by(subdomain=subdomain, status='active').first()
+                    g.current_organization = Organization.query.filter_by(
+                        subdomain=subdomain, status='active'
+                    ).first()
                     if not g.current_organization:
                         abort(404)
 
