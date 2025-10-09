@@ -334,23 +334,27 @@ def get_organization(org_id, current_user, **kwargs):
 @super_admin_required()
 def update_organization(org_id, current_user, **kwargs):
     org = Organization.query.get_or_404(org_id)
-    data = request.get_json()
 
-    # --- THIS IS THE BULLETPROOF FIX ---
-    # It checks if the data was accidentally corrupted into a string.
+    # Safely parse JSON, including "stringified JSON"
+    data = request.get_json(silent=True)
     if isinstance(data, str):
         try:
-            # If it's a string, we try to parse it back into a dictionary.
             data = json.loads(data)
         except json.JSONDecodeError:
-            # If it's a string but not valid JSON, then it's a real error.
             return jsonify({"message": "Invalid data format received."}), 400
+    if not isinstance(data, dict):
+        return jsonify({"message": "Invalid JSON payload."}), 400
 
-    # The rest of the function can now proceed safely.
-    subdomain = data.get('subdomain', '').strip().lower()
+    # --- Subdomain handling & uniqueness ---
+    subdomain = data.get('subdomain', '')
+    if isinstance(subdomain, str):
+        subdomain = subdomain.strip().lower()
+    else:
+        subdomain = ''
+
     if subdomain:
         existing_org = Organization.query.filter(
-            Organization.id != org_id, 
+            Organization.id != org_id,
             Organization.subdomain == subdomain
         ).first()
         if existing_org:
@@ -359,18 +363,58 @@ def update_organization(org_id, current_user, **kwargs):
     else:
         org.subdomain = None
 
-    if 'name' in data: org.name = data['name']
-    if 'code' in data: org.code = data['code']
-    if 'plan_id' in data: org.plan_id = data['plan_id']
-    if 'status' in data: org.status = data['status']
+    # --- Simple field updates ---
+    if 'name' in data:
+        org.name = data['name']
+    if 'code' in data:
+        org.code = data['code']
+    if 'plan_id' in data:
+        org.plan_id = data['plan_id']
 
+    # --- Status transition logic (with symmetric deactivate) ---
+    if 'status' in data:
+        original_status = org.status
+        new_status = data['status']
+
+        allowed_statuses = {'pending_payment', 'active', 'inactive', 'suspended'}
+        if new_status not in allowed_statuses:
+            return jsonify({"message": f"Invalid status '{new_status}'."}), 400
+
+        org.status = new_status
+
+        # Helper to fetch the main_co_admin membership once
+        def get_main_admin_membership():
+            return OrganizationMembership.query.filter(
+                OrganizationMembership.organization_id == org.id,
+                OrganizationMembership.user.has(User.user_type == 'main_co_admin')
+            ).first()
+
+        # Activate main co-admin when moving from pending_payment -> active
+        if new_status == 'active' and original_status == 'pending_payment':
+            m = get_main_admin_membership()
+            if m and not m.is_active:
+                m.is_active = True
+                current_app.logger.info(
+                    f"Auto-activated main_co_admin user_id={m.user_id} for org_id={org.id}"
+                )
+
+        # Deactivate main co-admin when org becomes inactive or suspended
+        if new_status in {'inactive', 'suspended'}:
+            m = get_main_admin_membership()
+            if m and m.is_active:
+                m.is_active = False
+                current_app.logger.info(
+                    f"Auto-deactivated main_co_admin user_id={m.user_id} for org_id={org.id} "
+                    f"due to org status='{new_status}'"
+                )
     try:
         db.session.commit()
         return jsonify({"message": "Organization updated successfully."}), 200
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error updating organization {org_id}: {e}")
+        current_app.logger.error(f"Error updating organization {org_id}: {e}", exc_info=True)
         return jsonify({"message": "An error occurred while updating."}), 500
+
 
 @super_admin_bp.route('/organizations/<int:org_id>', methods=['DELETE'])
 @super_admin_required()
