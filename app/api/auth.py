@@ -441,6 +441,7 @@ def google_login():
     # ✅ THE FIX: Build the redirect URI using the main domain from your config
     # This ensures Google always sends the user back to the same, approved address.
     main_domain_callback = f"https://{current_app.config['SERVER_NAME']}/api/auth/google/callback"
+    current_app.logger.info(f"Redirecting to Google with callback: {main_domain_callback}")
     
     # ✅ Store the user's current subdomain in the session so we can return them later.
     if g.current_organization:
