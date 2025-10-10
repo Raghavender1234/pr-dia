@@ -190,6 +190,7 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
     try:
         client = get_razorpay_client()
         plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID')
+        current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
         subscription = client.subscription.create({
             'plan_id': plan_id,
@@ -235,9 +236,11 @@ def create_ai_subscription_order():
     try:
         client = get_razorpay_client()
         plan_id = current_app.config.get('AI_TUTOR_PLAN_ID')
+        current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
         subscription = client.subscription.create({
             'plan_id': plan_id,
+            'total_count': 12,
             'quantity': 1,
             'notes': {
                 'type': 'ai_tutor_student',
