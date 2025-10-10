@@ -452,20 +452,38 @@ def google_login():
 @auth_bp.route('/google/callback')
 def google_callback():
     """Handles the callback from Google, logs in or creates the user."""
-    current_app.logger.info(f"🟢 Google Callback - Session data: {dict(session)}")
-    current_app.logger.info(f"🟢 Request URL: {request.url}")
-    current_app.logger.info(f"🟢 Request Args: {request.args}")
-    
     try:
-        # Get user information from Google
+        # 1) Exchange authorization code for tokens
         token = oauth.google.authorize_access_token()
-        user_info = oauth.google.parse_id_token(token)
-        
+
+        # 2) Retrieve the nonce that was stored under the state key
+        state = request.args.get("state")
+        state_key = f"_state_google_{state}"
+        nonce = (
+            session.get(state_key, {})
+                   .get("data", {})
+                   .get("nonce")
+        )
+        if not nonce:
+            # If nonce is missing, fail fast (or fall back to userinfo endpoint below)
+            current_app.logger.warning("Missing nonce in session; attempting userinfo fallback.")
+            # If you prefer to hard-fail here, raise instead:
+            # raise RuntimeError("Missing nonce in session; cannot validate ID token.")
+
+        # 3) Validate & parse the ID token with the SAME nonce (preferred)
+        user_info = None
+        if nonce:
+            user_info = oauth.google.parse_id_token(token, nonce=nonce)
+
+        # 4) Fallback: use the UserInfo endpoint if ID token parsing couldn't happen
+        if not user_info:
+            # Requires Google OIDC discovery/server_metadata to have userinfo_endpoint
+            user_info = oauth.google.userinfo()
+
         current_app.logger.info(f"🟢 User info from Google: {user_info.get('email')}")
 
-        # Find or create the user in your database
+        # 5) Find or create the user
         user = User.query.filter_by(email=user_info['email']).first()
-
         if not user:
             user = User(
                 email=user_info['email'],
@@ -478,30 +496,28 @@ def google_callback():
             db.session.commit()
             current_app.logger.info(f"🟢 Created new user: {user.email}")
 
-        # Log the user in by creating a session
-        access_token = create_access_token(identity=str(user.id))
+        # 6) Preserve subdomain BEFORE clearing the session
+        subdomain = session.pop('oauth_subdomain', None)
+
+        # 7) Reset session and set your own login state
         session.clear()
+        access_token = create_access_token(identity=str(user.id))
         session['access_token'] = access_token
         session['user_id'] = str(user.id)
         session['user_type'] = user.user_type
         session['user_name'] = user.first_name
         session['user_email'] = user.email
-        
-        # Get stored subdomain
-        subdomain = session.pop('oauth_subdomain', None)
-        current_app.logger.info(f"🟢 Retrieved subdomain: {subdomain}")
-        
-        # Build dashboard URL
         if subdomain:
-            org_param = {'org': subdomain}
-        else:
-            org_param = {}
-        
+            session['oauth_subdomain'] = subdomain  # optional: keep it around
+
+        current_app.logger.info(f"🟢 Retrieved subdomain: {subdomain}")
+
+        # 8) Build dashboard URL
+        org_param = {'org': subdomain} if subdomain else {}
         dashboard_url = url_for(f'frontend.{user.user_type}_dashboard', **org_param)
         current_app.logger.info(f"🟢 Redirecting to: {dashboard_url}")
-        
         return redirect(dashboard_url)
-    
+
     except Exception as e:
         current_app.logger.error(f"❌ Google OAuth Error: {e}", exc_info=True)
         flash("An error occurred during Google authentication. Please try again.", "danger")
