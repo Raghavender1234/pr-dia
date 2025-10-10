@@ -430,7 +430,7 @@ def change_password():
     if not user.check_password(current_password):
         return jsonify({"message": "Current password is incorrect"}), 400
 
-    user.set_password(new_.password)
+    user.set_password(new_password)
     db.session.commit()
     return jsonify({"message": "Password changed successfully"}), 200
 
@@ -449,8 +449,11 @@ def google_login():
     else:
         session.pop('oauth_subdomain', None) # Clear it if they are on the main site
 
+    from authlib.common.security import generate_token
+    state = generate_token(30)
+    session['_request_token_state'] = state
     current_app.logger.info(f"Session before redirect: {session}")
-    return oauth.google.authorize_redirect(main_domain_callback)
+    return oauth.google.authorize_redirect(main_domain_callback, state=state)
 
 
 @auth_bp.route('/google/callback')
