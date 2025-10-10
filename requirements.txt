@@ -68,3 +68,4 @@ flask_socketio
 sib_api_v3_sdk
 python-magic
 flask-apscheduler
+Flask-Session
