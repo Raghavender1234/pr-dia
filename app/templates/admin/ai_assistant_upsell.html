@@ -78,7 +78,7 @@ window.pageInit = function() {
         $buttonText.text('Processing...');
 
         try {
-            const orderRes = await window.authenticatedFetch('/api/payment/organization/create-ai-order', {
+            const orderRes = await window.authenticatedFetch('/api/payment/organization/create-ai-subscription', {
                 method: 'POST'
             });
             const orderData = await orderRes.json();
@@ -89,33 +89,11 @@ window.pageInit = function() {
                 amount: orderData.amount,
                 name: "DIA AI Assistant (for Organizations)",
                 order_id: orderData.order_id,
-                handler: async function (response) {
-                    try {
-                        const verifyRes = await window.authenticatedFetch('/api/payment/organization/verify-ai-payment', {
-                            method: 'POST',
-                            body: JSON.stringify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature
-                            })
-                        });
-                        const verifyData = await verifyRes.json();
-                        if (!verifyRes.ok) throw new Error(verifyData.message);
-
-                        window.showToast(verifyData.message, 'success');
-                        
-                        // --- THIS IS THE FIX ---
-                        // After a short delay, reload the page to show the activated feature.
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500); // 1.5 second delay
-                        // --- END OF FIX ---
-
-                    } catch (err) {
-                        window.showToast(`Verification Failed: ${err.message}`, 'danger');
-                        $btn.prop('disabled', false);
-                        $buttonText.text('Upgrade Your Organization for ₹999/month');
-                    }
+                handler: function (response) {
+                    window.showToast('Payment successful! Your organization is being upgraded.', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
                 },
                 modal: {
                     ondismiss: function () {
