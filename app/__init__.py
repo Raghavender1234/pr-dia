@@ -8,6 +8,7 @@ from .config import Config
 from .extensions import db, mail, jwt, migrate, scheduler
 from datetime import datetime
 from flask_session import Session
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .models import Organization
 from .models.user import User
@@ -18,6 +19,16 @@ from app.api.community import community_bp
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    
+    # ✅ FIX: Add ProxyFix to handle X-Forwarded-* headers from reverse proxy
+    # This tells Flask to trust the proxy headers and use HTTPS
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app, 
+        x_for=1,      # Trust X-Forwarded-For
+        x_proto=1,    # Trust X-Forwarded-Proto (HTTP vs HTTPS)
+        x_host=1,     # Trust X-Forwarded-Host
+        x_prefix=1    # Trust X-Forwarded-Prefix
+    )
 
     # --- Extensions ---
     db.init_app(app)

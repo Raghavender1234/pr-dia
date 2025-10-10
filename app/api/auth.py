@@ -26,13 +26,9 @@ def init_oauth(app):
     """Initialize OAuth with the app context"""
     oauth.init_app(app)
     
-    # Build the redirect URI explicitly
-    if app.config.get('SERVER_NAME'):
-        redirect_uri = f"https://{app.config['SERVER_NAME']}/api/auth/google/callback"
-    else:
-        redirect_uri = f"{app.config.get('FRONTEND_URL', 'http://localhost:5000')}/api/auth/google/callback"
-    
-    app.logger.info(f"🔧 Registering Google OAuth with redirect_uri: {redirect_uri}")
+    app.logger.info(f"🔧 Initializing Google OAuth")
+    app.logger.info(f"🔧 SERVER_NAME: {app.config.get('SERVER_NAME')}")
+    app.logger.info(f"🔧 PREFERRED_URL_SCHEME: {app.config.get('PREFERRED_URL_SCHEME')}")
     
     oauth.register(
         name='google',
@@ -425,17 +421,18 @@ def change_password():
 def google_login():
     """Redirects the user to Google's authentication page."""
     
-    # ✅ Build the redirect URI dynamically but consistently
-    if current_app.config.get('SERVER_NAME'):
-        # In production with SERVER_NAME set
-        redirect_uri = f"https://{current_app.config['SERVER_NAME']}/api/auth/google/callback"
-    else:
-        # In development or when SERVER_NAME is not set
-        redirect_uri = f"{request.url_root.rstrip('/')}/api/auth/google/callback"
+    # ✅ Build the redirect URI using url_for with _external and explicit https scheme
+    redirect_uri = url_for(
+        'auth_api.google_callback', 
+        _external=True, 
+        _scheme='https'
+    )
     
     current_app.logger.info(f"🔵 Google Login - Redirect URI: {redirect_uri}")
     current_app.logger.info(f"🔵 Request Host: {request.host}")
     current_app.logger.info(f"🔵 Request URL Root: {request.url_root}")
+    current_app.logger.info(f"🔵 Request Scheme: {request.scheme}")
+    current_app.logger.info(f"🔵 Request is_secure: {request.is_secure}")
     
     # Store the originating subdomain for later redirect
     if g.get('current_organization'):
@@ -554,3 +551,22 @@ def toggle_availability(current_user, **kwargs):
         current_user.availability_status = 'available'
     db.session.commit()
     return jsonify({'message': f'Your status has been updated to {current_user.availability_status}', 'new_status': current_user.availability_status}), 200
+
+# ✅ Debugging endpoint - REMOVE IN PRODUCTION
+@auth_bp.route('/debug/oauth-config', methods=['GET'])
+def debug_oauth_config():
+    """Debug endpoint to verify OAuth configuration"""
+    if current_app.config.get('SERVER_NAME'):
+        expected_redirect = f"https://{current_app.config['SERVER_NAME']}/api/auth/google/callback"
+    else:
+        expected_redirect = f"{request.url_root.rstrip('/')}/api/auth/google/callback"
+    
+    return jsonify({
+        "server_name": current_app.config.get('SERVER_NAME'),
+        "request_host": request.host,
+        "request_url_root": request.url_root,
+        "expected_redirect_uri": expected_redirect,
+        "google_client_id": current_app.config.get('GOOGLE_CLIENT_ID')[:20] + "..." if current_app.config.get('GOOGLE_CLIENT_ID') else None,
+        "session_cookie_domain": current_app.config.get('SESSION_COOKIE_DOMAIN'),
+        "flask_env": os.getenv('FLASK_ENV'),
+    }), 200
