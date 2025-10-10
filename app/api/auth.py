@@ -5,6 +5,7 @@ from app.models.organization import Organization, OrganizationMembership, Plan
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt, unset_jwt_cookies
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash
 import os
 from razorpay import Client as RazorpayClient
 from authlib.integrations.flask_client import OAuth
@@ -490,11 +491,15 @@ def google_callback():
                 first_name=user_info.get('given_name', 'New'),
                 last_name=user_info.get('family_name', 'User'),
                 user_type='student',
-                status='active'
+                status='active',
+                password_hash=generate_password_hash(f"oauth_{user_info['email']}_{os.urandom(8)}")
             )
             db.session.add(user)
             db.session.commit()
             current_app.logger.info(f"🟢 Created new user: {user.email}")
+        elif not user.password_hash:
+            user.password_hash = generate_password_hash(f"oauth_{user_info['email']}_{os.urandom(8)}")
+            db.session.commit()
 
         # 6) Preserve subdomain BEFORE clearing the session
         subdomain = session.pop('oauth_subdomain', None)
