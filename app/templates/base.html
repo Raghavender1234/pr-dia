@@ -1287,12 +1287,7 @@ $(document).ready(function() {
 
     // --- GENERAL PAGE LOGIC ---
 
-    // Logout handler
-    $('#logoutButton').on('click', function(e) {
-        e.preventDefault();
-        sessionStorage.removeItem('dia_access_token');
-        window.location.href = "{{ url_for('frontend.logout') }}";
-    });
+
 
     function formatToLocalTime(utcIsoString) {
         if (!utcIsoString) return 'N/A';

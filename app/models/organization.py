@@ -32,6 +32,8 @@ class Organization(db.Model):
     code = db.Column(db.String(50), unique=True, nullable=False, index=True)
     plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=True)
     status = db.Column(db.String(20), nullable=False, default='pending_payment')
+    razorpay_subscription_id = db.Column(db.String(100), nullable=True, index=True)
+    subscription_ends_at = db.Column(db.DateTime, nullable=True)
     razorpay_order_id = db.Column(db.String(100))
     current_invited_student_count = db.Column(db.Integer, default=0)
     current_coadmin_count = db.Column(db.Integer, default=0)
@@ -128,3 +130,19 @@ class OrganizationReport(db.Model):
     # Relationships
     organization = db.relationship('Organization')
     reporter = db.relationship('User')
+
+class OrganizationAISubscription(db.Model):
+    __tablename__ = 'organization_ai_subscriptions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organizations.id'), nullable=False, unique=True)
+    razorpay_subscription_id = db.Column(db.String(100), nullable=True, index=True)
+    status = db.Column(db.String(20), nullable=False, default='inactive') # 'pending', 'active', 'inactive', 'halted', 'cancelled'
+    ends_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    organization = db.relationship('Organization', backref=db.backref('ai_subscription', uselist=False))
+
+    def __repr__(self):
+        return f"<OrgAISubscription Org:{self.organization_id} Status:{self.status}>"

@@ -389,13 +389,15 @@ def update_organization(org_id, current_user, **kwargs):
                 OrganizationMembership.user.has(User.user_type == 'main_co_admin')
             ).first()
 
-        # Activate main co-admin when moving from pending_payment -> active
+        # Activate main co-admin and user when moving from pending_payment -> active
         if new_status == 'active' and original_status == 'pending_payment':
             m = get_main_admin_membership()
-            if m and not m.is_active:
+            if m:
                 m.is_active = True
+                if m.user:
+                    m.user.status = 'active'
                 current_app.logger.info(
-                    f"Auto-activated main_co_admin user_id={m.user_id} for org_id={org.id}"
+                    f"Auto-activated main_co_admin user_id={m.user_id} and membership for org_id={org.id}"
                 )
 
         # Deactivate main co-admin when org becomes inactive or suspended

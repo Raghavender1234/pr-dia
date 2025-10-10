@@ -786,9 +786,12 @@ body::before {
 
 {% block content %}
 <div class="container-fluid p-4">
-    <div class="dashboard-header">
-        <h1>Super Admin Dashboard</h1>
-        <p>Welcome, <strong>{{ g.user_context.user_name or 'Super Admin' }}</strong>. Here's a global overview of the DIA platform.</p>
+    <div class="dashboard-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1>Super Admin Dashboard</h1>
+            <p>Welcome, <strong>{{ g.user_context.user_name or 'Super Admin' }}</strong>. Here's a global overview of the DIA platform.</p>
+        </div>
+        <a href="#" id="logoutButton" class="btn btn-outline-light">Logout <i class="bi bi-box-arrow-right"></i></a>
     </div>
 
     <div id="superAdminMessage"></div>
