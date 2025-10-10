@@ -254,16 +254,23 @@ def login():
                 organization_id = membership.organization_id
                 organization_name = membership.organization.name
         
-        elif user.user_type == 'student' and target_org:
-            # For students, find their membership specifically for the target organization
-            membership = OrganizationMembership.query.filter_by(
-                user_id=user.id, 
-                organization_id=target_org.id, 
-                is_active=True
-            ).first()
-            if membership:
-                organization_id = membership.organization_id
-                organization_name = membership.organization.name
+        elif user.user_type == 'student':
+            # If logging in via subdomain, prioritize that organization
+            if target_org:
+                membership = OrganizationMembership.query.filter_by(
+                    user_id=user.id, 
+                    organization_id=target_org.id, 
+                    is_active=True
+                ).first()
+                if membership:
+                    organization_id = membership.organization_id
+                    organization_name = membership.organization.name
+            # If not on a subdomain, find their first active membership
+            else:
+                membership = OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).first()
+                if membership and membership.organization:
+                    organization_id = membership.organization_id
+                    organization_name = membership.organization.name
         
         session['organization_id'] = organization_id
         session['organization_name'] = organization_name

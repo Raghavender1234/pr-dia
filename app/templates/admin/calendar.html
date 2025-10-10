@@ -819,8 +819,8 @@ document.addEventListener('DOMContentLoaded', function () {
       const description = ev.extendedProps?.description;
 
       let joinBtn = '';
-      if (joinUrl) {
-        joinBtn = `<a href="${joinUrl}" class="btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:20px;">
+      if (meetingLink) {
+        joinBtn = `<a href="${meetingLink}" target="_blank" rel="noopener" class="btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:20px;">
           <i class="fas fa-video me-2"></i>Join Class
         </a>`;
       }

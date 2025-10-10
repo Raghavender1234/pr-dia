@@ -639,6 +639,32 @@ $(document).ready(function () {
         }
     });
 
+    $reviewBtn.on('click', async function () {
+        const qid = allQuestions[currentQuestionIndex]?.id;
+        if (!qid) return;
+
+        const $btn = $(this);
+        $btn.prop('disabled', true);
+
+        try {
+            const res = await window.authenticatedFetch(
+                `/api/student/questions/${qid}/toggle-review`,
+                { method: 'POST' }
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            allQuestions[currentQuestionIndex].is_marked_for_review = data.marked;
+            updateReviewButtonState(data.marked);
+            window.showToast(data.message, 'success');
+
+        } catch (err) {
+            window.showToast(err.message || 'Could not update review status.', 'danger');
+        } finally {
+            $btn.prop('disabled', false);
+        }
+    });
+
     // Make entire form-check div clickable
     $(document).on('click', '.form-check', function(e) {
         if (e.target.type === 'radio' || e.target.tagName === 'LABEL') return;

@@ -317,6 +317,13 @@ def student_profile(): # Removed jwt_required here as get_user_context already h
         return redirect(url_for('frontend.login'))
     return render_template('student/profile.html', **g.user_context) 
 
+@frontend_bp.route('/student/schedule')
+def student_class_schedule():
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') != 'student':
+        flash('Access denied. Please log in as a student.', 'danger')
+        return redirect(url_for('frontend.login'))
+    return render_template('student/class_schedule.html', **g.user_context)
+
 @frontend_bp.route('/student/organizations')
 def student_organizations():
     if not g.user_context['is_logged_in'] or g.user_context['user_type'] != 'student':

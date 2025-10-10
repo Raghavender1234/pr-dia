@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+
+{% block title %}Class Schedule{% endblock %}
+
+{% block head_extra %}
+    {# --- Include FullCalendar CSS --- #}
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Modern styling for the entire page */
+        .schedule-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eaeaea;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin: 0;
+        }
+
+        /* Calendar styling */
+        #calendar {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        /* FullCalendar customizations */
+        .fc-toolbar {
+            margin-bottom: 20px !important;
+        }
+
+        .fc-toolbar-title {
+            font-size: 24px !important;
+            font-weight: 600 !important;
+            color: #2c3e50 !important;
+        }
+
+        .fc-button {
+            background-color: #f8f9fa !important;
+            border: 1px solid #dee2e6 !important;
+            color: #495057 !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .fc-button:hover {
+            background-color: #e9ecef !important;
+        }
+
+        .fc-button-active {
+            background-color: #3498db !important;
+            color: white !important;
+            border-color: #3498db !important;
+        }
+
+        .fc-event {
+            border-radius: 6px !important;
+            border: none !important;
+            padding: 5px 8px !important;
+            font-size: 13px !important;
+            font-weight: 500 !important;
+            cursor: pointer !important;
+        }
+
+        .fc-daygrid-event {
+            margin-bottom: 3px !important;
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1050;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s ease;
+            overflow: hidden;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .close-button {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            line-height: 1;
+        }
+
+        .close-button:hover {
+            transform: scale(1.1);
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .modal-footer {
+            padding: 20px 25px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #eaeaea;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .timezone-info {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #1565c0;
+        }
+
+        .event-detail {
+            padding: 15px 0;
+        }
+
+        .event-detail h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .event-detail p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .event-detail strong {
+            color: #34495e;
+        }
+
+        .event-detail a {
+            color: #3498db;
+            text-decoration: none;
+            word-break: break-all;
+        }
+
+        .event-detail a:hover {
+            text-decoration: underline;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="schedule-container">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-calendar-alt me-2"></i>My Class Schedule
+        </h1>
+    </div>
+
+    <!-- Timezone info -->
+    <div class="timezone-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Timezone:</strong> All times are displayed in your local timezone (<span id="userTimezone"></span>).
+    </div>
+
+    <!-- The calendar will be rendered inside this div -->
+    <div id="calendar" data-organization-id="{{ user_context.organization_id }}"></div>
+
+    <!-- Loading indicator -->
+    <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p class="mt-2">Loading calendar events...</p>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div id="eventDetailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Class Details</h2>
+            <span class="close-button">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="eventDetailsContent">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" id="closeDetailsBtn">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.34/moment-timezone-with-data.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/moment-timezone@5.11.3/main.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales-all.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+  if (!calendarEl) return;
+
+  const organizationId = parseInt(calendarEl.dataset.organizationId, 10);
+  if (!organizationId) {
+      calendarEl.innerHTML = '<p>You are not part of an organization. Please join one to see your class schedule.</p>';
+      return;
+  }
+
+  const eventDetailsModal = document.getElementById('eventDetailsModal');
+  const detailsCloseX = eventDetailsModal.querySelector('.close-button');
+  const detailsCloseBtn = document.getElementById('closeDetailsBtn');
+  const loadingIndicator = document.getElementById('loadingIndicator');
+
+  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTzSpan = document.getElementById('userTimezone');
+  if (userTzSpan) userTzSpan.textContent = userTz;
+
+  const parseUTCtoLocal = (utcString) => {
+    if (!utcString) return null;
+    return moment.utc(utcString).toDate();
+  };
+
+  const formatToLocalTime = (dateLike) => {
+    const d = dateLike instanceof Date ? dateLike : new Date(dateLike);
+    if (Number.isNaN(d)) return 'Invalid Date';
+    return d.toLocaleString(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short',
+    });
+  };
+
+  const closeDetailsModal = () => {
+    eventDetailsModal.style.display = 'none';
+  };
+
+  detailsCloseX.addEventListener('click', closeDetailsModal);
+  detailsCloseBtn.addEventListener('click', closeDetailsModal);
+  window.addEventListener('click', (e) => {
+    if (e.target === eventDetailsModal) closeDetailsModal();
+  });
+
+  if (loadingIndicator) loadingIndicator.style.display = 'block';
+
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    timeZone: userTz,
+    initialView: 'timeGridWeek',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    editable: false,
+    nowIndicator: true,
+    dayMaxEvents: true,
+    eventDisplay: 'block',
+    displayEventEnd: true,
+    eventColor: '#3498db',
+    eventTextColor: '#ffffff',
+    height: 'auto',
+    eventTimeFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
+    slotLabelFormat: { hour: 'numeric', minute: '2-digit', meridiem: 'short', hour12: true },
+
+    events: async (fetchInfo, success, failure) => {
+      try {
+        if (loadingIndicator) loadingIndicator.style.display = 'block';
+        const res = await window.authenticatedFetch(`/api/classes/organization/${organizationId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const apiEvents = await res.json();
+
+        const fcEvents = apiEvents.map((e) => ({
+          id: e.id,
+          title: e.title,
+          start: parseUTCtoLocal(e.start),
+          end: parseUTCtoLocal(e.end),
+          extendedProps: e.extendedProps
+        }));
+
+        success(fcEvents);
+      } catch (err) {
+        console.error('Error fetching calendar events:', err);
+        if (window.showToast) window.showToast('Failed to load calendar events. Please refresh.', 'danger');
+        failure(err);
+      } finally {
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
+      }
+    },
+
+    eventClick: (info) => {
+      const ev = info.event;
+      const startStr = formatToLocalTime(ev.start);
+      const endStr = ev.end ? formatToLocalTime(ev.end) : 'Not specified';
+      const meetingLink = ev.extendedProps?.meeting_link;
+      const description = ev.extendedProps?.description;
+
+      let joinBtn = '';
+      if (meetingLink) {
+        joinBtn = `<a href="${meetingLink}" target="_blank" rel="noopener" class="btn btn-primary" style="text-decoration:none;display:inline-block;margin-bottom:20px;">
+          <i class="fas fa-video me-2"></i>Join Class
+        </a>`;
+      }
+
+      const meetingHtml = meetingLink
+        ? `<p><strong>Meeting Link:</strong> <a href="${meetingLink}" target="_blank" rel="noopener">${meetingLink}</a></p>`
+        : `<p><strong>Meeting Link:</strong> Not provided</p>`;
+
+      const html = `
+        <div class="event-detail">
+          ${joinBtn}
+          <h4>${ev.title}</h4>
+          <p><strong>Start:</strong> ${startStr}</p>
+          <p><strong>End:</strong> ${endStr}</p>
+          ${description ? `<p><strong>Description:</strong> ${description}</p>` : ''}
+          ${meetingHtml}
+        </div>
+      `;
+
+      document.getElementById('eventDetailsContent').innerHTML = html;
+      eventDetailsModal.style.display = 'block';
+    },
+
+    loading: (isLoading) => {
+      if (!isLoading && loadingIndicator) loadingIndicator.style.display = 'none';
+    }
+  });
+
+  calendar.render();
+});
+</script>
+{% endblock %}

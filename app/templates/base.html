@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap-icons.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
     <style>
         /* Navigation Styles */
         .navbar { backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
@@ -577,7 +579,7 @@ window.MathJax = {
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
-                        <a class="dropdown-item" href="{{ url_for('frontend.archived_content', **org_param) }}">
+                        <a class="dropdown-item" href="{{ url_for('frontend.reported_content_page', **org_param) }}">
                             <i class="fas fa-flag me-2"></i> Reported Content
                         </a>
                                 </li>
@@ -864,7 +866,7 @@ window.MathJax = {
 <script src="{{ url_for('static', filename='js/jquery.dataTables.min.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <!-- CKEditor Super Build -->
 <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/super-build/ckeditor.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@wiris/mathtype-ckeditor5@latest/dist/plugin.min.js"></script>
