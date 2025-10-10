@@ -7,6 +7,7 @@ from flask_cors import CORS
 from .config import Config
 from .extensions import db, mail, jwt, migrate, scheduler
 from datetime import datetime
+from flask_session import Session
 
 # add these imports (if not already present)
 from .models import Organization
@@ -27,6 +28,7 @@ def create_app(config_class=Config):
     scheduler.init_app(app)
     scheduler.start()
     CORS(app)
+    Session(app)
 
     # --- Configure Logging ---
     if not app.debug and not app.testing:
