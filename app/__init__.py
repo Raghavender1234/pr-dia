@@ -9,7 +9,6 @@ from .extensions import db, mail, jwt, migrate, scheduler
 from datetime import datetime
 from flask_session import Session
 
-# add these imports (if not already present)
 from .models import Organization
 from .models.user import User
 from .models.student_progress import StudentAISubscription
@@ -45,7 +44,7 @@ def create_app(config_class=Config):
 
     with app.app_context():
         from . import models 
-        from .api.auth import auth_bp
+        from .api.auth import auth_bp, init_oauth, init_razorpay
         from .api.super_admin import super_admin_bp
         from .api.main_co_admin import main_co_admin_bp
         from .api.co_admin import co_admin_bp
@@ -56,8 +55,11 @@ def create_app(config_class=Config):
         from .frontend.routes import frontend_bp
         from .api.class_routes import class_bp
         from .api.notification_routes import notification_bp
-            
-
+        
+        # ✅ Initialize OAuth and Razorpay with app context
+        init_oauth(app)
+        init_razorpay(app)
+        
         app.register_blueprint(auth_bp)
         app.register_blueprint(super_admin_bp)
         app.register_blueprint(main_co_admin_bp)
@@ -79,22 +81,19 @@ def create_app(config_class=Config):
             Handles subdomain detection and sets up the global user context (g).
             This runs before every single request.
             """
-            from .frontend.routes import get_user_context  # Import locally to avoid circular dependency
+            from .frontend.routes import get_user_context
             
             g.user_context = get_user_context()
             g.current_organization = None
 
-            # Extract host from the request (without port)
             host = request.host.split(':')[0]
             server_name_config = current_app.config.get("SERVER_NAME")
 
-            # If SERVER_NAME is set (e.g., .pr-dia.com), use it, otherwise fall back to request.host
             if server_name_config:
                 server_name = server_name_config.split(":")[0]
             else:
                 server_name = host
 
-            # Subdomain detection: check if host ends with the server_name
             if host != server_name and host.endswith(server_name):
                 subdomain = host[:-len(server_name)].strip('.')
                 if subdomain:
@@ -139,4 +138,9 @@ def create_app(config_class=Config):
 
     from . import commands
     commands.register_commands(app)
+    
+    # ✅ Log the OAuth configuration on startup
+    app.logger.info(f"🔧 OAuth initialized with SERVER_NAME: {app.config.get('SERVER_NAME')}")
+    app.logger.info(f"🔧 Expected Google OAuth redirect: https://{app.config.get('SERVER_NAME')}/api/auth/google/callback")
+    
     return app

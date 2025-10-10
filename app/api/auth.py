@@ -15,25 +15,44 @@ from app import mail
 from app.utils.email_utils import send_email 
 from .decorators import admin_role_required
 import razorpay
+
 # --- Blueprint Setup ---
 auth_bp = Blueprint('auth_api', __name__, url_prefix='/api/auth')
 
-oauth = OAuth(current_app)
+# ✅ FIX: Initialize OAuth without registering yet
+oauth = OAuth()
 
-oauth.register(
-    name='google',
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    # FIX: Using the correct server metadata URL for Google
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
-)
-
+def init_oauth(app):
+    """Initialize OAuth with the app context"""
+    oauth.init_app(app)
+    
+    # Build the redirect URI explicitly
+    if app.config.get('SERVER_NAME'):
+        redirect_uri = f"https://{app.config['SERVER_NAME']}/api/auth/google/callback"
+    else:
+        redirect_uri = f"{app.config.get('FRONTEND_URL', 'http://localhost:5000')}/api/auth/google/callback"
+    
+    app.logger.info(f"🔧 Registering Google OAuth with redirect_uri: {redirect_uri}")
+    
+    oauth.register(
+        name='google',
+        client_id=app.config.get("GOOGLE_CLIENT_ID"),
+        client_secret=app.config.get("GOOGLE_CLIENT_SECRET"),
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={
+            'scope': 'openid email profile'
+        }
+    )
 
 # --- Razorpay Client Initialization ---
-razorpay_client = RazorpayClient(
-    auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET"))
-)
+razorpay_client = None
+
+def init_razorpay(app):
+    """Initialize Razorpay client with app context"""
+    global razorpay_client
+    razorpay_client = RazorpayClient(
+        auth=(app.config.get("RAZORPAY_KEY_ID"), app.config.get("RAZORPAY_KEY_SECRET"))
+    )
 
 DASHBOARD_ROUTES = {
     'student': 'frontend.student_dashboard',
@@ -66,7 +85,6 @@ def register_student():
         return jsonify({"message": "An account with this email already exists."}), 409
 
     try:
-        # Create the user but mark them as unverified
         new_student = User(
             email=email,
             first_name=first_name,
@@ -76,14 +94,12 @@ def register_student():
         )
         new_student.set_password(password)
         db.session.add(new_student)
-        db.session.flush() # Flush to get the new_student.id before creating membership
+        db.session.flush()
 
         org_message = ""
         if org_code:
             organization = Organization.query.filter_by(code=org_code, status='active').first()
             if organization:
-                # This logic correctly creates a 'public' membership
-                # that does NOT count against the organization's invited student limit.
                 membership = OrganizationMembership(
                     user_id=new_student.id,
                     organization_id=organization.id,
@@ -96,13 +112,9 @@ def register_student():
                 org_message = " The organization code you entered was not found."
 
         db.session.commit()
-
-        # Send the verification email after the user is successfully saved
         send_verification_email(new_student.email)
         
-        # This new message is clearer about the next step
         final_message = f"Student account created successfully! Please check your email to verify your account.{org_message}"
-
         return jsonify({"message": final_message}), 201
 
     except Exception as e:
@@ -113,20 +125,16 @@ def register_student():
 @auth_bp.route('/register-organization', methods=['POST'])
 def register_organization():
     data = request.get_json()
-    # Securely log the payload by excluding the password
     safe_payload = data.copy()
-    safe_payload.pop('password', None) # Remove password before logging
+    safe_payload.pop('password', None)
     print("✅ RECEIVED REGISTRATION PAYLOAD:", safe_payload)
 
     org_name = data.get('organization_name')
     org_code = data.get('code')
     admin_email = data.get('email')
     password = data.get('password')
-    plan_identifier = data.get('plan_id')  # This is the ID from the frontend, e.g., 13
+    plan_identifier = data.get('plan_id')
 
-    # --- Plan ID Mapping ---
-    # Look up the actual Razorpay plan ID from the config mapping
-    # We convert the identifier to a string to ensure the dictionary lookup works
     razorpay_plan_id = current_app.config.get('RAZORPAY_PLANS', {}).get(str(plan_identifier))
 
     print(f"  - Org Name: {org_name}")
@@ -135,7 +143,6 @@ def register_organization():
     print(f"  - Frontend Plan Identifier: {plan_identifier}")
     print(f"  - Mapped Razorpay Plan ID: {razorpay_plan_id}")
 
-    # Basic validation
     if not all([org_name, org_code, admin_email, password, plan_identifier]):
         print("❌ FAILED at: Missing required fields check.")
         return jsonify({"message": "Missing required fields."}), 400
@@ -151,7 +158,6 @@ def register_organization():
         return jsonify({"message": "An account with this email already exists."}), 409
 
     try:
-        # Create new organization
         new_org = Organization(
             name=org_name,
             code=org_code,
@@ -160,7 +166,6 @@ def register_organization():
         db.session.add(new_org)
         db.session.flush()
 
-        # Create admin user
         new_admin = User(
             email=admin_email,
             first_name=org_name,
@@ -172,7 +177,6 @@ def register_organization():
         db.session.add(new_admin)
         db.session.flush()
 
-        # Create organization membership
         membership = OrganizationMembership(
             user_id=new_admin.id,
             organization_id=new_org.id,
@@ -181,7 +185,6 @@ def register_organization():
         )
         db.session.add(membership)
 
-        # ✅ Razorpay Subscription logic
         razorpay_client = razorpay.Client(auth=(
             current_app.config['RAZORPAY_KEY_ID'],
             current_app.config['RAZORPAY_KEY_SECRET']
@@ -189,7 +192,7 @@ def register_organization():
 
         subscription = razorpay_client.subscription.create({
             "plan_id": razorpay_plan_id,
-            "total_count": 12,  # Total billing cycles (e.g., 12 months)
+            "total_count": 12,
             "quantity": 1,
             "notes": {
                 "organization_id": new_org.id,
@@ -197,7 +200,6 @@ def register_organization():
             }
         })
 
-        # Save subscription ID to org
         new_org.razorpay_subscription_id = subscription['id']
         db.session.commit()
 
@@ -229,6 +231,7 @@ def login():
     if user and user.check_password(password):
         if user.status != 'active':
             return jsonify({"message": "Your account is not active. Please check your email to verify your account."}), 403
+        
         access_token = create_access_token(identity=str(user.id))
         session.clear()
 
@@ -239,7 +242,6 @@ def login():
         session['user_email'] = user.email
         user.last_login = datetime.utcnow()
 
-        # ✅ START OF THE FIX: This logic now correctly handles all user types
         organization_id = None
         organization_name = None
         target_org = None
@@ -248,14 +250,12 @@ def login():
             target_org = Organization.query.filter_by(subdomain=org_subdomain, status='active').first()
 
         if user.user_type in ['main_co_admin', 'co_admin']:
-            # For admins, find their primary organization
             membership = OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).first()
             if membership and membership.organization:
                 organization_id = membership.organization_id
                 organization_name = membership.organization.name
         
         elif user.user_type == 'student':
-            # If logging in via subdomain, prioritize that organization
             if target_org:
                 membership = OrganizationMembership.query.filter_by(
                     user_id=user.id, 
@@ -265,7 +265,6 @@ def login():
                 if membership:
                     organization_id = membership.organization_id
                     organization_name = membership.organization.name
-            # If not on a subdomain, find their first active membership
             else:
                 membership = OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).first()
                 if membership and membership.organization:
@@ -274,7 +273,6 @@ def login():
         
         session['organization_id'] = organization_id
         session['organization_name'] = organization_name
-        # ✅ END OF THE FIX
         
         db.session.commit()
 
@@ -291,18 +289,14 @@ def login():
 def logout():
     session.clear()
     response = jsonify({"message": "Successfully logged out"})
-    # FIX: Unset JWT cookies if they are being used
     unset_jwt_cookies(response)
     return response, 200
 
-# Example of a protected route (requires JWT token)
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
 def protected():
-    # You can get identity (user_id) directly
     current_user_id = get_jwt_identity()
-    # To get additional claims like user_type:
-    claims = get_jwt() # Returns dictionary of all claims
+    claims = get_jwt()
     user_type = claims.get('user_type')
     return jsonify(logged_in_as=current_user_id, user_type=user_type), 200
 
@@ -334,7 +328,6 @@ def reset_password():
     
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     try:
-        # Check token validity (expires in 3600 seconds = 1 hour)
         email = s.loads(token, salt='password-reset-salt', max_age=3600)
     except SignatureExpired:
         return jsonify({"message": "The password reset link has expired."}), 400
@@ -350,8 +343,7 @@ def reset_password():
 @auth_bp.route('/join-organization', methods=['POST'])
 @jwt_required()
 def join_organization():
-    # Get user_id directly from JWT identity
-    user_id = get_jwt_identity() # ✅ FIXED: get_jwt_identity() returns the identity itself
+    user_id = get_jwt_identity()
     
     data = request.get_json()
     org_code = data.get('organization_code')
@@ -359,16 +351,14 @@ def join_organization():
     if not org_code:
         return jsonify({"message": "Organization code is required"}), 400
 
-    org = Organization.query.filter_by(code=org_code).first() # Assuming 'code' for Organization model
+    org = Organization.query.filter_by(code=org_code).first()
     if not org:
         return jsonify({"message": "Invalid organization code"}), 404
 
-    # Ensure user isn't already an active member of this organization
     existing_membership = OrganizationMembership.query.filter_by(user_id=user_id, organization_id=org.id, is_active=True).first()
     if existing_membership:
         return jsonify({"message": "Already an active member of this organization"}), 409
 
-    # If they were previously inactive, reactivate. Otherwise, create new.
     membership = OrganizationMembership.query.filter_by(user_id=user_id, organization_id=org.id).first()
     if membership:
         membership.is_active = True
@@ -378,7 +368,6 @@ def join_organization():
         db.session.add(membership)
         message = "Successfully joined organization"
 
-    # Increment student count if the joining user is a student
     user = User.query.get(user_id)
     if user and user.user_type == 'student':
         org.current_student_count += 1
@@ -407,11 +396,9 @@ def user_profile():
         user.first_name = data.get('first_name', user.first_name)
         user.last_name = data.get('last_name', user.last_name)
         db.session.commit()
-        # Update the name in the session as well
         session['user_name'] = user.first_name
         return jsonify({"message": "Profile updated successfully"}), 200
 
-# CHANGE USER'S OWN PASSWORD
 @auth_bp.route('/change-password', methods=['PUT'])
 @jwt_required()
 def change_password():
@@ -438,69 +425,91 @@ def change_password():
 def google_login():
     """Redirects the user to Google's authentication page."""
     
-    # ✅ THE FIX: Build the redirect URI using the main domain from your config
-    # This ensures Google always sends the user back to the same, approved address.
-    main_domain_callback = f"https://{current_app.config['SERVER_NAME']}/api/auth/google/callback"
-    current_app.logger.info(f"Redirecting to Google with callback: {main_domain_callback}")
-    
-    # ✅ Store the user's current subdomain in the session so we can return them later.
-    if g.current_organization:
-        session['oauth_subdomain'] = g.current_organization.subdomain
+    # ✅ Build the redirect URI dynamically but consistently
+    if current_app.config.get('SERVER_NAME'):
+        # In production with SERVER_NAME set
+        redirect_uri = f"https://{current_app.config['SERVER_NAME']}/api/auth/google/callback"
     else:
-        session.pop('oauth_subdomain', None) # Clear it if they are on the main site
-
-    from authlib.common.security import generate_token
-    state = generate_token(30)
-    session['_request_token_state'] = state
-    current_app.logger.info(f"Session before redirect: {session}")
-    return oauth.google.authorize_redirect(main_domain_callback, state=state)
+        # In development or when SERVER_NAME is not set
+        redirect_uri = f"{request.url_root.rstrip('/')}/api/auth/google/callback"
+    
+    current_app.logger.info(f"🔵 Google Login - Redirect URI: {redirect_uri}")
+    current_app.logger.info(f"🔵 Request Host: {request.host}")
+    current_app.logger.info(f"🔵 Request URL Root: {request.url_root}")
+    
+    # Store the originating subdomain for later redirect
+    if g.get('current_organization'):
+        session['oauth_subdomain'] = g.current_organization.subdomain
+        current_app.logger.info(f"🔵 Stored subdomain: {g.current_organization.subdomain}")
+    else:
+        session.pop('oauth_subdomain', None)
+        current_app.logger.info("🔵 No subdomain to store")
+    
+    # Make session permanent to survive redirect
+    session.permanent = True
+    session.modified = True
+    
+    return oauth.google.authorize_redirect(redirect_uri)
 
 
 @auth_bp.route('/google/callback')
 def google_callback():
-    current_app.logger.info(f"Session at callback: {session}")
     """Handles the callback from Google, logs in or creates the user."""
+    current_app.logger.info(f"🟢 Google Callback - Session data: {dict(session)}")
+    current_app.logger.info(f"🟢 Request URL: {request.url}")
+    current_app.logger.info(f"🟢 Request Args: {request.args}")
+    
     try:
         # Get user information from Google
         token = oauth.google.authorize_access_token()
         user_info = oauth.google.parse_id_token(token)
+        
+        current_app.logger.info(f"🟢 User info from Google: {user_info.get('email')}")
 
         # Find or create the user in your database
         user = User.query.filter_by(email=user_info['email']).first()
 
         if not user:
-            # If the user doesn't exist, create a new student account
             user = User(
                 email=user_info['email'],
                 first_name=user_info.get('given_name', 'New'),
                 last_name=user_info.get('family_name', 'User'),
-                user_type='student', # Default new users to students
+                user_type='student',
                 status='active'
-                # No password is set, as they use Google to log in
             )
             db.session.add(user)
             db.session.commit()
+            current_app.logger.info(f"🟢 Created new user: {user.email}")
 
         # Log the user in by creating a session
         access_token = create_access_token(identity=str(user.id))
         session.clear()
         session['access_token'] = access_token
-        session['user_id'] = user.id
+        session['user_id'] = str(user.id)
         session['user_type'] = user.user_type
         session['user_name'] = user.first_name
+        session['user_email'] = user.email
         
-        # Redirect to the appropriate dashboard
-        subdomain = session.pop('oauth_subdomain', None) # Get and remove from session
-        org_param = {'org': subdomain} if subdomain else {}
+        # Get stored subdomain
+        subdomain = session.pop('oauth_subdomain', None)
+        current_app.logger.info(f"🟢 Retrieved subdomain: {subdomain}")
+        
+        # Build dashboard URL
+        if subdomain:
+            org_param = {'org': subdomain}
+        else:
+            org_param = {}
         
         dashboard_url = url_for(f'frontend.{user.user_type}_dashboard', **org_param)
+        current_app.logger.info(f"🟢 Redirecting to: {dashboard_url}")
         
         return redirect(dashboard_url)
+    
     except Exception as e:
-        current_app.logger.error(f"Google OAuth Error: {e}")
+        current_app.logger.error(f"❌ Google OAuth Error: {e}", exc_info=True)
         flash("An error occurred during Google authentication. Please try again.", "danger")
         return redirect(url_for('frontend.login'))
-    
+
 def send_verification_email(email):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     token = s.dumps(email, salt='email-verification-salt')
@@ -519,10 +528,8 @@ def send_verification_email(email):
 def verify_email(token):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     try:
-        # Check token validity (expires in 1 day)
         email = s.loads(token, salt='email-verification-salt', max_age=86400)
     except (SignatureExpired, BadTimeSignature):
-        # You can create a simple HTML page for this
         return "<h1>The verification link is invalid or has expired.</h1>"
 
     user = User.query.filter_by(email=email).first_or_404()
