@@ -18,7 +18,7 @@ from app.api.decorators import admin_role_required
 
 payment_bp = Blueprint('payment_api', __name__, url_prefix='/api/payment')
 
-
+razorpay_client = None
 # ---------- helpers ----------
 def get_razorpay_client():
     """Create/reuse a singleton Razorpay client using app config/env."""
@@ -189,7 +189,7 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
 
     try:
         client = get_razorpay_client()
-        plan_id = 'plan_RRe2VVk0INlo0p'  # AI Assistant Plan ID
+        plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID')
 
         subscription = client.subscription.create({
             'plan_id': plan_id,
@@ -234,7 +234,7 @@ def create_ai_subscription_order():
 
     try:
         client = get_razorpay_client()
-        plan_id = 'plan_RRe1LwkOmKn6Y7'  # AI Tutor Plan ID
+        plan_id = current_app.config.get('AI_TUTOR_PLAN_ID')
 
         subscription = client.subscription.create({
             'plan_id': plan_id,

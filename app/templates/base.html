@@ -1322,6 +1322,28 @@ $(document).ready(function() {
             }
         }, 5000);
 
+        // --- Logout Button Logic ---
+        $('#logoutButton').on('click', async function(e) {
+            e.preventDefault();
+
+            try {
+                const response = await authenticatedFetch('/api/auth/logout', { method: 'POST' });
+
+                if (response.ok) {
+                    // Clear any session/local storage you are using
+                    sessionStorage.removeItem('dia_access_token');
+                    
+                    // Redirect to login page
+                    window.location.href = "{{ url_for('frontend.login') }}";
+                } else {
+                    const errorData = await response.json();
+                    showToast(errorData.message || 'Logout failed.', 'danger');
+                }
+            } catch (error) {
+                showToast('An error occurred during logout.', 'danger');
+            }
+        });
+
         // --- (Your existing notification, compose message, and logout logic is correct) ---
 
         // --- NEW: Auto-Converter for All Dates on the Page ---

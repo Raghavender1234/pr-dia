@@ -71,3 +71,7 @@ class Config:
         '15': 'plan_RRQgEpIkuHHijr', # Premium 9999 Plan
         # Add other plans here as you create them
     }
+
+    # --- AI Subscription Plan IDs ---
+    AI_ASSISTANT_PLAN_ID = os.getenv('AI_ASSISTANT_PLAN_ID', 'plan_RRe2VVk0INlo0p')
+    AI_TUTOR_PLAN_ID = os.getenv('AI_TUTOR_PLAN_ID', 'plan_RRe1LwkOmKn6Y7')
