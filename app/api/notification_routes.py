@@ -212,80 +212,133 @@ def send_broadcast_notification(current_user, organization, **kwargs):
     db.session.commit()
     return jsonify({"message": f"Announcement sent to {len(student_members)} students."}), 200
 
-@notification_bp.route('/send-direct', methods=['POST'])
-@student_required()
-def send_direct_notification(current_user, **kwargs):
-    """Sends a notification from a student to one or more tagged users."""
-    data = request.get_json()
-    recipient_ids = data.get('recipient_ids', [])
-    title = data.get('title')
-    message = data.get('message')
-
-    if not all([recipient_ids, title, message]):
-        return jsonify({"message": "Recipients, title, and message are required."}), 400
-
-    # For security, verify that all recipients are in the same organization as the sender.
-    sender_org_id = current_user.memberships[0].organization_id if current_user.memberships else None
-    if not sender_org_id:
-        return jsonify({"message": "You must belong to an organization to send messages."}), 403
-
-    # This ensures a student can't message users outside their own organization
-    valid_recipients = User.query.join(OrganizationMembership).filter(
-        User.id.in_(recipient_ids),
-        OrganizationMembership.organization_id == sender_org_id
-    ).all()
-
-    if len(valid_recipients) != len(recipient_ids):
-        return jsonify({"message": "One or more recipients are not valid."}), 400
-
-    for user in valid_recipients:
-        notification = Notification(
-            organization_id=sender_org_id,
-            user_id=user.id, # The recipient
-            sender_user_id=current_user.id, # The sender
-            notification_type='direct_message',
-            title=title,
-            message=f"From {current_user.first_name}: {message}"
-        )
-        db.session.add(notification)
-        
-    db.session.commit()
-    return jsonify({"message": f"Message sent to {len(valid_recipients)} user(s)."}), 200
-
 @notification_bp.route('/admin/send-direct', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
 def send_admin_direct_notification(current_user, organization, **kwargs):
     """Sends a direct notification from an admin to specific users in their org."""
-    data = request.get_json()
-    recipient_ids = data.get('recipient_ids', [])
-    title = data.get('title')
-    message = data.get('message')
+    try:
+        data = request.get_json()
+        recipient_ids = data.get('recipient_ids', [])
+        title = data.get('title', '').strip()
+        message = data.get('message', '').strip()
 
-    if not all([recipient_ids, title, message]):
-        return jsonify({"message": "Recipients, title, and message are required."}), 400
+        # Validation
+        if not recipient_ids:
+            return jsonify({"message": "At least one recipient is required."}), 400
+        if not title:
+            return jsonify({"message": "Title is required."}), 400
+        if not message:
+            return jsonify({"message": "Message is required."}), 400
 
-    # Security: Verify all recipients belong to the admin's organization
-    valid_recipients = User.query.join(OrganizationMembership).filter(
-        User.id.in_(recipient_ids),
-        OrganizationMembership.organization_id == organization.id
-    ).all()
+        # Ensure recipient_ids are integers (in case they come as strings)
+        try:
+            recipient_ids = [int(rid) for rid in recipient_ids]
+        except (ValueError, TypeError) as e:
+            return jsonify({"message": "Invalid recipient IDs format."}), 400
 
-    if len(valid_recipients) != len(recipient_ids):
-        return jsonify({"message": "One or more recipients are not valid members."}), 400
+        # Security: Verify all recipients belong to the admin's organization
+        valid_recipients = User.query.join(OrganizationMembership).filter(
+            User.id.in_(recipient_ids),
+            OrganizationMembership.organization_id == organization.id,
+            OrganizationMembership.is_active == True
+        ).all()
 
-    for user in valid_recipients:
-        notification = Notification(
-            organization_id=organization.id,
-            user_id=user.id,
-            sender_user_id=current_user.id,
-            notification_type='direct_message',
-            title=title,
-            message=message
-        )
-        db.session.add(notification)
+        if not valid_recipients:
+            return jsonify({"message": "No valid recipients found in your organization."}), 400
+
+        if len(valid_recipients) != len(recipient_ids):
+            return jsonify({"message": f"Only {len(valid_recipients)} of {len(recipient_ids)} recipients are valid members."}), 400
+
+        # Create notifications
+        notifications_created = 0
+        for user in valid_recipients:
+            notification = Notification(
+                organization_id=organization.id,
+                user_id=user.id,
+                sender_user_id=current_user.id,
+                notification_type='direct_message',
+                title=title,
+                message=message
+            )
+            db.session.add(notification)
+            notifications_created += 1
         
-    db.session.commit()
-    return jsonify({"message": f"Direct message sent to {len(valid_recipients)} user(s)."}), 200
+        db.session.commit()
+        return jsonify({"message": f"Direct message sent to {notifications_created} user(s)."}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in send_admin_direct_notification: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+    
+@notification_bp.route('/send-direct', methods=['POST'])
+@student_required()
+def send_direct_notification(current_user, **kwargs):
+    """Sends a notification from a student to one or more tagged users."""
+    try:
+        data = request.get_json()
+        recipient_ids = data.get('recipient_ids', [])
+        title = data.get('title', '').strip()
+        message = data.get('message', '').strip()
+
+        # Validation
+        if not recipient_ids:
+            return jsonify({"message": "At least one recipient is required."}), 400
+        if not title:
+            return jsonify({"message": "Title is required."}), 400
+        if not message:
+            return jsonify({"message": "Message is required."}), 400
+
+        # Ensure recipient_ids are integers
+        try:
+            recipient_ids = [int(rid) for rid in recipient_ids]
+        except (ValueError, TypeError):
+            return jsonify({"message": "Invalid recipient IDs format."}), 400
+
+        # For security, verify that all recipients are in the same organization as the sender.
+        sender_org_id = current_user.memberships[0].organization_id if current_user.memberships else None
+        if not sender_org_id:
+            return jsonify({"message": "You must belong to an organization to send messages."}), 403
+
+        # This ensures a student can't message users outside their own organization
+        valid_recipients = User.query.join(OrganizationMembership).filter(
+            User.id.in_(recipient_ids),
+            OrganizationMembership.organization_id == sender_org_id,
+            OrganizationMembership.is_active == True
+        ).all()
+
+        if not valid_recipients:
+            return jsonify({"message": "No valid recipients found in your organization."}), 400
+
+        if len(valid_recipients) != len(recipient_ids):
+            return jsonify({"message": f"Only {len(valid_recipients)} of {len(recipient_ids)} recipients are valid members."}), 400
+
+        notifications_created = 0
+        for user in valid_recipients:
+            notification = Notification(
+                organization_id=sender_org_id,
+                user_id=user.id,  # The recipient
+                sender_user_id=current_user.id,  # The sender
+                notification_type='direct_message',
+                title=title,
+                message=f"From {current_user.first_name}: {message}"
+            )
+            db.session.add(notification)
+            notifications_created += 1
+            
+        db.session.commit()
+        return jsonify({"message": f"Message sent to {notifications_created} user(s)."}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error in send_direct_notification: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"message": f"Server error: {str(e)}"}), 500
+
+
 
 @notification_bp.route('/<int:notification_id>/reply', methods=['POST'])
 @jwt_required()

@@ -1197,55 +1197,63 @@ $(document).ready(function() {
         });
 
         // 4. Event Handler for the form submission
-        $composeForm.on('submit', async function(e) {
-            e.preventDefault();
-            const $submitBtn = $(this).find('button[type="submit"]');
-            $submitBtn.prop('disabled', true).find('.btn-text').addClass('d-none');
-            $submitBtn.find('.btn-loading').removeClass('d-none');
+$composeForm.on('submit', async function(e) {
+    e.preventDefault();
+    const $submitBtn = $(this).find('button[type="submit"]');
+    $submitBtn.prop('disabled', true).find('.btn-text').addClass('d-none');
+    $submitBtn.find('.btn-loading').removeClass('d-none');
 
-            let url, payload;
-            const messageType = $('input[name="messageType"]:checked').val();
+    let url, payload;
+    const messageType = $('input[name="messageType"]:checked').val();
 
-            if (userType === 'student') {
-                url = '/api/notifications/send-direct';
-                payload = {
-                    recipient_ids: $('#recipientTags').val(),
-                    title: $('#notificationTitle').val(),
-                    message: $('#notificationMessage').val()
-                };
-            } else { // For Admins
-                if (messageType === 'direct') {
-                url = '/api/notifications/admin/send-direct'; 
-                    payload = {
-                        recipient_ids: $('#recipientTags').val(),
-                        title: $('#notificationTitle').val(),
-                        message: $('#notificationMessage').val()
-                    };
-                } else { // Default to broadcast
-                    url = '/api/notifications/broadcast';
-                    payload = {
-                        title: $('#notificationTitle').val(),
-                        message: $('#notificationMessage').val()
-                    };
-                }
-            }
+    if (userType === 'student') {
+        url = '/api/notifications/send-direct';
+        // Parse the JSON string back to an array
+        const recipientIds = JSON.parse($('#recipientTags').val() || '[]');
+        payload = {
+            recipient_ids: recipientIds,
+            title: $('#notificationTitle').val(),
+            message: $('#notificationMessage').val()
+        };
+    } else { // For Admins
+        if (messageType === 'direct') {
+            url = '/api/notifications/admin/send-direct'; 
+            // Parse the JSON string back to an array
+            const recipientIds = JSON.parse($('#recipientTags').val() || '[]');
+            payload = {
+                recipient_ids: recipientIds,
+                title: $('#notificationTitle').val(),
+                message: $('#notificationMessage').val()
+            };
+        } else { // Default to broadcast
+            url = '/api/notifications/broadcast';
+            payload = {
+                title: $('#notificationTitle').val(),
+                message: $('#notificationMessage').val()
+            };
+        }
+    }
 
-            try {
-                const res = await authenticatedFetch(url, {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message);
-                showToast(data.message, 'success');
-                composeModal.hide();
-            } catch (err) {
-                showToast(`Error: ${err.message}`, 'danger');
-            } finally {
-                $submitBtn.prop('disabled', false).find('.btn-text').removeClass('d-none');
-                $submitBtn.find('.btn-loading').addClass('d-none');
-            }
+    try {
+        const res = await authenticatedFetch(url, {
+            method: 'POST',
+            body: JSON.stringify(payload)
         });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || `Server error: ${res.status}`);
+        showToast(data.message, 'success');
+        composeModal.hide();
+        $composeForm[0].reset();
+        selectedRecipients = []; // Clear selected recipients
+        updateRecipientInput();
+    } catch (err) {
+        showToast(`Error: ${err.message}`, 'danger');
+        console.error('Send notification error:', err);
+    } finally {
+        $submitBtn.prop('disabled', false).find('.btn-text').removeClass('d-none');
+        $submitBtn.find('.btn-loading').addClass('d-none');
+    }
+});
 
         // 5. Event Handler for the Admin Status Toggle
         if (userType === 'main_co_admin' || userType === 'co_admin') {
