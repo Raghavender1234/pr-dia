@@ -6,7 +6,7 @@ from app.models.organization import OrganizationMembership
 from app.extensions import db
 from datetime import datetime
 from sqlalchemy import or_, and_, func, select
-from .decorators import org_member_required, admin_role_required, student_required
+from .decorators import org_member_required, admin_role_required, student_required, org_member_flexible
 from app.models.user import User
 
 notification_bp = Blueprint('notification_api', __name__, url_prefix='/api/notifications')
@@ -150,7 +150,7 @@ def mark_notifications_read():
     return jsonify({'message': 'Notifications marked as read.'})
 
 @notification_bp.route('/users-for-tagging', methods=['GET'])
-@org_member_required() # Any active member of an org can see other members
+@org_member_flexible()  # Use the new flexible decorator
 def get_users_for_tagging(current_user, organization, **kwargs):
     """Fetches a list of all users in the current organization for the tagging feature."""
     query = request.args.get('query', '').strip().lower()

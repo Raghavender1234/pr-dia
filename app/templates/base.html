@@ -1524,21 +1524,44 @@ $(document).ready(function() {
             });
         }
 
-        $('#recipient-input').on('keyup', async function() {
-            const query = $(this).val();
-            if (query.length < 2) {
-                $('#recipient-suggestions').empty();
-                return;
-            }
+$('#recipient-input').on('keyup', async function() {
+    const query = $(this).val();
+    if (query.length < 2) {
+        $('#recipient-suggestions').empty();
+        return;
+    }
 
-            const res = await authenticatedFetch(`/api/notifications/users-for-tagging?query=${query}`);
-            const users = await res.json();
-            const $suggestions = $('#recipient-suggestions');
-            $suggestions.empty();
-            users.forEach(user => {
-                $suggestions.append(`<a href="#" class="list-group-item list-group-item-action" data-id="${user.id}" data-name="${user.name}">${user.name} (${user.role})</a>`);
-            });
+    try {
+        const res = await authenticatedFetch(`/api/notifications/users-for-tagging?query=${encodeURIComponent(query)}`);
+        
+        if (!res.ok) {
+            console.error('Failed to fetch users:', res.status);
+            $('#recipient-suggestions').empty();
+            return;
+        }
+        
+        const data = await res.json();
+        
+        // Handle both array and object responses
+        const users = Array.isArray(data) ? data : (data.users || []);
+        
+        const $suggestions = $('#recipient-suggestions');
+        $suggestions.empty();
+        
+        if (users.length === 0) {
+            $suggestions.append('<div class="list-group-item text-muted">No users found</div>');
+            return;
+        }
+        
+        users.forEach(user => {
+            $suggestions.append(`<a href="#" class="list-group-item list-group-item-action" data-id="${user.id}" data-name="${user.name}">${user.name} (${user.role})</a>`);
         });
+    } catch (error) {
+        console.error('Error searching users:', error);
+        $('#recipient-suggestions').empty();
+        $('#recipient-suggestions').append('<div class="list-group-item text-danger">Error loading users</div>');
+    }
+});
 
         $('#recipient-suggestions').on('click', 'a', function(e) {
             e.preventDefault();

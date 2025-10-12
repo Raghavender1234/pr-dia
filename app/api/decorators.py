@@ -216,3 +216,45 @@ def ai_usage_limited(feature_type: str):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+def org_member_flexible():
+    """New - works on both subdomain and global domain"""
+    def decorator(fn):
+        @wraps(fn)
+        @jwt_required() 
+        def wrapper(*args, **kwargs):
+            user_id = get_jwt_identity()
+            current_user = User.query.get(user_id)
+            
+            if not current_user:
+                return jsonify({"message": "User not found."}), 404
+            
+            organization = g.current_organization
+            
+            # If no subdomain org, get user's default/first organization
+            if not organization:
+                membership = OrganizationMembership.query.filter_by(
+                    user_id=user_id,
+                    is_active=True
+                ).first()
+                
+                if not membership:
+                    return jsonify({"message": "You are not a member of any organization."}), 403
+                
+                organization = membership.organization
+            else:
+                # Verify membership in subdomain org
+                membership = OrganizationMembership.query.filter_by(
+                    user_id=user_id,
+                    organization_id=organization.id,
+                    is_active=True
+                ).first()
+                
+                if not membership:
+                    return jsonify({"message": "You are not an active member of this organization."}), 403
+            
+            kwargs['current_user'] = current_user
+            kwargs['organization'] = organization
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
