@@ -84,7 +84,8 @@
     <div class="card mt-5 contact-info-card">
         <div class="card-body p-5">
             <h3 class="text-center mb-4">Send Us a Message</h3>
-            <form>
+            <form id="contactForm">
+                <div id="form-response"></div>
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="contactName" class="form-label">Your Name</label>
@@ -110,4 +111,42 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('contactForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const formData = {
+        name: document.getElementById('contactName').value,
+        email: document.getElementById('contactEmail').value,
+        subject: document.getElementById('contactSubject').value,
+        message: document.getElementById('contactMessage').value
+    };
+
+    const formResponse = document.getElementById('form-response');
+
+    fetch("{{ url_for('public_api.contact_form') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message) {
+            formResponse.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+            form.reset();
+        } else {
+            formResponse.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+    })
+    .catch(error => {
+        formResponse.innerHTML = `<div class="alert alert-danger">An error occurred. Please try again later.</div>`;
+    });
+});
+</script>
 {% endblock %}

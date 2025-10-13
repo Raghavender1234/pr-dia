@@ -92,3 +92,42 @@ def get_public_plans():
     except Exception as e:
         current_app.logger.error(f"Error fetching public plans: {e}")
         return jsonify({"message": "Could not load subscription plans."}), 500
+
+from app.utils.email_utils import send_email
+
+@public_api_bp.route('/contact', methods=['POST'])
+def contact_form():
+    """
+    Handles contact form submissions.
+    """
+    data = request.get_json()
+    name = data.get('name')
+    email = data.get('email')
+    subject = data.get('subject')
+    message = data.get('message')
+
+    if not all([name, email, subject, message]):
+        return jsonify({"message": "All fields are required."}), 400
+
+    # Send email to admin
+    admin_email = current_app.config.get('ADMIN_EMAIL')
+    if not admin_email:
+        current_app.logger.error("ADMIN_EMAIL not set.")
+        return jsonify({"message": "Could not send message."}), 500
+
+    html_content = f"""
+    <h3>New Contact Form Submission</h3>
+    <p><b>Name:</b> {name}</p>
+    <p><b>Email:</b> {email}</p>
+    <p><b>Subject:</b> {subject}</p>
+    <p><b>Message:</b></p>
+    <p>{message}</p>
+    """
+
+    send_email(
+        to_email=admin_email,
+        subject=f"New Contact Form Submission: {subject}",
+        html_content=html_content
+    )
+
+    return jsonify({"message": "Your message has been sent successfully!"}), 200

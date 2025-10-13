@@ -68,11 +68,12 @@ class Config:
     # --- Razorpay Plan Mapping ---
     # Maps frontend plan identifiers to actual Razorpay Plan IDs
     RAZORPAY_PLANS = {
-        '13': 'plan_RRQUYFdyhs7kEW', # Basic 1999 Plan
-        '14': 'plan_RRQaOQ8HM4krXH', # Pro 4999 Plan
-        '15': 'plan_RRQgEpIkuHHijr', # Premium 9999 Plan
-        # Add other plans here as you create them
+        '1': os.environ.get('RAZORPAY_PLAN_ID_1'), # Basic
+        '2': os.environ.get('RAZORPAY_PLAN_ID_2'), # Pro
+        '3': os.environ.get('RAZORPAY_PLAN_ID_3')  # Premium
     }
+
+    ADMIN_EMAIL = 'info@pr-dia.com'
 
     # --- AI Subscription Plan IDs ---
     AI_ASSISTANT_PLAN_ID = os.getenv('AI_ASSISTANT_PLAN_ID', 'plan_RRe2VVk0INlo0p')
