@@ -215,7 +215,7 @@
 
                                 <div id="testQuestionsContainer" style="max-height: 400px; overflow-y: auto;">
                                     <ul class="list-group" id="testQuestionsList">
-                                        <li class="list-group-item text-muted">No questions added yet.</li>
+                                        <li class="list-group-item text-muted">No questions have been added yet.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -244,6 +244,30 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteMockTestBtn">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+<!-- Report Modal -->
+<div class="modal fade" id="viewReportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Performance Audit Report: <span id="reportTestTitle"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <div id="reportError" class="d-none"></div>
+                <div id="reportLoading" class="text-center py-5">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status"></div>
+                    <p class="mt-3">Generating Insights...</p>
+                </div>
+                <div id="reportContent" class="d-none">
+                    <!-- Report content will be dynamically inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary download-pdf-report-btn" id="modalDownloadPdfBtn"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>
             </div>
         </div>
     </div>
@@ -300,6 +324,7 @@ window.pageInit = function () {
     const manageQuestionsModal = new bootstrap.Modal($('#manageQuestionsModal')[0]);
     const deleteMockTestConfirmModal = new bootstrap.Modal(document.getElementById('deleteMockTestConfirmModal'));
     const importModal = new bootstrap.Modal($('#importQuestionsModal')[0]);
+    const reportModal = new bootstrap.Modal(document.getElementById('viewReportModal'));
 
     // --- HELPER FUNCTIONS ---
     const showMessage = (msg, type = 'danger', isModal = false) => {
@@ -377,10 +402,6 @@ window.pageInit = function () {
                     data: 'is_live_test', 
                     title: 'Type', 
                     render: (isLive, type, row) => {
-                        // Debug logging - remove after fixing
-                        console.log('Live test value:', isLive, typeof isLive, row);
-                        
-                        // Handle different possible values
                         const isLiveTest = isLive === true || isLive === 1 || isLive === '1' || isLive === 'true';
                         return isLiveTest ? '<span class="badge bg-danger">Live</span>' : '<span class="badge bg-info">On-Demand</span>';
                     }
@@ -391,6 +412,33 @@ window.pageInit = function () {
                     data: 'status', 
                     title: 'Status', 
                     render: (s) => `<span class="badge bg-${s === 'active' ? 'success' : 'secondary'} text-capitalize">${s}</span>` 
+                },
+                {
+                    data: 'report_status',
+                    title: 'Report',
+                    orderable: false,
+                    render: (status, type, row) => {
+                        const testId = row.id;
+                        if (row.status !== 'active') {
+                            return '<span class="text-muted small">N/A for drafts</span>';
+                        }
+                        if (status === 'completed') {
+                            return `
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-info view-report-btn" data-testid="${testId}" data-testname="${row.title}">View Report</button>
+                                    <button class="btn btn-sm btn-danger download-pdf-report-btn" data-testid="${testId}"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                                </div>
+                            `;
+                        } else if (status === 'pending') {
+                            return `<button class="btn btn-sm btn-secondary" disabled><span class="spinner-border spinner-border-sm"></span> Generating...</button>`;
+                        } else if (status === 'failed') {
+                            return `<button class="btn btn-sm btn-warning generate-report-btn" data-testid="${testId}">Regenerate</button>`;
+                        } else if (status === 'no_data') {
+                            return `<span class="text-muted small">No data to generate report</span>`;
+                        } else {
+                            return `<button class="btn btn-sm btn-primary generate-report-btn" data-testid="${testId}">Generate Report</button>`;
+                        }
+                    }
                 },
                 {
                     data: 'id', 
@@ -432,6 +480,79 @@ window.pageInit = function () {
             order: [[0, 'asc']]
         });
     };
+
+    $table.on('click', '.generate-report-btn', async function() {
+        const $btn = $(this);
+        const testId = $btn.data('testid');
+        const url = `/api/main-co-admin/mock-tests/${testId}/generate-report`;
+
+        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Starting...');
+
+        try {
+            const response = await window.authenticatedFetch(url, { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to start report generation.');
+            }
+            showMessage(data.message, 'success');
+            mockTestsDataTable.ajax.reload(); // Reload the table to show 'pending' status
+        } catch (error) {
+            showMessage(`Error: ${error.message}`, 'danger');
+            $btn.prop('disabled', false).text('Regenerate'); // Or 'Generate Report'
+        }
+    });
+
+    $table.on('click', '.download-pdf-report-btn', function() {
+        const testId = $(this).data('testid');
+        const url = `/api/main-co-admin/mock-tests/${testId}/export-pdf-report`;
+        window.location.href = url;
+    });
+
+    $table.on('click', '.view-report-btn', async function() {
+        const testId = $(this).data('testid');
+        const testName = $(this).data('testname');
+        $('#reportTestTitle').text(testName);
+        $('#reportContent').addClass('d-none');
+        $('#reportError').addClass('d-none');
+        $('#reportLoading').removeClass('d-none');
+        reportModal.show();
+
+        try {
+            const response = await window.authenticatedFetch(`/api/main-co-admin/mock-tests/${testId}/report`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+
+            const report = data.report;
+            let contentHtml = `
+                <div class="row">
+                    <div class="col-md-4"><div class="card p-3 mb-3"><strong>Total Attempts:</strong> ${report.total_attempts}</div></div>
+                    <div class="col-md-4"><div class="card p-3 mb-3"><strong>Average Score:</strong> ${report.average_score.toFixed(2)}%</div></div>
+                    <div class="col-md-4"><div class="card p-3 mb-3"><strong>Pass Rate:</strong> ${report.pass_rate.toFixed(2)}%</div></div>
+                </div>
+                <h5 class="mt-4">Topic Performance</h5>
+            `;
+
+            if (report.topic_performance && report.topic_performance.length > 0) {
+                contentHtml += '<ul class="list-group">';
+                report.topic_performance.forEach(topic => {
+                    contentHtml += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                        ${topic.topic_name}
+                        <span class="badge bg-primary rounded-pill">${topic.average_accuracy.toFixed(2)}% avg. accuracy</span>
+                    </li>`;
+                });
+                contentHtml += '</ul>';
+            } else {
+                contentHtml += '<p class="text-muted">No topic performance data available.</p>';
+            }
+
+            $('#reportContent').html(contentHtml);
+        } catch (error) {
+            $('#reportError').removeClass('d-none').html(`<div class="alert alert-danger">${error.message}</div>`);
+        } finally {
+            $('#reportLoading').addClass('d-none');
+            $('#reportContent').removeClass('d-none');
+        }
+    });
 
     // --- EXAM DROPDOWN FUNCTIONS ---
     async function populateExamsDropdown() {

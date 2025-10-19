@@ -69,3 +69,5 @@ sib_api_v3_sdk
 python-magic
 flask-apscheduler
 Flask-Session==0.5.0
+reportlab
+matplotlib

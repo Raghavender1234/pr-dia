@@ -36,7 +36,8 @@ def create_app(config_class=Config):
     jwt.init_app(app)
     mail.init_app(app)
     scheduler.init_app(app)
-    scheduler.start()
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        scheduler.start()
     CORS(app)
     Session(app)
 
@@ -151,7 +152,7 @@ def create_app(config_class=Config):
     commands.register_commands(app)
     
     # ✅ Log the OAuth configuration on startup
-    app.logger.info(f"🔧 OAuth initialized with SERVER_NAME: {app.config.get('SERVER_NAME')}")
-    app.logger.info(f"🔧 Expected Google OAuth redirect: https://{app.config.get('SERVER_NAME')}/api/auth/google/callback")
+    app.logger.info(f"OAuth initialized with SERVER_NAME: {app.config.get('SERVER_NAME')}")
+    app.logger.info(f"Expected Google OAuth redirect: https://{app.config.get('SERVER_NAME')}/api/auth/google/callback")
     
     return app

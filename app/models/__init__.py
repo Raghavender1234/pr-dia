@@ -12,6 +12,8 @@ from .topic import Topic
 from .question import Question, MCQOption, ComprehensionPassage # ADD THIS LINE
 from .mock_test import MockTest, MockTestQuestion # ADD THIS LINE
 from .student_progress import StudentExam, StudentAISubscription, StudentTestAttempt, StudentQuestionResponse, StudentAIUsage
+from .reports import MockTestReport, TopicPerformanceSummary
+
 # You can potentially add other models here as you create them:
 # from .question import Question, MCQOption, ComprehensionPassage
 # from .mock_test import MockTest, MockTestQuestion

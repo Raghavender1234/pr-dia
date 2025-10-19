@@ -13,6 +13,7 @@ class MockTest(db.Model):
     total_marks = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     passing_marks = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.String(20), nullable=False, default='draft') # 'draft', 'active', 'archived'
+    report_status = db.Column(db.String(20), nullable=True, server_default=None) # 'pending', 'completed', 'failed'
     default_marks_per_question = db.Column(db.Numeric(5, 2), nullable=False, default=1.00, server_default='1.00')
 
     

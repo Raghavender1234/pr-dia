@@ -1,5 +1,9 @@
 # backend/app/api/ai.py
 import os
+import uuid
+import requests
+import boto3
+import re
 from flask import Blueprint, request, jsonify, current_app, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
@@ -20,6 +24,31 @@ ai_bp = Blueprint('ai_api', __name__, url_prefix='/api/ai')
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 CA_KEYWORDS_SUBJ = ['current affairs', 'general awareness', 'gk', 'general knowledge']
 CA_KEYWORDS_TOPIC = ['current affairs', 'current events', 'news', 'national affairs', 'international affairs']
+
+def _upload_image_to_s3(image_url):
+    try:
+        s3_bucket = os.environ.get('S3_BUCKET_NAME')
+        if not s3_bucket:
+            current_app.logger.error("S3_BUCKET_NAME environment variable not set.")
+            return None
+
+        response = requests.get(image_url, stream=True)
+        response.raise_for_status()
+
+        s3_client = boto3.client('s3')
+        image_key = f"generated_questions/{uuid.uuid4()}.png"
+
+        s3_client.upload_fileobj(response.raw, s3_bucket, image_key)
+
+        # Construct the URL manually
+        region = os.environ.get('AWS_REGION', 'us-east-1') # Default to us-east-1 if not set
+        s3_url = f"https://{s3_bucket}.s3.{region}.amazonaws.com/{image_key}"
+        
+        return s3_url
+    except Exception as e:
+        current_app.logger.error(f"S3 upload failed: {e}")
+        return None
+
 
 
 @ai_bp.route('/generate_questions', methods=['POST'])
@@ -72,20 +101,39 @@ A student is preparing for the "{exam_name}" exam, studying the "{subject_name}"
 
 Based on the following original question (difficulty: "{difficulty}"), generate 3 new, distinct, and more interesting Multiple-Choice Questions.
 
-**Instructions for Generating Interesting Questions:**
-1.  **Go Beyond Rote Memorization:** Instead of just asking "what," try to create questions that ask "why," "how," or present a scenario.
-2.  **Explore Different Angles:**
-    *   **Application:** How is this concept applied in a real-world scenario?
-    *   **Exception:** Which of the following is an exception to the rule/concept?
-    *   **Analysis:** Ask the student to analyze a situation or compare/contrast concepts.
-3.  **Create Plausible Distractors:** The incorrect options should be challenging and based on common misconceptions related to the "{topic_name}".
-4.  **Maintain Difficulty:** The new questions should match the original's "{difficulty}" level.
-5.  **Stay Relevant:** All questions must remain strictly relevant to the "{topic_name}" topic.
+**Analysis of the Original Question:**
+First, analyze the original question provided at the end. Does it contain any of the following?
+- A mathematical equation (e.g., quadratic formula, integral)
+- A chemical reaction (e.g., acid-base neutralization)
+- A diagram or circuit (described in text or as ASCII art)
+
+**Instructions for Generating High-Quality Questions:**
+
+1.  **Mirror Complexity (When Applicable):**
+    *   If the original question **does** contain a diagram, equation, or reaction, you **must generate at least one** new question that features a similar type of complex element. For example, if the original has a circuit diagram, one of your new questions should also be based on a circuit diagram.
+
+2.  **Emphasize Real-World Scenarios:**
+    *   For all questions, aim to create scenarios that mirror real-world problems.
+    *   If relevant to the `{topic_name}`, consider introducing diagrams, chemical equations, or mathematical formulas even if the original question didn't have them.
+
+3.  **Use Advanced Formatting (Where Appropriate):**
+    *   **Use Markdown for all formatting.**
+    *   **Mathematical/Chemical Equations:** ALWAYS enclose LaTeX expressions in double dollar signs (`$...$`). For example: `$2H_2 + O_2 \rightarrow 2H_2O$` or `$x = \frac{{-b \pm \sqrt{{b^2-4ac}}}}{{2a}}$`.
+    *   **Diagrams/Circuits:** For complex visuals that cannot be drawn with ASCII art, you MUST use the following format: `[GENERATE_IMAGE: A detailed, specific description of the image to be generated]`. The description should be sufficient for a text-to-image model to create an accurate and relevant image for the question. For simple diagrams, you can use ASCII art inside a code block.
+
+4.  **Vary the Question Style:**
+    *   Go beyond simple "what is" questions. Ask "why," "how," or present a scenario for analysis.
+    *   Try creating questions based on application, exceptions to a rule, or comparing concepts.
+
+5.  **Maintain Quality:**
+    *   The new questions should match the original's "{difficulty}" level.
+    *   All questions must be strictly relevant to the "{topic_name}".
+    *   Incorrect options (distractors) should be challenging and based on common misconceptions.
 
 **Formatting Rules:**
+*   Use Markdown for formatting (bolding, lists).
 *   Each question must have 4 options (A, B, C, D).
 *   Mark the single correct option in each with `(Correct)`.
-*   Output as plain text.
 
 **Original Question:**
 {original_question}
@@ -99,6 +147,38 @@ Based on the following original question (difficulty: "{difficulty}"), generate 
             max_tokens=700
         )
         generated_text = resp.choices[0].message.content
+
+        # Find image generation requests
+        image_requests = re.findall(r'\[GENERATE_IMAGE: (.*?)\]', generated_text)
+
+        for image_prompt in image_requests:
+            try:
+                # Generate image with DALL-E
+                image_resp = client.images.generate(
+                    model="dall-e-3",
+                    prompt=image_prompt,
+                    n=1,
+                    size="1024x1024",
+                    response_format="url"
+                )
+                dalle_image_url = image_resp.data[0].url
+
+                # Upload to S3
+                s3_url = _upload_image_to_s3(dalle_image_url)
+
+                if s3_url:
+                    # Replace placeholder with Markdown image
+                    markdown_image = f"![{image_prompt}]({s3_url})"
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", markdown_image, 1)
+                else:
+                    # If upload fails, replace with a note
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+
+            except Exception as img_e:
+                current_app.logger.error(f"DALL-E or S3 error: {img_e}")
+                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+
+
         return jsonify({"generated": generated_text}), 200
     except Exception as e:
         current_app.logger.error(f"OpenAI error (generate): {e}")
@@ -211,21 +291,35 @@ def generate_practice_from_chat():
     persona = "expert question author" if user.user_type != 'student' else "expert tutor"
 
     system_prompt = f'''
-    You are an expert question author. Based on the following conversation, create exactly {question_count} multiple-choice questions (MCQ).
-    
+    You are an {persona}. Based on the following conversation about '{subject_name}', create exactly {question_count} multiple-choice questions (MCQs).
+
+    **Instructions for Generating High-Quality Questions:**
+
+    1.  **Analyze the Conversation:** Review the chat history to identify key concepts, formulas, or topics discussed.
+
+    2.  **Create Scenario-Based Questions:**
+        *   Generate questions that apply the discussed concepts to real-world scenarios.
+        *   If the conversation involved topics from science (Physics, Chemistry) or Math, **you are encouraged to include relevant equations, formulas, or simple diagrams** to make the questions more practical and comprehensive.
+
+    3.  **Formatting Guidelines:**
+        *   **Use Markdown for all formatting (bold, lists, etc.).**
+        *   **Equations:** Enclose all LaTeX code in double dollar signs (`$...$`). For example: `$E = mc^2$`.
+        *   **Diagrams:** For complex visuals, you MUST use the format `[GENERATE_IMAGE: A detailed description]`. For simple diagrams, use ASCII art.
+
     **CRITICAL FORMATTING RULES:**
-    1. Each question must start with a number followed by a period (e.g., "1.").
-    2. Provide exactly four options, each starting with A), B), C), and D).
-    3. **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
+    1.  Each question must start with a number followed by a period (e.g., "1.").
+    2.  Provide exactly four options, each starting with A), B), C), and D).
+    3.  **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
 
     **EXAMPLE OF PERFECT FORMATTING:**
-    1. What is the capital of France?
-    A) London
-    B) Berlin
-    C) Paris (Correct)
-    D) Madrid
+    1.  What is the formula for calculating the area of a circle?
+        A) `$A = \pi r$`
+        B) `$A = 2\pi r$`
+        C) `$A = \pi r^2$ (Correct)`
+        D) `$A = d^2$`
 
-    Conversation: "{' '.join([msg['content'] for msg in history])}"
+    **Conversation History:**
+    "{' '.join([msg['content'] for msg in history])}"
     '''
     
     try:
@@ -236,6 +330,37 @@ def generate_practice_from_chat():
             max_tokens=1500
         )
         generated_text = response.choices[0].message.content
+        
+        # Find image generation requests
+        image_requests = re.findall(r'\[GENERATE_IMAGE: (.*?)\]', generated_text)
+
+        for image_prompt in image_requests:
+            try:
+                # Generate image with DALL-E
+                image_resp = client.images.generate(
+                    model="dall-e-3",
+                    prompt=image_prompt,
+                    n=1,
+                    size="1024x1024",
+                    response_format="url"
+                )
+                dalle_image_url = image_resp.data[0].url
+
+                # Upload to S3
+                s3_url = _upload_image_to_s3(dalle_image_url)
+
+                if s3_url:
+                    # Replace placeholder with Markdown image
+                    markdown_image = f"![{image_prompt}]({s3_url})"
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", markdown_image, 1)
+                else:
+                    # If upload fails, replace with a note
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+
+            except Exception as img_e:
+                current_app.logger.error(f"DALL-E or S3 error: {img_e}")
+                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+
         return jsonify({"generated_questions": generated_text})
     except Exception as e:
         return jsonify({"message": f"Error generating questions: {str(e)}"}), 503

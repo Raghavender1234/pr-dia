@@ -7,6 +7,7 @@ from app.models.subject import Subject
 from app.models.topic import Topic, TopicContent
 from app.models.student_progress import StudentExam, StudentAISubscription, StudentTestAttempt, StudentQuestionResponse, StudentWeeklyProgress
 from app.models.question import Question, MCQOption, ComprehensionPassage, ReportedContent
+from app.models.reports import MockTestReport, TopicPerformanceSummary
 from app.models.mock_test import MockTest, MockTestQuestion
 from .decorators import admin_role_required
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +16,10 @@ from sqlalchemy.orm import joinedload
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from razorpay import Client as RazorpayClient
 from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+import base64
+from app.extensions import scheduler
+from app.tasks import analyze_mock_test_performance
 from app.models.class_management import Notification
 import os
 import uuid
@@ -23,7 +28,7 @@ from urllib.parse import quote
 import io
 import csv
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import boto3
 from botocore.exceptions import NoCredentialsError, ParamValidationError
 import openpyxl
@@ -37,6 +42,12 @@ import zipfile
 from app.api.ai import client
 import bleach
 from PIL import Image
+import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as ReportLabImage, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 
 DEFAULT_CONTACT_TEMPLATE = {
@@ -186,7 +197,7 @@ def register_organization():
 
     except IntegrityError:
         db.session.rollback()
-        return jsonify({"message": "Database integrity error. Check unique constraints."}), 500
+        return jsonify({"message": "Database integrity error. Check unique constraints."} ), 500
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": f"Error registering organization: {str(e)}"}), 500
@@ -378,6 +389,7 @@ def serialize_mock_test(test):
         "total_marks": str(test.total_marks),
         "passing_marks": str(test.passing_marks),
         "status": test.status,
+        "report_status": test.report_status,
         "is_live_test": bool(test.is_live_test),
         "live_start_time": format_utc_datetime(test.live_start_time),
         "live_end_time": format_utc_datetime(test.live_end_time),
@@ -486,7 +498,7 @@ def get_org_user_roles_distribution(current_user, organization, **kwargs):
     except Exception as e:
         # It's good practice to log the actual error on the server for debugging.
         current_app.logger.error(f"Error in get_org_user_roles_distribution: {e}", exc_info=True)
-        return jsonify({"message": "Could not load user roles chart due to a server error."}), 500
+        return jsonify({"message": "Could not load user roles chart due to a server error."} ), 500
 
 @main_co_admin_bp.route('/exam_performance_trends', methods=['GET'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -504,14 +516,14 @@ def get_exam_performance_trends(current_user, organization, **kwargs):
             (func.sum(case((StudentTestAttempt.score >= MockTest.passing_marks, 1), else_=0)).cast(db.Float) / 
              func.count(StudentTestAttempt.id) * 100).label('pass_rate')
         ).join(MockTest, StudentTestAttempt.mock_test_id == MockTest.id)\
-         .join(Exam, MockTest.exam_id == Exam.id)\
-         .filter(
+        .join(Exam, MockTest.exam_id == Exam.id)\
+        .filter(
             Exam.organization_id == organization.id,
             StudentTestAttempt.status == 'completed' # Only consider completed tests
-         )\
-         .group_by(Exam.id, Exam.name)\
-         .order_by(Exam.name)\
-         .all()
+        )\
+        .group_by(Exam.id, Exam.name)\
+        .order_by(Exam.name)\
+        .all()
 
         # Process the query results into the format the chart expects.
         labels = [row.name for row in trends]
@@ -526,7 +538,7 @@ def get_exam_performance_trends(current_user, organization, **kwargs):
         
     except Exception as e:
         current_app.logger.error(f"Error fetching exam performance trends: {e}", exc_info=True)
-        return jsonify({"message": "Could not calculate performance data."}), 500
+        return jsonify({"message": "Could not calculate performance data."} ), 500
 
 @main_co_admin_bp.route('/exams', methods=['GET', 'POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -537,7 +549,7 @@ def manage_exams(current_user, organization, **kwargs):
 
     if request.method == 'POST':
         if current_user.user_type != 'main_co_admin':
-            return jsonify({"message": "Permission denied to create exams."}), 403
+            return jsonify({"message": "Permission denied to create exams."} ), 403
         
         data = request.get_json()
         is_free = data.get('is_free', False)
@@ -546,7 +558,7 @@ def manage_exams(current_user, organization, **kwargs):
         if is_free:
             plan = organization.plan
             if not plan:
-                 return jsonify({"message": "Organization does not have an active plan."}), 400
+                 return jsonify({"message": "Organization does not have an active plan."} ), 400
 
             # Count how many free exams this organization already has
             current_free_exam_count = Exam.query.filter_by(
@@ -590,7 +602,7 @@ def manage_single_exam(current_user, organization, exam_id, **kwargs):
         if is_being_made_free and not exam.is_free:
             plan = organization.plan
             if not plan:
-                 return jsonify({"message": "Organization does not have an active plan."}), 400
+                 return jsonify({"message": "Organization does not have an active plan."} ), 400
             
             current_free_exam_count = Exam.query.filter_by(
                 organization_id=organization.id,
@@ -609,14 +621,14 @@ def manage_single_exam(current_user, organization, exam_id, **kwargs):
         exam.is_free = is_being_made_free
         exam.price = 0.00 if exam.is_free else data.get('price', exam.price)
         db.session.commit()
-        return jsonify({"message": "Exam updated successfully."}), 200
+        return jsonify({"message": "Exam updated successfully."} ), 200
 
     if request.method == 'DELETE':
         if Subject.query.filter_by(exam_id=exam.id, deleted_at=None).first():
-            return jsonify({"message": "Cannot archive exam with active subjects."}), 400
+            return jsonify({"message": "Cannot archive exam with active subjects."} ), 400
         exam.deleted_at = datetime.utcnow()
         db.session.commit()
-        return jsonify({"message": "Exam archived successfully."}), 200
+        return jsonify({"message": "Exam archived successfully."} ), 200
 # --- Subject Management ---
 
 @main_co_admin_bp.route('/exams/<int:exam_id>/subjects', methods=['GET', 'POST'])
@@ -626,7 +638,7 @@ def manage_subjects(current_user, organization, exam_id, **kwargs):
 
     if request.method == 'GET':
         subjects = Subject.query.filter_by(exam_id=exam_id, deleted_at=None).order_by(Subject.name).all()
-        return jsonify([{
+        return jsonify([{ 
             'id': subject.id,
             'exam_id': subject.exam_id,
             'name': subject.name,
@@ -654,7 +666,7 @@ def manage_subjects(current_user, organization, exam_id, **kwargs):
             return jsonify({"message": "Subject created successfully", "subject_id": new_subject.id}), 201
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"message": "A subject with this name already exists under this exam."}), 409
+            return jsonify({"message": "A subject with this name already exists under this exam."} ), 409
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error creating subject: {str(e)}"}), 500
@@ -687,7 +699,7 @@ def manage_single_subject(current_user, organization, subject_id, **kwargs):
             return jsonify({"message": "Subject updated successfully"}), 200
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"message": "A subject with this name already exists under this exam."}), 409
+            return jsonify({"message": "A subject with this name already exists under this exam."} ), 409
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error updating subject: {str(e)}"}), 500
@@ -695,11 +707,11 @@ def manage_single_subject(current_user, organization, subject_id, **kwargs):
     if request.method == 'DELETE':
         active_topic = Topic.query.filter_by(subject_id=subject.id, deleted_at=None).first()
         if active_topic:
-            return jsonify({"message": "Cannot delete this subject because it still contains active topics. Please archive them first."}), 400
+            return jsonify({"message": "Cannot delete this subject because it still contains active topics. Please archive them first."} ), 400
         try:
             subject.deleted_at = datetime.utcnow()
             db.session.commit()
-            return jsonify({"message": "Subject archived successfully."}), 200
+            return jsonify({"message": "Subject archived successfully."} ), 200
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error archiving subject: {str(e)}"}), 500
@@ -716,7 +728,7 @@ def manage_topics(current_user, organization, subject_id, **kwargs):
 
     if request.method == 'GET':
         topics = Topic.query.filter_by(subject_id=subject_id, deleted_at=None).order_by(Topic.name).all()
-        return jsonify([{
+        return jsonify([{ 
             'id': topic.id,
             'subject_id': topic.subject_id,
             'name': topic.name,
@@ -749,7 +761,7 @@ def manage_topics(current_user, organization, subject_id, **kwargs):
             return jsonify({"message": "Topic created successfully", "topic_id": new_topic.id}), 201
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"message": "A topic with this name already exists under this subject."}), 409
+            return jsonify({"message": "A topic with this name already exists under this subject."} ), 409
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error creating topic: {str(e)}"}), 500
@@ -782,20 +794,20 @@ def manage_single_topic(current_user, organization, topic_id, **kwargs):
             return jsonify({"message": "Topic updated successfully"}), 200
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"message": "A topic with this name already exists under this subject."}), 409
+            return jsonify({"message": "A topic with this name already exists under this subject."} ), 409
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error updating topic: {str(e)}"}), 500
 
     if request.method == 'DELETE':
         if topic.questions.filter_by(deleted_at=None).first():
-            return jsonify({"message": "Cannot archive topic. Please archive all questions within it first."}), 400
+            return jsonify({"message": "Cannot archive topic. Please archive all questions within it first."} ), 400
         # --- END OF FIX ---
         
         try:
             topic.deleted_at = datetime.utcnow()
             db.session.commit()
-            return jsonify({"message": "Topic archived successfully."}), 200
+            return jsonify({"message": "Topic archived successfully."} ), 200
         except Exception as e:
             db.session.rollback()
             return jsonify({"message": f"Error archiving topic: {str(e)}"}), 500
@@ -851,7 +863,7 @@ def topic_contents(current_user, organization, topic_id, **kwargs):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error adding topic content: {e}", exc_info=True)
-        return jsonify({"success": False, "message": "Error adding content."}), 500
+        return jsonify({"success": False, "message": "Error adding content."} ), 500
 
 @main_co_admin_bp.route('/topic_content/<int:content_id>', methods=['GET', 'PUT', 'DELETE'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -905,7 +917,7 @@ def manage_single_topic_content(current_user, organization, content_id, **kwargs
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error updating topic content {content_id}: {e}", exc_info=True)
-            return jsonify({"success": False, "message": "Error updating content."}), 500
+            return jsonify({"success": False, "message": "Error updating content."} ), 500
 
     # DELETE -> soft delete (archive)
     try:
@@ -919,7 +931,7 @@ def manage_single_topic_content(current_user, organization, content_id, **kwargs
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error archiving topic content {content_id}: {e}", exc_info=True)
-        return jsonify({"success": False, "message": "Error archiving content."}), 500
+        return jsonify({"success": False, "message": "Error archiving content."} ), 500
         
 @main_co_admin_bp.route('/topics/<int:topic_id>/comprehension-questions', methods=['GET'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -934,10 +946,57 @@ def get_comprehension_questions(current_user, organization, topic_id, **kwargs):
         deleted_at=None
     ).all()
 
-    return jsonify([{
+    return jsonify([{ 
         "id": q.id,
         "question_text": q.question_text
     } for q in questions]), 200
+
+def _convert_base64_images_to_s3(html_content):
+    if not html_content:
+        return ""
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    images = soup.find_all('img')
+
+    for img in images:
+        src = img.get('src')
+        if src and src.startswith('data:image'):
+            try:
+                # e.g., data:image/png;base64,iVBORw0KGgo...
+                header, encoded = src.split(',', 1)
+                # Get file extension
+                ext = header.split(';')[0].split('/')[1]
+                
+                decoded_data = base64.b64decode(encoded)
+                
+                # Create a file-like object
+                image_stream = io.BytesIO(decoded_data)
+                
+                # Create a mock file object for _upload_file_to_s3
+                from werkzeug.datastructures import FileStorage
+                mock_file = FileStorage(
+                    stream=image_stream,
+                    filename=f'pasted_image.{ext}',
+                    content_type=f'image/{ext}'
+                )
+
+                # Upload to S3
+                upload_result = _upload_file_to_s3(mock_file, subfolder="content_images")
+                image_url = upload_result.get("url")
+
+                if image_url:
+                    img['src'] = image_url
+                else:
+                    # If upload fails, maybe remove the image or leave a placeholder
+                    img.decompose() # Or some other handling
+
+            except Exception as e:
+                current_app.logger.error(f"Error converting base64 image to S3: {e}", exc_info=True)
+                # Decide on error handling: remove image, add alt text, etc.
+                img.decompose() # Removing the broken image tag
+
+    return str(soup)
+
 
 @main_co_admin_bp.route('/topics/<int:topic_id>/questions', methods=['GET', 'POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -955,7 +1014,7 @@ def manage_questions(current_user, organization, topic_id, **kwargs):
         questions = Question.query.join(User, Question.created_by_user_id == User.id).options(
             db.joinedload(Question.sub_questions).joinedload(Question.mcq_options),
             db.joinedload(Question.comprehension_passage),
-            db.joinedload(Question.mcq_options)
+            db.joinedload(Question.mcq_options)  # Add this for direct MCQ questions
         ).filter(
             Question.topic_id == topic_id,
             Question.deleted_at.is_(None),
@@ -969,7 +1028,7 @@ def manage_questions(current_user, organization, topic_id, **kwargs):
         data = request.get_json()
         question_type = data.get('question_type')
         if not question_type:
-            return jsonify({"message": "Question type is required."}), 400
+            return jsonify({"message": "Question type is required."} ), 400
 
         try:
             # ✅ Resolve exam_id from topic
@@ -1002,10 +1061,13 @@ def manage_questions(current_user, organization, topic_id, **kwargs):
                     db.session.add(mcq_option)
 
             elif question_type == 'Comprehension':
+                # Convert any pasted base64 images to S3 URLs before saving
+                passage_html = data.get('passage_text', '')
+                processed_passage_html = _convert_base64_images_to_s3(passage_html)
                 # Create passage
                 passage = ComprehensionPassage(
                     question_id=new_question.id,
-                    passage_text=data.get('passage_text', '')
+                    passage_text=processed_passage_html
                 )
                 db.session.add(passage)
 
@@ -1042,7 +1104,7 @@ def manage_questions(current_user, organization, topic_id, **kwargs):
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error creating question: {e}", exc_info=True)
-            return jsonify({"message": "An error occurred while creating the question."}), 500
+            return jsonify({"message": "An error occurred while creating the question."} ), 500
  
 @main_co_admin_bp.route('/questions/bulk-delete', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -1052,7 +1114,7 @@ def bulk_delete_questions(current_user, organization, **kwargs):
     question_ids = data.get('question_ids', [])
 
     if not question_ids or not isinstance(question_ids, list):
-        return jsonify({"message": "A list of question_ids is required."}), 400
+        return jsonify({"message": "A list of question_ids is required."} ), 400
 
     try:
         # First, archive all sub-questions of any comprehension questions in the list
@@ -1068,12 +1130,12 @@ def bulk_delete_questions(current_user, organization, **kwargs):
         ).update({"deleted_at": datetime.utcnow()}, synchronize_session=False)
 
         db.session.commit()
-        return jsonify({"message": f"Successfully archived {len(question_ids)} questions."}), 200
+        return jsonify({"message": f"Successfully archived {len(question_ids)} questions."} ), 200
         
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Bulk delete error: {e}", exc_info=True)
-        return jsonify({"message": "An error occurred during the bulk delete operation."}), 500
+        return jsonify({"message": "An error occurred during the bulk delete operation."} ), 500
 
 # ====================================
 # FIXED SERIALIZER FUNCTIONS
@@ -1144,9 +1206,10 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
     question = Question.query.options(
         db.joinedload(Question.sub_questions).joinedload(Question.mcq_options),
         db.joinedload(Question.comprehension_passage),
-        db.joinedload(Question.mcq_options)  # Add this for direct MCQ questions
+        db.joinedload(Question.mcq_options)
     ).get_or_404(question_id)
 
+    # Authorization: question must belong to org
     if question.topic.subject.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
 
@@ -1154,9 +1217,15 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
         return jsonify(serialize_question(question, include_sub_questions=True)), 200
 
     if request.method == 'PUT':
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        # Basic editable fields
         question.difficulty_level = data.get('difficulty_level', question.difficulty_level)
         question.explanation_text = data.get('explanation_text', question.explanation_text)
+
+        # Optional: enforce that top-level questions have an exam_id
+        if question.parent_question_id is None and question.exam_id is None:
+            return jsonify({"message": "Parent question has no exam assigned; cannot update sub-questions without exam."}), 400
 
         try:
             if question.question_type == 'MCQ':
@@ -1169,8 +1238,13 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
                     parent = Question.query.get(parent_id)
                     if not parent or parent.topic.subject.exam.organization_id != organization.id:
                         return jsonify({"message": "Invalid parent question"}), 400
-                    
+
                     question.parent_question_id = parent_id
+
+                    # <<< FIX: inherit exam_id from parent when present
+                    if question.exam_id is None:
+                        question.exam_id = parent.exam_id
+
                     max_order = db.session.query(
                         db.func.max(Question.sub_question_order)
                     ).filter_by(parent_question_id=parent_id).scalar() or 0
@@ -1185,7 +1259,7 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
                 incoming = data.get('mcq_options', [])
                 incoming_ids = {opt.get('id') for opt in incoming if opt.get('id')}
 
-                # Delete removed options
+                # Delete removed options (if not used)
                 to_delete_ids = existing_ids - incoming_ids
                 for opt in existing_options:
                     if opt.id in to_delete_ids:
@@ -1220,19 +1294,21 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
                     return jsonify({"message": "At least one sub-question or existing MCQ is required."}), 400
 
                 # --- Passage ---
+                processed_passage_html = _convert_base64_images_to_s3(passage_text)
                 if question.comprehension_passage:
-                    question.comprehension_passage.passage_text = passage_text
+                    question.comprehension_passage.passage_text = processed_passage_html
                 else:
+                    # comprehension passage uses the parent's question.id
                     question.comprehension_passage = ComprehensionPassage(
                         question_id=question.id,
-                        passage_text=passage_text
+                        passage_text=processed_passage_html
                     )
                     db.session.add(question.comprehension_passage)
 
                 # --- Remove deleted sub-questions ---
                 current_sub_ids = {sub.id for sub in question.sub_questions}
                 to_delete = current_sub_ids - set(existing_ids)
-                for sub_q in question.sub_questions:
+                for sub_q in list(question.sub_questions):
                     if sub_q.id in to_delete:
                         existing_opts = MCQOption.query.filter_by(question_id=sub_q.id).all()
                         for opt in existing_opts:
@@ -1260,9 +1336,12 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
                             # Validate MCQ belongs to same organization
                             if mcq.topic.subject.exam.organization_id != organization.id:
                                 return jsonify({"message": "Invalid MCQ selection"}), 400
-                            
+
                             mcq.parent_question_id = question.id
                             mcq.topic_id = question.topic_id
+                            # <<< FIX: ensure MCQ inherits parent's exam_id (avoid NOT NULL failure)
+                            if mcq.exam_id is None:
+                                mcq.exam_id = question.exam_id
                             mcq.sub_question_order = order
                             order += 1
 
@@ -1275,11 +1354,14 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
                         question_type='MCQ',
                         difficulty_level=sub_data.get('difficulty_level', 'medium'),
                         explanation_text=sub_data.get('explanation_text'),
-                        created_by_user_id=current_user.id
+                        created_by_user_id=current_user.id,
+                        # <<< FIX: inherit exam_id from parent question (required column)
+                        exam_id=question.exam_id
                     )
                     sub_q.sub_question_order = order
                     order += 1
                     db.session.add(sub_q)
+                    # safe to flush because exam_id is set
                     db.session.flush()
 
                     for opt_data in sub_data.get('mcq_options', []):
@@ -1292,6 +1374,17 @@ def manage_single_question(current_user, organization, question_id, **kwargs):
             elif question.question_type == 'OpenEnded':
                 question.question_text = data.get('question_text', question.question_text)
                 question.sample_answer = data.get('sample_answer', question.sample_answer)
+
+            # <<< FIX: final sanity check - ensure no sub-question will have a null exam_id
+            null_exam_exists = db.session.query(
+                db.exists().where(
+                    (Question.parent_question_id == question.id) &
+                    (Question.exam_id.is_(None))
+                )
+            ).scalar()
+            if null_exam_exists:
+                db.session.rollback()
+                return jsonify({"message": "Internal error: one or more sub-questions lack exam_id. Parent must have an exam."}), 400
 
             db.session.commit()
             return jsonify({"message": "Question updated successfully."}), 200
@@ -1382,10 +1475,29 @@ def manage_mock_tests(current_user, organization, **kwargs):
                     
         db.session.add(new_test)
         db.session.commit()
-                    
+
+        # --- THIS IS THE NEW SCHEDULING LOGIC ---
+        if new_test.is_live_test and new_test.live_end_time:
+            # Schedule the analysis to run 10 minutes after the test ends
+            run_time = new_test.live_end_time + timedelta(minutes=10)
+            
+            # Use a unique ID for the job to prevent duplicates
+            job_id = f'analyze_mock_test_{new_test.id}'
+            
+            scheduler.add_job(
+                id=job_id,
+                func=analyze_mock_test_performance,
+                args=[new_test.id],
+                trigger='date',
+                run_date=run_time,
+                replace_existing=True # Overwrite if this test is updated later
+            )
+            print(f"Scheduled performance analysis for test {new_test.id} to run at {run_time} UTC.")
+        # --- END OF NEW LOGIC ---
+
         return jsonify({
             "message": "Mock Test created successfully!",
-            "mock_test": serialize_mock_test(new_test)  # Fixed: now calling the function
+            "mock_test": serialize_mock_test(new_test)
         }), 201
         
     except Exception as e:
@@ -1405,18 +1517,18 @@ def manage_single_mock_test(current_user, organization, test_id, **kwargs):
         return jsonify(serialize_mock_test(test)), 200
 
     if current_user.user_type != 'main_co_admin':
-        return jsonify({"message": "You do not have permission to edit or delete mock test settings."}), 403
+        return jsonify({"message": "You do not have permission to edit or delete mock test settings."} ), 403
 
     if request.method == 'PUT':
         data = request.get_json()
         if not data:
-            return jsonify({"message": "Invalid request data."}), 400
+            return jsonify({"message": "Invalid request data."} ), 400
             
         if isinstance(data, str):
             try:
                 data = json.loads(data)
             except json.JSONDecodeError:
-                return jsonify({"message": "Invalid data format received."}), 400
+                return jsonify({"message": "Invalid data format received."} ), 400
 
         # --- UPDATED LOGIC WITH PROPER NULL HANDLING ---
 
@@ -1459,41 +1571,140 @@ def manage_single_mock_test(current_user, organization, test_id, **kwargs):
                     try:
                         test.live_start_time = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
-                        return jsonify({"message": "Invalid live_start_time format."}), 400
+                        return jsonify({"message": "Invalid live_start_time format."} ), 400
                 if end_str:
                     try:
                         test.live_end_time = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
                     except (ValueError, AttributeError):
-                        return jsonify({"message": "Invalid live_end_time format."}), 400
+                        return jsonify({"message": "Invalid live_end_time format."} ), 400
         
         # 5. Ensure negative_marking_ratio is never null (safety check)
         if test.negative_marking_ratio is None:
             test.negative_marking_ratio = 0.0
 
         # --- END OF UPDATED LOGIC ---
+
+        # --- THIS IS THE NEW SCHEDULING LOGIC ---
+        if test.is_live_test and test.live_end_time:
+            run_time = test.live_end_time + timedelta(minutes=10)
+            job_id = f'analyze_mock_test_{test.id}'
+            
+            scheduler.add_job(
+                id=job_id,
+                func=analyze_mock_test_performance,
+                args=[test.id],
+                trigger='date',
+                run_date=run_time,
+                replace_existing=True # This is important for updates
+            )
+            print(f"Rescheduled performance analysis for test {test.id} to run at {run_time} UTC.")
+        # --- END OF NEW LOGIC ---
         
         try:
             db.session.commit()
-            return jsonify({"message": "Mock test updated successfully."}), 200
+            return jsonify({"message": "Mock test updated successfully."} ), 200
         except IntegrityError as e:
             db.session.rollback()
             current_app.logger.error(f"Database integrity error updating mock test {test_id}: {e}")
-            return jsonify({"message": "Database error occurred. Please check the data."}), 500
+            return jsonify({"message": "Database error occurred. Please check the data."} ), 500
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error updating mock test {test_id}: {e}")
-            return jsonify({"message": "An error occurred while updating the mock test."}), 500
+            return jsonify({"message": "An error occurred while updating the mock test."} ), 500
 
     # DELETE -> soft delete (archive)
     if request.method == 'DELETE':
         try:
             test.deleted_at = datetime.utcnow()
             db.session.commit()
-            return jsonify({"message": "Mock test has been successfully archived and hidden from view."}), 200
+            return jsonify({"message": "Mock test has been successfully archived and hidden from view."} ), 200
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error archiving mock test {test_id}: {e}")
-            return jsonify({"message": "An error occurred while archiving the mock test."}), 500
+            return jsonify({"message": "An error occurred while archiving the mock test."} ), 500
+
+
+@main_co_admin_bp.route('/mock-tests/<int:test_id>/report', methods=['GET'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def get_mock_test_report_data(current_user, organization, test_id, **kwargs):
+    """
+    Fetches the performance report data for a specific mock test.
+    """
+    test = (MockTest.query
+        .join(Exam, MockTest.exam_id == Exam.id)
+        .filter(MockTest.id == test_id, Exam.organization_id == organization.id)
+        .first_or_404())
+
+    report = MockTestReport.query.filter_by(mock_test_id=test.id).first()
+
+    if not report:
+        return jsonify({"message": "Report not found for this mock test."} ), 404
+
+    plan = organization.plan
+    is_premium = plan and "AI Assistant" in plan.features
+
+    topic_summaries = TopicPerformanceSummary.query.filter_by(report_id=report.id).order_by(TopicPerformanceSummary.average_accuracy.asc()).all()
+
+    serialized_summaries = [{
+        "topic_name": s.topic_name,
+        "average_accuracy": s.average_accuracy,
+        "question_count": s.question_count,
+        "student_count": s.student_count
+    } for s in topic_summaries]
+
+    report_data = {
+        "id": report.id,
+        "mock_test_title": test.title,
+        "generated_at": report.generated_at.isoformat(),
+        "total_attempts": report.total_attempts,
+        "average_score": report.average_score,
+        "pass_rate": report.pass_rate,
+        "topic_performance": serialized_summaries,
+        "remedial_plan": report.remedial_plan_details,
+        "at_risk_students": report.at_risk_students
+    }
+
+    return jsonify({
+        "report": report_data,
+        "is_premium": is_premium
+    }), 200
+
+
+@main_co_admin_bp.route('/mock-tests/<int:test_id>/generate-report', methods=['POST'])
+@admin_role_required(allowed_roles=['main_co_admin'])
+def generate_mock_test_report(current_user, organization, test_id, **kwargs):
+    """
+    Triggers a background task to generate a performance report for a mock test.
+    """
+    test = (MockTest.query
+        .join(Exam, MockTest.exam_id == Exam.id)
+        .filter(MockTest.id == test_id, Exam.organization_id == organization.id)
+        .first_or_404())
+
+    if test.report_status == 'pending':
+        return jsonify({"message": "A report for this test is already being generated."} ), 409
+
+    # Check for completed attempts
+    completed_attempts = StudentTestAttempt.query.filter_by(mock_test_id=test_id, status='completed').count()
+    if completed_attempts == 0:
+        return jsonify({"message": "Cannot generate a report. There are no completed attempts for this mock test yet."} ), 400
+
+    # Reset status to pending
+    test.report_status = 'pending'
+    db.session.commit()
+
+    # Enqueue the background task
+    job_id = f'analyze_mock_test_{test.id}'
+    scheduler.add_job(
+        id=job_id,
+        func=analyze_mock_test_performance,
+        args=[test.id],
+        trigger='date',
+        replace_existing=True
+    )
+
+    return jsonify({"message": "Report generation has been started. It will be available shortly."} ), 202
+
 
 # --- Mock Test Question Association ---
 
@@ -1508,10 +1719,9 @@ def manage_mock_test_questions(current_user, organization, test_id, **kwargs):
     
     if request.method == 'GET':
         # Fetch questions in order
-        links = MockTestQuestion.query.filter_by(mock_test_id=test_id)\
-            .order_by(MockTestQuestion.question_order).all()
+        links = MockTestQuestion.query.filter_by(mock_test_id=test_id).order_by(MockTestQuestion.question_order).all()
         
-        return jsonify([{
+        return jsonify([{ 
             'mock_test_question_id': link.id,
             'question_id': link.question_id,
             'question_order': link.question_order,
@@ -1527,23 +1737,23 @@ def manage_mock_test_questions(current_user, organization, test_id, **kwargs):
             try:
                 data = json.loads(data)
             except json.JSONDecodeError:
-                return jsonify({"message": "Invalid data format received."}), 400
+                return jsonify({"message": "Invalid data format received."} ), 400
         
         question_id = data.get('question_id')
         if not question_id:
-            return jsonify({"message": "Question ID is required."}), 400
+            return jsonify({"message": "Question ID is required."} ), 400
         
         # ✅ Validate question exists, is not deleted, and belongs to same organization
         question = Question.query.get(question_id)
         if not question or question.deleted_at or question.parent_question_id:
-            return jsonify({"message": "Cannot add this question."}), 400
+            return jsonify({"message": "Cannot add this question."} ), 400
         
         if question.topic.subject.exam.organization_id != organization.id:
-            return jsonify({"message": "Invalid question selection."}), 400
+            return jsonify({"message": "Invalid question selection."} ), 400
         
         # ✅ NEW SECURITY CHECK - Ensure the question was not created by a student
         if question.creator and question.creator.user_type == 'student':
-            return jsonify({"message": "Cannot add a student-generated practice question to an official mock test."}), 403
+            return jsonify({"message": "Cannot add a student-generated practice question to an official mock test."} ), 403
         
         # Check if already added
         existing = MockTestQuestion.query.filter_by(
@@ -1551,11 +1761,10 @@ def manage_mock_test_questions(current_user, organization, test_id, **kwargs):
             question_id=question_id
         ).first()
         if existing:
-            return jsonify({"message": "This question is already added to the mock test."}), 400
+            return jsonify({"message": "This question is already added to the mock test."} ), 400
         
         # Determine question order
-        last = MockTestQuestion.query.filter_by(mock_test_id=test_id)\
-            .order_by(MockTestQuestion.question_order.desc()).first()
+        last = MockTestQuestion.query.filter_by(mock_test_id=test_id).order_by(MockTestQuestion.question_order.desc()).first()
         order = (last.question_order + 1) if last else 1
         
         # Add the question
@@ -1583,11 +1792,11 @@ def manage_mock_test_questions(current_user, organization, test_id, **kwargs):
         
         except IntegrityError:
             db.session.rollback()
-            return jsonify({"message": "This question is already in the mock test (duplicate key)."}), 400
+            return jsonify({"message": "This question is already in the mock test (duplicate key)."} ), 400
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Error adding question to mock test {test_id}: {e}", exc_info=True)
-            return jsonify({"message": "An error occurred while adding the question."}), 500
+            return jsonify({"message": "An error occurred while adding the question."} ), 500
         
 @main_co_admin_bp.route('/mock-tests/<int:test_id>/questions/<int:mtq_id>', methods=['PUT', 'DELETE'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -1606,19 +1815,19 @@ def manage_single_mock_test_question(current_user, organization, test_id, mtq_id
             try:
                 data = json.loads(data)
             except json.JSONDecodeError:
-                return jsonify({"message": "Invalid data format received."}), 400
+                return jsonify({"message": "Invalid data format received."} ), 400
         # --- END OF FIX ---
 
         link.marks = data.get('marks', link.marks)
         db.session.commit()
         _recalculate_mock_test_total_marks(test_id) 
-        return jsonify({"message": "Marks updated for question."}), 200
+        return jsonify({"message": "Marks updated for question."} ), 200
 
     if request.method == 'DELETE':
         db.session.delete(link)
         db.session.commit()
         _recalculate_mock_test_total_marks(test_id) 
-        return jsonify({"message": "Question removed from mock test."}), 200
+        return jsonify({"message": "Question removed from mock test."} ), 200
 
 
 @main_co_admin_bp.route('/mock-tests/<int:test_id>/questions/reorder', methods=['PUT'])
@@ -1628,7 +1837,7 @@ def reorder_mock_test_questions(current_user, organization, test_id, **kwargs):
     ordered_ids = data.get('ordered_ids')
 
     if not isinstance(ordered_ids, list):
-        return jsonify({"message": "Invalid data format."}), 400
+        return jsonify({"message": "Invalid data format."} ), 400
 
     for idx, mtq_id in enumerate(ordered_ids):
         mtq = MockTestQuestion.query.get(mtq_id)
@@ -1636,7 +1845,7 @@ def reorder_mock_test_questions(current_user, organization, test_id, **kwargs):
             mtq.question_order = idx
 
     db.session.commit()
-    return jsonify({"message": "Question order saved."}), 200
+    return jsonify({"message": "Question order saved."} ), 200
 
 @main_co_admin_bp.route('/topics/<int:topic_id>/questions/import', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -1646,12 +1855,12 @@ def import_questions_from_file(current_user, organization, topic_id, **kwargs):
         return jsonify({"message": "Unauthorized"}), 403
 
     if 'question_file' not in request.files:
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['question_file']
     filename = file.filename
     if not filename or not (filename.endswith('.csv') or filename.endswith('.xlsx')):
-        return jsonify({"message": "Please upload a valid .csv or .xlsx file."}), 400
+        return jsonify({"message": "Please upload a valid .csv or .xlsx file."} ), 400
 
     rows = []
     try:
@@ -1838,12 +2047,12 @@ def import_questions_to_mock_test(current_user, organization, mock_test_id, **kw
         return jsonify({"message": "Unauthorized"}), 403
 
     if 'question_file' not in request.files:
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['question_file']
     filename = file.filename
     if not filename or not (filename.endswith('.csv') or filename.endswith('.xlsx')):
-        return jsonify({"message": "Please upload a valid .csv or .xlsx file."}), 400
+        return jsonify({"message": "Please upload a valid .csv or .xlsx file."} ), 400
 
     rows = []
     try:
@@ -2130,12 +2339,12 @@ def check_user_existence(current_user, organization, **kwargs):
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            return jsonify({"message": "Invalid data format received."}), 400
+            return jsonify({"message": "Invalid data format received."} ), 400
     # --- END OF FIX ---
 
     email = data.get('email')
     if not email:
-        return jsonify({"exists": False, "message": "Email is required."}), 400
+        return jsonify({"exists": False, "message": "Email is required."} ), 400
         
     user_exists = User.query.filter_by(email=email).first() is not None
     return jsonify({"exists": user_exists}), 200
@@ -2157,16 +2366,16 @@ def invite_user_to_org(current_user, organization, **kwargs):
         try:
             data = json.loads(data)
         except json.JSONDecodeError:
-            return jsonify({"message": "Invalid data format received."}), 400
+            return jsonify({"message": "Invalid data format received."} ), 400
     if not isinstance(data, dict):
-        return jsonify({"message": "Invalid payload."}), 400
+        return jsonify({"message": "Invalid payload."} ), 400
 
     # --- Extract inputs ---
     email = (data.get('email') or '').strip().lower()
     user_type = (data.get('user_type') or '').strip().lower()
 
     if not email or not user_type:
-        return jsonify({"message": "Email and User Role are required."}), 400
+        return jsonify({"message": "Email and User Role are required."} ), 400
 
     # --- Plan + limit metadata ---
     plan = getattr(organization, 'plan', None)
@@ -2194,7 +2403,7 @@ def invite_user_to_org(current_user, organization, **kwargs):
             organization_id=organization.id
         ).first()
         if existing_membership:
-            return jsonify({"message": f"User '{email}' is already a member of your organization."}), 409
+            return jsonify({"message": f"User '{email}' is already a member of your organization."} ), 409
 
         membership = OrganizationMembership(
             user_id=user.id,
@@ -2210,7 +2419,7 @@ def invite_user_to_org(current_user, organization, **kwargs):
             )
 
         db.session.commit()
-        return jsonify({"message": f"Existing user '{email}' successfully invited to your organization."}), 200
+        return jsonify({"message": f"Existing user '{email}' successfully invited to your organization."} ), 200
 
     # --- Brand new user path ---
     first_name = (data.get('first_name') or '').strip()
@@ -2246,7 +2455,7 @@ def invite_user_to_org(current_user, organization, **kwargs):
         )
 
     db.session.commit()
-    return jsonify({"message": "New user account created and invited successfully."}), 201
+    return jsonify({"message": "New user account created and invited successfully."} ), 201
 
 @main_co_admin_bp.route('/organization/users/<int:user_id>/status', methods=['PUT'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -2254,17 +2463,17 @@ def update_org_user_status(current_user, organization, user_id, **kwargs):
     # This function is correct and remains unchanged.
     membership = OrganizationMembership.query.filter_by(user_id=user_id, organization_id=organization.id).first_or_404()
     if membership.user.user_type == 'main_co_admin':
-        return jsonify({"message": "Cannot change status of the Main Co-Admin."}), 403
+        return jsonify({"message": "Cannot change status of the Main Co-Admin."} ), 403
     
     data = request.get_json()
     new_status = data.get('status')
     
     if new_status not in ['active', 'inactive']:
-        return jsonify({"message": "Invalid status."}), 400
+        return jsonify({"message": "Invalid status."} ), 400
     
     membership.is_active = (new_status == 'active')
     db.session.commit()
-    return jsonify({"message": "User status within the organization has been updated."}), 200
+    return jsonify({"message": "User status within the organization has been updated."} ), 200
 
 @main_co_admin_bp.route('/organization/users/<int:user_id>', methods=['DELETE'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -2277,10 +2486,10 @@ def remove_user_from_org(current_user, organization, user_id, **kwargs):
 
 
     if membership.user.user_type == 'main_co_admin':
-        return jsonify({"message": "Cannot remove the Main Co-Admin."}), 403
+        return jsonify({"message": "Cannot remove the Main Co-Admin."} ), 403
 
     if membership.is_active:
-        return jsonify({"message": "User must be inactive before they can be removed."}), 400
+        return jsonify({"message": "User must be inactive before they can be removed."} ), 400
 
     try:
         org_exam_ids = [int(e.id) for e in getattr(organization, 'exams', []) if getattr(e, 'id', None) is not None]
@@ -2308,12 +2517,12 @@ def remove_user_from_org(current_user, organization, user_id, **kwargs):
         db.session.delete(membership)
         db.session.commit()
 
-        return jsonify({"message": "User and all their associated data have been permanently removed from the organization."}), 200
+        return jsonify({"message": "User and all their associated data have been permanently removed from the organization."} ), 200
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Error removing user %s from organization %s", user_id, organization.id)
-        return jsonify({"message": "Failed to remove user. See server logs for details."}), 500
+        return jsonify({"message": "Failed to remove user. See server logs for details."} ), 500
 
 @main_co_admin_bp.route('/organization/settings', methods=['GET'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -2345,7 +2554,7 @@ def update_organization_settings(current_user, organization, **kwargs):
     """Updates general and custom organization settings with validation + sanitization."""
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
-        return jsonify({"message": "Invalid JSON payload."}), 400
+        return jsonify({"message": "Invalid JSON payload."} ), 400
 
     # Whitelist of allowed fields
     updatable_fields = {
@@ -2368,7 +2577,7 @@ def update_organization_settings(current_user, organization, **kwargs):
             value = data[field]
             # type check
             if not isinstance(value, expected_type):
-                return jsonify({"message": f"Invalid type for '{field}'. Expected {expected_type.__name__}."}), 400
+                return jsonify({"message": f"Invalid type for '{field}'. Expected {expected_type.__name__}."} ), 400
 
             # sanitize HTML content (for CKEditor fields)
             if field in ("about_html", "privacy_policy_html", "tos_html"):
@@ -2382,24 +2591,24 @@ def update_organization_settings(current_user, organization, **kwargs):
                     if v is None or v == '':
                         continue
                     if not isinstance(v, str) or len(v) > 200:
-                        return jsonify({"message": f"Invalid social link for {k}."}), 400
+                        return jsonify({"message": f"Invalid social link for {k}."} ), 400
                     cleaned_links[k] = v.strip()
                 organization.social_links = cleaned_links
             elif field == "faq_data":
                 # basic validation of FAQ shape: list of {question, answer, category}
                 if len(value) > 200:
-                    return jsonify({"message": "Too many FAQ items."}), 400
+                    return jsonify({"message": "Too many FAQ items."} ), 400
                 cleaned_faqs = []
                 for idx, item in enumerate(value):
                     if not isinstance(item, dict):
-                        return jsonify({"message": f"Invalid FAQ item at index {idx}."}), 400
+                        return jsonify({"message": f"Invalid FAQ item at index {idx}."} ), 400
                     q = item.get('question', '')
                     a = item.get('answer', '')
                     cat = item.get('category', 'General')
                     if not (isinstance(q, str) and isinstance(a, str) and isinstance(cat, str)):
-                        return jsonify({"message": f"Invalid FAQ fields at index {idx}."}), 400
+                        return jsonify({"message": f"Invalid FAQ fields at index {idx}."} ), 400
                     if len(q) > 1000 or len(a) > 10000:
-                        return jsonify({"message": f"FAQ item too long at index {idx}."}), 400
+                        return jsonify({"message": f"FAQ item too long at index {idx}."} ), 400
                     cleaned_faqs.append({
                         'question': q.strip(),
                         'answer': bleach.clean(a, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRIBUTES, strip=True),
@@ -2414,7 +2623,7 @@ def update_organization_settings(current_user, organization, **kwargs):
                 general_email = value.get('general_email', '')
                 support_email = value.get('support_email', '')
                 if address and not isinstance(address, str):
-                    return jsonify({"message": "Invalid contact address."}), 400
+                    return jsonify({"message": "Invalid contact address."} ), 400
                 cd['address'] = address.strip() if address else ''
                 cd['phone'] = phone.strip() if phone else ''
                 cd['general_email'] = general_email.strip() if general_email else ''
@@ -2423,16 +2632,16 @@ def update_organization_settings(current_user, organization, **kwargs):
             else:
                 # Simple string fields
                 if isinstance(value, str) and len(value) > 10000:
-                    return jsonify({"message": f"Field {field} too long."}), 400
+                    return jsonify({"message": f"Field {field} too long."} ), 400
                 setattr(organization, field, value)
 
         db.session.commit()
-        return jsonify({"message": "Settings updated successfully."}), 200
+        return jsonify({"message": "Settings updated successfully."} ), 200
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Error updating organization settings")
-        return jsonify({"message": "An error occurred while saving settings."}), 500
+        return jsonify({"message": "An error occurred while saving settings."} ), 500
 
 
 @main_co_admin_bp.route('/organization/asset-upload', methods=['POST'])
@@ -2444,16 +2653,16 @@ def upload_organization_asset(current_user, organization, **kwargs):
         return jsonify({"message": "An 'asset_type' is required and must be one of: " + ','.join(sorted(ALLOWED_ASSET_TYPES))}), 400
 
     if 'asset_file' not in request.files or request.files['asset_file'].filename == '':
-        return jsonify({"message": "No file selected."}), 400
+        return jsonify({"message": "No file selected."} ), 400
 
     file = request.files['asset_file']
     filename = secure_filename(file.filename)
     if '.' not in filename:
-        return jsonify({"message": "Invalid file."}), 400
+        return jsonify({"message": "Invalid file."} ), 400
 
     ext = filename.rsplit('.', 1)[1].lower()
     if ext not in ALLOWED_IMAGE_EXT:
-        return jsonify({"message": f"Unsupported file extension: .{ext}"}), 400
+        return jsonify({"message": f"Unsupported file extension: .{ext}"} ), 400
 
     # Basic size check (request.content_length may be None)
     file.stream.seek(0, os.SEEK_END)
@@ -2465,7 +2674,7 @@ def upload_organization_asset(current_user, organization, **kwargs):
         max_size = 5 * 1024 * 1024  # 5 MB for large hero images
 
     if file_size > max_size:
-        return jsonify({"message": f"File too large. Max size is {max_size // (1024*1024)} MB."}), 400
+        return jsonify({"message": f"File too large. Max size is {max_size // (1024*1024)} MB."} ), 400
 
     # Verify image by reading header with PIL or imghdr
     try:
@@ -2476,7 +2685,7 @@ def upload_organization_asset(current_user, organization, **kwargs):
         file.stream.seek(0)
     except Exception as e:
         current_app.logger.warning("Uploaded file failed image verification", exc_info=True)
-        return jsonify({"message": "Uploaded file is not a valid image."}), 400
+        return jsonify({"message": "Uploaded file is not a valid image."} ), 400
 
     # Build a deterministic, collision-resistant filename (e.g., orgid-assettype-timestamp.ext)
     import time, uuid
@@ -2503,7 +2712,7 @@ def upload_organization_asset(current_user, organization, **kwargs):
     except Exception as e:
         db.session.rollback()
         current_app.logger.exception("Asset upload failed")
-        return jsonify({"message": "Failed to upload asset."}), 500
+        return jsonify({"message": "Failed to upload asset."} ), 500
 
 @main_co_admin_bp.route('/test-attempts/<int:attempt_id>/unlock', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin'])
@@ -2642,11 +2851,11 @@ def _upload_file_to_s3(
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
 def handle_image_upload(current_user, organization, **kwargs):
     if 'image_file' not in request.files:
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['image_file']
     if file.filename == '':
-        return jsonify({"message": "No file selected."}), 400
+        return jsonify({"message": "No file selected."} ), 400
 
     try:
         # --- THIS IS THE FIX ---
@@ -2662,7 +2871,7 @@ def handle_image_upload(current_user, organization, **kwargs):
         # --- END OF FIX ---
         
     except Exception as e:
-        return jsonify({"message": f"Upload failed: {str(e)}"}), 500
+        return jsonify({"message": f"Upload failed: {str(e)}"} ), 500
     
 @main_co_admin_bp.route('/upload/pdf', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -2671,11 +2880,11 @@ def handle_pdf_upload(current_user, organization, **kwargs):
     Handles uploading a PDF file for topic content to the S3 bucket.
     """
     if 'file' not in request.files: # The JS sends the file with the key 'file'
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"message": "No file selected."}), 400
+        return jsonify({"message": "No file selected."} ), 400
 
     try:
         # Use your powerful S3 helper, specifying that only PDFs are allowed
@@ -2693,7 +2902,7 @@ def handle_pdf_upload(current_user, organization, **kwargs):
         
     except Exception as e:
         current_app.logger.error(f"PDF upload failed: {e}", exc_info=True)
-        return jsonify({"message": f"Upload failed: {str(e)}"}), 500
+        return jsonify({"message": f"Upload failed: {str(e)}"} ), 500
 
 @main_co_admin_bp.route('/upload/video', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -2702,11 +2911,11 @@ def handle_video_upload(current_user, organization, **kwargs):
     Handles uploading a video file for topic content to the S3 bucket.
     """
     if 'file' not in request.files:
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"message": "No file selected."}), 400
+        return jsonify({"message": "No file selected."} ), 400
 
     try:
         upload_result = _upload_file_to_s3(
@@ -2723,7 +2932,7 @@ def handle_video_upload(current_user, organization, **kwargs):
         
     except Exception as e:
         current_app.logger.error(f"Video upload failed: {e}", exc_info=True)
-        return jsonify({"message": f"Upload failed: {str(e)}"}), 500
+        return jsonify({"message": f"Upload failed: {str(e)}"} ), 500
 
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
 def global_content_import(current_user, organization, **kwargs):
@@ -2739,12 +2948,12 @@ def global_content_import(current_user, organization, **kwargs):
     and creates TopicContent records under the matching Topic (scoped to organization).
     """
     if 'content_file' not in request.files:
-        return jsonify({"message": "No file part in the request."}), 400
+        return jsonify({"message": "No file part in the request."} ), 400
 
     file = request.files['content_file']
     filename = file.filename or ""
     if not (filename.endswith('.csv') or filename.endswith('.xlsx')):
-        return jsonify({"message": "Please upload a valid .csv or .xlsx file."}), 400
+        return jsonify({"message": "Please upload a valid .csv or .xlsx file."} ), 400
 
     try:
         # --- Parse to list[dict] with lowercase, trimmed keys ---
@@ -2780,7 +2989,7 @@ def global_content_import(current_user, organization, **kwargs):
             rows = [_normalize_row_keys(r) for r in csv_reader]
 
         if not rows:
-            return jsonify({"message": "No data rows found in the file."}), 400
+            return jsonify({"message": "No data rows found in the file."} ), 400
 
         created_count = 0
         skipped_count = 0
@@ -2864,7 +3073,7 @@ def global_content_import(current_user, organization, **kwargs):
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Global content import failed: {e}", exc_info=True)
-        return jsonify({"message": f"Import failed: {str(e)}"}), 500
+        return jsonify({"message": f"Import failed: {str(e)}"} ), 500
 
 
 @main_co_admin_bp.route('/grade-submissions/queue', methods=['GET'])
@@ -2922,7 +3131,7 @@ def get_ai_grade_suggestion(current_user, organization, response_id, **kwargs):
 
     except Exception as e:
         current_app.logger.error(f"AI grading failed: {e}")
-        return jsonify({"message": "AI grading service failed."}), 500
+        return jsonify({"message": "AI grading service failed."} ), 500
 
 
 @main_co_admin_bp.route('/grade-submission/<int:response_id>/confirm', methods=['POST'])
@@ -2947,7 +3156,7 @@ def confirm_grade(current_user, organization, response_id, **kwargs):
     attempt.score = new_total_score
 
     db.session.commit()
-    return jsonify({"message": "Grade confirmed and total score updated."}), 200
+    return jsonify({"message": "Grade confirmed and total score updated."} ), 200
 
 @main_co_admin_bp.route('/exams/<int:exam_id>/study-plan', methods=['PUT'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -2957,7 +3166,7 @@ def update_study_plan(current_user, organization, exam_id, **kwargs):
     items_data = data.get('items', [])
     
     if not plan_name:
-        return jsonify({"success": False, "message": "Study plan name is required."}), 400
+        return jsonify({"success": False, "message": "Study plan name is required."} ), 400
         
     exam = Exam.query.filter_by(id=exam_id, organization_id=organization.id).first_or_404()
     study_plan = StudyPlan.query.filter_by(exam_id=exam_id).first()
@@ -2987,7 +3196,7 @@ def update_study_plan(current_user, organization, exam_id, **kwargs):
         db.session.add(new_item)
         
     db.session.commit()
-    return jsonify({"success": True, "message": "Study plan saved successfully."})
+    return jsonify({"success": True, "message": "Study plan saved successfully."} )
 
 @main_co_admin_bp.route('/exams/<int:exam_id>/study-plan', methods=['GET'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -3068,10 +3277,14 @@ def ckeditor_image_upload(current_user, organization, **kwargs):
 
     file = request.files['upload']
     try:
-        # Call our central helper function
-        image_url = _upload_file_to_s3(file, subfolder="content_images")
+        # Call our central helper function which returns a dict
+        upload_result = _upload_file_to_s3(file, subfolder="content_images")
+        image_url = upload_result.get("url")
+
+        if not image_url:
+            raise Exception("S3 helper did not return a URL.")
         
-        # CKEditor expects a specific JSON format
+        # CKEditor expects a specific JSON format: {"url": "http://..."}
         return jsonify({"url": image_url}), 200
     except Exception as e:
         return jsonify({"error": {"message": f"Upload failed: {str(e)}" }}), 500
@@ -3110,13 +3323,13 @@ def resolve_reported_question(current_user, organization, report_id, **kwargs):
     report = ReportedContent.query.get_or_404(report_id)
     if report.question.topic.subject.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
-        
+    
     report.status = 'resolved'
     # We no longer delete the question here. The admin fixes it manually.
     # report.question.deleted_at = datetime.utcnow() <-- This line is removed
     
     db.session.commit()
-    return jsonify({"message": "Report has been marked as resolved."})
+    return jsonify({"message": "Report has been marked as resolved."} )
 
 @main_co_admin_bp.route('/reports/<int:report_id>/dismiss', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -3126,13 +3339,13 @@ def dismiss_reported_question(current_user, organization, report_id, **kwargs):
         report = ReportedContent.query.get_or_404(report_id)
         if report.question.topic.subject.exam.organization_id != organization.id:
             return jsonify({"message": "Unauthorized"}), 403
-            
+
         report.status = 'dismissed'
         db.session.commit()
-        return jsonify({"message": "Report has been dismissed."})
+        return jsonify({"message": "Report has been dismissed."} )
     except Exception as e:
         db.session.rollback()
-        return jsonify({"message": "An error occurred."}), 500
+        return jsonify({"message": "An error occurred."} ), 500
 
 
 def _prepare_document(title_text, org_name, exam_name=None, subject_name=None, margin_cm=2.54):
@@ -3198,6 +3411,95 @@ def _format_mcq_options(document, options):
         label = letters[idx] if idx < len(letters) else f"({idx+1})"
         document.add_paragraph(f"{label}. {getattr(opt, 'option_text', '')}", style='List Bullet')
 
+def _add_html_content_to_doc(doc, html_content, s3_client):
+    """
+    Parses HTML, adds text to the document,
+    and downloads images from S3 to embed them.
+    """
+    if not html_content:
+        return
+        
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # We create a new paragraph for this block of content
+    current_paragraph = doc.add_paragraph()
+
+    for element in soup.contents:
+        if getattr(element, 'name', None) == 'p':
+            # Handle paragraphs
+            current_paragraph = doc.add_paragraph()
+            for child in element.contents:
+                _process_html_element(doc, current_paragraph, child, s3_client)
+        elif getattr(element, 'name', None) == 'img':
+            # Handle images that are not in a <p> tag
+            _process_html_element(doc, current_paragraph, element, s3_client)
+        else:
+            # Handle other tags like <b>, <i>, <span>, or raw text
+            _process_html_element(doc, current_paragraph, element, s3_client)
+
+def _process_html_element(doc, paragraph, element, s3_client):
+    """
+    Recursive helper to process text, formatting tags, and images.
+    Handles images from S3 URLs and Base64 data URIs.
+    """
+    if isinstance(element, str):
+        paragraph.add_run(element)
+        return
+
+    if element.name == 'img' and element.get('src'):
+        image_url = element['src']
+        try:
+            image_stream = None
+            # Case 1: Image is a Base64-encoded Data URI
+            if image_url.startswith('data:image'):
+                import base64
+                # e.g., data:image/png;base64,iVBORw0KGgo...
+                header, encoded = image_url.split(',', 1)
+                decoded_data = base64.b64decode(encoded)
+                image_stream = io.BytesIO(decoded_data)
+            
+            # Case 2: Image is a full S3 URL
+            elif 's3.amazonaws.com' in image_url:
+                bucket_name = current_app.config['S3_BUCKET']
+                # Ensure bucket_name is valid before splitting
+                if bucket_name and f"{bucket_name}.s3.amazonaws.com/" in image_url:
+                    object_key = image_url.split(f"{bucket_name}.s3.amazonaws.com/")[1]
+                    image_stream = io.BytesIO()
+                    s3_client.download_fileobj(bucket_name, object_key, image_stream)
+                    image_stream.seek(0)
+                else:
+                    raise ValueError("S3 bucket name not configured or URL format is unexpected.")
+
+            # Case 3: Image is a general public URL (fallback)
+            else:
+                response = requests.get(image_url, stream=True, timeout=10)
+                response.raise_for_status()
+                image_stream = io.BytesIO(response.content)
+
+            if image_stream:
+                paragraph.add_run().add_picture(image_stream, width=Inches(4.0))
+
+        except Exception as e:
+            print(f"Error processing image {image_url}: {e}")
+            paragraph.add_run(f" [Image not found: {image_url}] ").italic = True
+
+    # Handle formatting tags (bold, italic, etc.)
+    elif element.name in ['strong', 'b']:
+        run = paragraph.add_run()
+        run.bold = True
+        for child in element.contents: _process_html_element(doc, run, child, s3_client)
+    elif element.name in ['em', 'i']:
+        run = paragraph.add_run()
+        run.italic = True
+        for child in element.contents: _process_html_element(doc, run, child, s3_client)
+    
+    # Handle other tags or just get their text
+    elif element.contents:
+        for child in element.contents:
+            _process_html_element(doc, paragraph, child, s3_client)
+    elif element.string:
+        paragraph.add_run(element.string)
+
 # ---------- Topic export route (ZIP) ----------
 @main_co_admin_bp.route('/topics/<int:topic_id>/export-zip')
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -3206,6 +3508,14 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
     # authorization
     if topic.subject.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
+
+    # --- NEW: Initialize S3 Client ---
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=current_app.config['S3_KEY'],
+        aws_secret_access_key=current_app.config['S3_SECRET'],
+        region_name=current_app.config.get('S3_REGION')
+    )
 
     # collect questions (top-level only)
     questions = Question.query.filter_by(
@@ -3228,32 +3538,36 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
         if q.question_type == 'Comprehension':
             p = doc_questions.add_paragraph()
             p.add_run(f"Q{q_counter} (Comprehension): ").bold = True
-            _append_html_to_paragraph(doc_questions, p, q.question_text or "")
+            _add_html_content_to_doc(doc_questions, q.question_text or "", s3_client)
 
             if getattr(q, "comprehension_passage", None):
                 passage_p = doc_questions.add_paragraph()
                 passage_p.add_run("Read the passage below and answer the questions that follow:").italic = True
-                _append_html_to_paragraph(doc_questions, passage_p, q.comprehension_passage.passage_text or "")
+                _add_html_content_to_doc(doc_questions, q.comprehension_passage.passage_text or "", s3_client)
 
             if getattr(q, "sub_questions", None):
                 for sub_idx, sub_q in enumerate(q.sub_questions):
                     sp = doc_questions.add_paragraph()
                     sp.add_run(f"  Sub-Q {sub_idx + 1}: ").bold = True
-                    _append_html_to_paragraph(doc_questions, sp, sub_q.question_text or "")
+                    _add_html_content_to_doc(doc_questions, sub_q.question_text or "", s3_client)
                     if getattr(sub_q, "mcq_options", None):
                         _format_mcq_options(doc_questions, sub_q.mcq_options)
 
             # ANSWERS doc
             ap = doc_answers.add_paragraph()
             ap.add_run(f"Q{q_counter} (Comprehension): ").bold = True
-            _append_html_to_paragraph(doc_answers, ap, q.question_text or "")
+            _add_html_content_to_doc(doc_answers, q.question_text or "", s3_client)
+            if getattr(q, "comprehension_passage", None):
+                passage_ap = doc_answers.add_paragraph()
+                passage_ap.add_run("Read the passage below and answer the questions that follow:").italic = True
+                _add_html_content_to_doc(doc_answers, q.comprehension_passage.passage_text or "", s3_client)
+
             if getattr(q, "sub_questions", None):
                 for sub_idx, sub_q in enumerate(q.sub_questions):
                     subp = doc_answers.add_paragraph()
                     subp.add_run(f"  Sub-Q {sub_idx + 1}: ").bold = True
-                    _append_html_to_paragraph(doc_answers, subp, sub_q.question_text or "")
+                    _add_html_content_to_doc(doc_answers, sub_q.question_text or "", s3_client)
                     if getattr(sub_q, "mcq_options", None):
-                        # show options and mark correct one(s)
                         letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                         for idx, opt in enumerate(sub_q.mcq_options):
                             label = letters[idx] if idx < len(letters) else f"({idx+1})"
@@ -3262,17 +3576,16 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
                             opt_para = doc_answers.add_paragraph(f"{label}. {text}", style='List Bullet')
                             if is_correct:
                                 opt_para.add_run("  ← Correct").bold = True
-                    # explanation if available
-                    explanation = getattr(sub_q, "explanation", None)
+                    explanation = getattr(sub_q, "explanation_text", None)
                     if explanation:
                         ex_p = doc_answers.add_paragraph()
                         ex_p.add_run("Explanation: ").italic = True
-                        _append_html_to_paragraph(doc_answers, ex_p, explanation)
+                        _add_html_content_to_doc(doc_answers, explanation, s3_client)
 
         else:
             p = doc_questions.add_paragraph()
             p.add_run(f"Q{q_counter}: ").bold = True
-            _append_html_to_paragraph(doc_questions, p, q.question_text or "")
+            _add_html_content_to_doc(doc_questions, q.question_text or "", s3_client)
 
             if q.question_type == 'MCQ' and getattr(q, "mcq_options", None):
                 _format_mcq_options(doc_questions, q.mcq_options)
@@ -3280,7 +3593,7 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
             # Answers doc for non-comprehension
             ap = doc_answers.add_paragraph()
             ap.add_run(f"Q{q_counter}: ").bold = True
-            _append_html_to_paragraph(doc_answers, ap, q.question_text or "")
+            _add_html_content_to_doc(doc_answers, q.question_text or "", s3_client)
 
             if q.question_type == 'MCQ' and getattr(q, "mcq_options", None):
                 letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -3291,14 +3604,22 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
                     opt_para = doc_answers.add_paragraph(f"{label}. {text}", style='List Bullet')
                     if is_correct:
                         opt_para.add_run("  ← Correct").bold = True
+            
+            if q.question_type == 'OpenEnded':
+                sample_answer = getattr(q, "sample_answer", None)
+                if sample_answer:
+                    sa_p = doc_answers.add_paragraph()
+                    sa_p.add_run("Sample Answer: ").italic = True
+                    _add_html_content_to_doc(doc_answers, sample_answer, s3_client)
 
             # per-question explanation if present
-            explanation = getattr(q, "explanation", None)
+            explanation = getattr(q, "explanation_text", None)
             if explanation:
                 ex_p = doc_answers.add_paragraph()
                 ex_p.add_run("Explanation: ").italic = True
-                _append_html_to_paragraph(doc_answers, ex_p, explanation)
+                _add_html_content_to_doc(doc_answers, explanation, s3_client)
 
+        # spacing between questions
         doc_questions.add_paragraph()
         doc_answers.add_paragraph()
         q_counter += 1
@@ -3314,16 +3635,18 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
     # Build zip in-memory
     zip_stream = io.BytesIO()
     with zipfile.ZipFile(zip_stream, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{topic.name}_questions.docx", q_stream.read())
-        zf.writestr(f"{topic.name}_answers.docx", a_stream.read())
+        safe_topic_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in topic.name)
+        zf.writestr(f"{safe_topic_name}_questions.docx", q_stream.read())
+        zf.writestr(f"{safe_topic_name}_answers.docx", a_stream.read())
 
     zip_stream.seek(0)
     return send_file(
         zip_stream,
         as_attachment=True,
-        download_name=f"{topic.name}_Practice_Package.zip",
+        download_name=f"{safe_topic_name}_Practice_Package.zip",
         mimetype="application/zip"
     )
+
 
 # ---------- Mock test export route (ZIP) ----------
 @main_co_admin_bp.route('/mock-tests/<int:test_id>/export-zip')
@@ -3333,7 +3656,14 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
     if mock_test.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
 
-    # fetch ordered mock test questions
+    # --- NEW: Initialize S3 Client ---
+    s3_client = boto3.client(
+        's3',
+        aws_access_key_id=current_app.config['S3_KEY'],
+        aws_secret_access_key=current_app.config['S3_SECRET'],
+        region_name=current_app.config.get('S3_REGION')
+    )
+
     mock_test_questions = MockTestQuestion.query.filter_by(
         mock_test_id=test_id
     ).order_by(MockTestQuestion.question_order).all()
@@ -3355,30 +3685,35 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
         if question.question_type == 'Comprehension':
             p = doc_questions.add_paragraph()
             p.add_run(f"Q{q_counter} (Comprehension): ").bold = True
-            _append_html_to_paragraph(doc_questions, p, question.question_text or "")
+            _add_html_content_to_doc(doc_questions, question.question_text or "", s3_client)
 
             if getattr(question, "comprehension_passage", None):
                 passage_p = doc_questions.add_paragraph()
                 passage_p.add_run("Read the passage below and answer the questions that follow:").italic = True
-                _append_html_to_paragraph(doc_questions, passage_p, question.comprehension_passage.passage_text or "")
+                _add_html_content_to_doc(doc_questions, question.comprehension_passage.passage_text or "", s3_client)
 
             if getattr(question, "sub_questions", None):
                 for sub_idx, sub_q in enumerate(question.sub_questions):
                     sp = doc_questions.add_paragraph()
                     sp.add_run(f"  Sub-Q {sub_idx + 1}: ").bold = True
-                    _append_html_to_paragraph(doc_questions, sp, sub_q.question_text or "")
+                    _add_html_content_to_doc(doc_questions, sub_q.question_text or "", s3_client)
                     if getattr(sub_q, "mcq_options", None):
                         _format_mcq_options(doc_questions, sub_q.mcq_options)
 
             # Answers
             ap = doc_answers.add_paragraph()
             ap.add_run(f"Q{q_counter} (Comprehension): ").bold = True
-            _append_html_to_paragraph(doc_answers, ap, question.question_text or "")
+            _add_html_content_to_doc(doc_answers, question.question_text or "", s3_client)
+            if getattr(question, "comprehension_passage", None):
+                passage_ap = doc_answers.add_paragraph()
+                passage_ap.add_run("Read the passage below and answer the questions that follow:").italic = True
+                _add_html_content_to_doc(doc_answers, question.comprehension_passage.passage_text or "", s3_client)
+
             if getattr(question, "sub_questions", None):
                 for sub_idx, sub_q in enumerate(question.sub_questions):
                     subp = doc_answers.add_paragraph()
                     subp.add_run(f"  Sub-Q {sub_idx + 1}: ").bold = True
-                    _append_html_to_paragraph(doc_answers, subp, sub_q.question_text or "")
+                    _add_html_content_to_doc(doc_answers, sub_q.question_text or "", s3_client)
                     if getattr(sub_q, "mcq_options", None):
                         letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                         for idx, opt in enumerate(sub_q.mcq_options):
@@ -3392,12 +3727,12 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
                     if explanation:
                         ex_p = doc_answers.add_paragraph()
                         ex_p.add_run("Explanation: ").italic = True
-                        _append_html_to_paragraph(doc_answers, ex_p, explanation)
+                        _add_html_content_to_doc(doc_answers, explanation, s3_client)
 
         else:
             p = doc_questions.add_paragraph()
             p.add_run(f"Q{q_counter}: ").bold = True
-            _append_html_to_paragraph(doc_questions, p, question.question_text or "")
+            _add_html_content_to_doc(doc_questions, question.question_text or "", s3_client)
 
             if question.question_type == 'MCQ' and getattr(question, "mcq_options", None):
                 _format_mcq_options(doc_questions, question.mcq_options)
@@ -3405,7 +3740,7 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
             # Answers doc
             ap = doc_answers.add_paragraph()
             ap.add_run(f"Q{q_counter}: ").bold = True
-            _append_html_to_paragraph(doc_answers, ap, question.question_text or "")
+            _add_html_content_to_doc(doc_answers, question.question_text or "", s3_client)
 
             if question.question_type == 'MCQ' and getattr(question, "mcq_options", None):
                 letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -3416,13 +3751,21 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
                     opt_para = doc_answers.add_paragraph(f"{label}. {text}", style='List Bullet')
                     if is_correct:
                         opt_para.add_run("  ← Correct").bold = True
+            
+            if question.question_type == 'OpenEnded':
+                sample_answer = getattr(question, "sample_answer", None)
+                if sample_answer:
+                    sa_p = doc_answers.add_paragraph()
+                    sa_p.add_run("Sample Answer: ").italic = True
+                    _add_html_content_to_doc(doc_answers, sample_answer, s3_client)
 
-            explanation = getattr(question, "explanation", None)
+            explanation = getattr(question, "explanation_text", None)
             if explanation:
                 ex_p = doc_answers.add_paragraph()
                 ex_p.add_run("Explanation: ").italic = True
-                _append_html_to_paragraph(doc_answers, ex_p, explanation)
+                _add_html_content_to_doc(doc_answers, explanation, s3_client)
 
+        # spacing between questions
         doc_questions.add_paragraph()
         doc_answers.add_paragraph()
         q_counter += 1
@@ -3457,25 +3800,33 @@ def get_all_topics_for_org(current_user, organization, **kwargs):
     try:
         # --- THIS IS THE CORRECTED QUERY ---
         # We now explicitly define the join path: Topic -> Subject -> Exam
-        topics = db.session.query(
-            Topic.id, 
-            Topic.name, 
-            Subject.name, 
-            Exam.name
-        ).join(Subject, Topic.subject_id == Subject.id)\
-         .join(Exam, Subject.exam_id == Exam.id)\
-         .filter(
-            Exam.organization_id == organization.id,
-            Topic.deleted_at.is_(None)
-        ).order_by(Exam.name, Subject.name, Topic.name).all()
+        topics = (
+            db.session.query(
+                Topic.id,
+                Topic.name,
+                Subject.name,
+                Exam.name
+            )
+            .join(Subject, Topic.subject_id == Subject.id)
+            .join(Exam, Subject.exam_id == Exam.id)
+            .filter(
+                Exam.organization_id == organization.id,
+                Topic.deleted_at.is_(None)
+            )
+            .order_by(Exam.name, Subject.name, Topic.name)
+            .all()
+        )
         # --- END OF CORRECTION ---
 
-        topic_list = [{
-            "id": t[0],
-            "name": t[1],
-            "subject_name": t[2],
-            "exam_name": t[3]
-        } for t in topics]
+        topic_list = [
+            {
+                "id": t[0],
+                "name": t[1],
+                "subject_name": t[2],
+                "exam_name": t[3]
+            }
+            for t in topics
+        ]
         
         return jsonify(topic_list)
 
@@ -3495,7 +3846,7 @@ def send_custom_notification(current_user, organization, **kwargs):
     message = data.get('message')
 
     if not title or not message:
-        return jsonify({"message": "A title and message are required."}), 400
+        return jsonify({"message": "A title and message are required."} ), 400
 
     try:
         # Find all active student members of the current admin's organization
@@ -3506,7 +3857,7 @@ def send_custom_notification(current_user, organization, **kwargs):
         ).all()
 
         if not student_memberships:
-            return jsonify({"message": "There are no active students in your organization to notify."}), 400
+            return jsonify({"message": "There are no active students in your organization to notify."} ), 400
 
         # Create a notification for each student
         for membership in student_memberships:
@@ -3521,9 +3872,141 @@ def send_custom_notification(current_user, organization, **kwargs):
         
         db.session.commit()
         
-        return jsonify({"message": f"Announcement sent to {len(student_memberships)} students."}), 200
+        return jsonify({"message": f"Announcement sent to {len(student_memberships)} students."} ), 200
 
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error sending custom notification: {e}")
-        return jsonify({"message": "An error occurred while sending the notification."}), 500
+        return jsonify({"message": "An error occurred while sending the notification."} ), 500
+
+def _generate_performance_graph(topic_performance_data):
+    """Generates a bar chart of topic performance and returns it as an in-memory image."""
+    if not topic_performance_data:
+        return None
+
+    topics = [item['topic_name'] for item in topic_performance_data]
+    accuracies = [item['average_accuracy'] for item in topic_performance_data]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars = ax.barh(topics, accuracies, color='skyblue')
+    ax.set_xlabel('Average Accuracy (%)')
+    ax.set_title('Performance by Topic')
+    ax.set_xlim(0, 100)
+
+    # Add labels to the bars
+    for bar in bars:
+        width = bar.get_width()
+        label_x_pos = width + 1
+        ax.text(label_x_pos, bar.get_y() + bar.get_height()/2., f'{width:.1f}%', va='center')
+
+    plt.tight_layout()
+
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png')
+    img_buffer.seek(0)
+    plt.close(fig)
+    return img_buffer
+
+def _create_report_pdf(report_data, graph_image_buffer):
+    """Creates a PDF report from the given data and graph."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Title
+    story.append(Paragraph(f"Mock Test Report: {report_data['mock_test_title']}", styles['h1']))
+    story.append(Spacer(1, 0.2*inch))
+
+    # Summary Stats
+    story.append(Paragraph("Overall Performance Summary", styles['h2']))
+    summary_text = (
+        f"<b>Total Attempts:</b> {report_data['total_attempts']}<br/>"
+        f"<b>Average Score:</b> {report_data['average_score']:.2f}%<br/>"
+        f"<b>Pass Rate:</b> {report_data['pass_rate']:.2f}%"
+    )
+    story.append(Paragraph(summary_text, styles['body']))
+    story.append(Spacer(1, 0.2*inch))
+
+    # Graph
+    if graph_image_buffer:
+        story.append(Paragraph("Topic Performance Graph", styles['h2']))
+        graph_img = ReportLabImage(graph_image_buffer, width=6*inch, height=4*inch)
+        story.append(graph_img)
+        story.append(Spacer(1, 0.2*inch))
+
+    # Topic Performance Table
+    story.append(Paragraph("Detailed Topic Performance", styles['h2']))
+    table_data = [['Topic', 'Avg. Accuracy (%)', 'Questions', 'Students']]
+    for item in report_data['topic_performance']:
+        table_data.append([
+            item['topic_name'],
+            f"{item['average_accuracy']:.2f}",
+            item['question_count'],
+            item['student_count']
+        ])
+    
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(table)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+@main_co_admin_bp.route('/mock-tests/<int:test_id>/export-pdf-report', methods=['GET'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def export_mock_test_pdf_report(current_user, organization, test_id, **kwargs):
+    """Generates and downloads a PDF performance report for a mock test."""
+    test = (MockTest.query
+        .join(Exam, MockTest.exam_id == Exam.id)
+        .filter(MockTest.id == test_id, Exam.organization_id == organization.id)
+        .first_or_404())
+
+    report = MockTestReport.query.filter_by(mock_test_id=test.id).first()
+
+    if not report:
+        return jsonify({"message": "Report not found for this mock test. Please generate it first."} ), 404
+
+    topic_summaries = TopicPerformanceSummary.query.filter_by(report_id=report.id).order_by(TopicPerformanceSummary.average_accuracy.asc()).all()
+
+    serialized_summaries = [{
+        "topic_name": s.topic_name,
+        "average_accuracy": s.average_accuracy,
+        "question_count": s.question_count,
+        "student_count": s.student_count
+    } for s in topic_summaries]
+
+    report_data = {
+        "mock_test_title": test.title,
+        "total_attempts": report.total_attempts,
+        "average_score": report.average_score,
+        "pass_rate": report.pass_rate,
+        "topic_performance": serialized_summaries,
+    }
+
+    try:
+        # Generate graph
+        graph_buffer = _generate_performance_graph(report_data['topic_performance'])
+
+        # Generate PDF
+        pdf_buffer = _create_report_pdf(report_data, graph_buffer)
+
+        safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in test.title)
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=f"{safe_title}_Performance_Report.pdf",
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        current_app.logger.error(f"Failed to generate PDF report for mock test {test_id}: {e}", exc_info=True)
+        return jsonify({"message": "An error occurred while generating the PDF report."} ), 500

@@ -27,9 +27,9 @@ def init_oauth(app):
     """Initialize OAuth with the app context"""
     oauth.init_app(app)
     
-    app.logger.info(f"🔧 Initializing Google OAuth")
-    app.logger.info(f"🔧 SERVER_NAME: {app.config.get('SERVER_NAME')}")
-    app.logger.info(f"🔧 PREFERRED_URL_SCHEME: {app.config.get('PREFERRED_URL_SCHEME')}")
+    app.logger.info(f"Initializing Google OAuth")
+    app.logger.info(f"SERVER_NAME: {app.config.get('SERVER_NAME')}")
+    app.logger.info(f"PREFERRED_URL_SCHEME: {app.config.get('PREFERRED_URL_SCHEME')}")
     
     oauth.register(
         name='google',

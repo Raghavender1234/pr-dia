@@ -1116,9 +1116,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-// Initial fetch and interval remain the same
-fetchNotifications();
-setInterval(fetchNotifications, 30000);
+    // Initial fetch and interval remain the same
+    fetchNotifications();
+    setInterval(fetchNotifications, 30000);
+
     // Bell click handler
     bell.addEventListener('click', function(event) {
         event.stopPropagation();
