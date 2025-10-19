@@ -18,3 +18,6 @@ node_modules/
 
 # Logs
 logs/
+
+# Flask session
+flask_session/
