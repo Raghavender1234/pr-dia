@@ -23,6 +23,7 @@ import traceback
 from app.utils.ai_evaluator import evaluate_open_ended_question
 import random
 from app.models.question import ReportedContent
+from app.utils.localization import get_country_code, format_price
 from collections import defaultdict
 import statistics
 from app.api.decorators import premium_feature_required
@@ -1380,6 +1381,7 @@ def enroll_in_exam(current_user, **kwargs):
 
     exam = Exam.query.get_or_404(exam_id)
     organization_id = exam.organization_id
+    country_code = get_country_code()
 
     enrollment = StudentExam.query.filter_by(
         student_user_id=current_user.id,
@@ -1438,9 +1440,16 @@ def enroll_in_exam(current_user, **kwargs):
                 db.session.commit()
 
             client = razorpay.Client(auth=(current_app.config['RAZORPAY_KEY_ID'], current_app.config['RAZORPAY_KEY_SECRET']))
+            
+            price = exam.price
+            currency = 'INR'
+            if country_code != 'IN':
+                price = price / 83.0
+                currency = 'USD'
+
             order = client.order.create({
-                "amount": int(exam.price * 100),
-                "currency": "INR",
+                "amount": int(price * 100),
+                "currency": currency,
                 "notes": {"exam_id": exam.id, "user_id": current_user.id}
             })
 
@@ -1459,7 +1468,8 @@ def enroll_in_exam(current_user, **kwargs):
                 "razorpay_key_id": current_app.config['RAZORPAY_KEY_ID'],
                 "order_id": order['id'],
                 "amount": order['amount'],
-                "exam_name": exam.name
+                "exam_name": exam.name,
+                "currency": currency
             }), 202
 
     except Exception as e:
@@ -1517,6 +1527,7 @@ def get_available_exams(current_user, **kwargs):
     - Global View: Shows exams ONLY from organizations the user is a member of.
     """
     try:
+        country_code = get_country_code()
         # 1. Get IDs of exams the user is already actively enrolled in.
         # This part is correct and remains the same.
         enrolled_exam_ids = {
@@ -1567,7 +1578,7 @@ def get_available_exams(current_user, **kwargs):
             "name": e.name,
             "organization_name": e.organization.name,
             "is_free": e.is_free,
-            "price": str(e.price or "0.00")
+            "price": format_price(e.price, country_code) if e.price else "Free"
         } for e in available_exams]
         
         return jsonify(results), 200

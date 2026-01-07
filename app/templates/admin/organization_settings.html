@@ -167,6 +167,11 @@
             <h6>Page Content</h6>
             <small class="text-muted">About, privacy & terms pages</small>
         </div>
+        <div class="quick-action-card" data-tab="ai">
+            <i class="bi bi-stars text-purple fs-1 mb-2"></i>
+            <h6>AI & Integrations</h6>
+            <small class="text-muted">Manage AI features</small>
+        </div>
     </div>
 
     <!-- Navigation Tabs -->
@@ -194,6 +199,11 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="content-tab" data-bs-toggle="tab" data-bs-target="#content" type="button" role="tab">
                 <i class="bi bi-file-richtext-fill me-2"></i>Page Content
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai" type="button" role="tab">
+                <i class="bi bi-stars me-2"></i>AI & Integrations
             </button>
         </li>
     </ul>
@@ -527,6 +537,19 @@
                 </div>
             </div>
         </div>
+        <!-- AI & Integrations Tab -->
+        <div class="tab-pane fade" id="ai" role="tabpanel">
+            <div class="card settings-card">
+                <div class="card-body p-4">
+                    <div class="section-header">
+                        <h5><i class="bi bi-stars me-2"></i>AI Assistant Subscription</h5>
+                    </div>
+                    <div id="aiSubscriptionStatus">
+                        <!-- Status will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -706,6 +729,9 @@ window.pageInit = function() {
                 }
             });
 
+            // Load AI subscription status
+            renderAISubscriptionStatus(data.ai_subscription);
+
         } catch (err) {
             window.showToast(`Error loading settings: ${err.message}`, 'danger');
         }
@@ -873,6 +899,29 @@ window.pageInit = function() {
         }
     }
 
+    function renderAISubscriptionStatus(sub) {
+        const $container = $('#aiSubscriptionStatus');
+        let content = '';
+        if (sub && sub.status === 'active') {
+            content = `
+                <div class="alert alert-success">
+                    <h5 class="alert-heading">AI Assistant is Active</h5>
+                    <p>Your subscription is active and will renew on ${new Date(sub.ends_at).toLocaleDateString()}.</p>
+                </div>
+            `;
+        } else {
+            content = `
+                <div class="alert alert-warning">
+                    <h5 class="alert-heading">Upgrade to AI Assistant Premium</h5>
+                    <p>Unlock powerful AI features to help you create content, generate questions, and more.</p>
+                    <hr>
+                    <button class="btn btn-primary" id="upgradeAiBtn">Upgrade to Premium</button>
+                </div>
+            `;
+        }
+        $container.html(content);
+    }
+
     // --- EVENT LISTENERS ---
     
     // File upload forms
@@ -945,6 +994,39 @@ async function resetFaqToDefault() {
     $('.quick-action-card').on('click', function() {
         const tabName = $(this).data('tab');
         $(`#${tabName}-tab`).tab('show');
+    });
+
+    $(document).on('click', '#upgradeAiBtn', async function() {
+        const $btn = $(this);
+        toggleButtonSpinner($btn, true);
+        try {
+            const res = await window.authenticatedFetch('/api/payment/organization/create-ai-subscription', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message);
+
+            const options = {
+                key: data.razorpay_key_id,
+                subscription_id: data.subscription_id,
+                name: "{{ g.current_organization.name }} - AI Assistant",
+                description: "Annual Subscription",
+                handler: function (response) {
+                    window.showToast('Payment successful! Refreshing...', 'success');
+                    setTimeout(() => location.reload(), 2000);
+                },
+                modal: {
+                    ondismiss: function() {
+                        window.showToast('Payment cancelled.', 'info');
+                    }
+                }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+
+        } catch (err) {
+            window.showToast(`Error: ${err.message}`, 'danger');
+        } finally {
+            toggleButtonSpinner($btn, false);
+        }
     });
 
     // --- INITIAL LOAD (only if editors not ready yet) ---

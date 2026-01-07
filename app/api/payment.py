@@ -15,6 +15,7 @@ from app.models.organization import Organization, OrganizationMembership, Organi
 from app.models.exam import Exam
 from app.models.student_progress import StudentExam, StudentAISubscription
 from app.api.decorators import admin_role_required
+from app.utils.localization import get_country_code
 
 payment_bp = Blueprint('payment_api', __name__, url_prefix='/api/payment')
 
@@ -189,7 +190,12 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
 
     try:
         client = get_razorpay_client()
-        plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID')
+        country_code = get_country_code()
+        if country_code == 'IN':
+            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_INR')
+        else:
+            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_USD')
+        
         current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
         subscription = client.subscription.create({
@@ -235,7 +241,12 @@ def create_ai_subscription_order():
 
     try:
         client = get_razorpay_client()
-        plan_id = current_app.config.get('AI_TUTOR_PLAN_ID')
+        country_code = get_country_code()
+        if country_code == 'IN':
+            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_INR')
+        else:
+            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_USD')
+
         current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
         subscription = client.subscription.create({

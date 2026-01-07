@@ -860,7 +860,7 @@ window.pageInit = function () {
     const options = {
       key: paymentData.razorpay_key_id,
       amount: paymentData.amount,
-      currency: "INR",
+      currency: paymentData.currency,
       name: "DIA Exam Prep",
       description: `Payment for ${paymentData.exam_name || 'Exam'}`,
       order_id: paymentData.order_id,
@@ -995,7 +995,7 @@ window.pageInit = function () {
         const isFree = !!exam.is_free || Number(exam.price || 0) === 0;
         const priceBadge = isFree
           ? `<span class="badge bg-success ms-2">Free</span>`
-          : `<span class="badge bg-warning text-dark ms-2">₹${parseFloat(exam.price || 0).toFixed(2)}</span>`;
+          : `<span class="badge bg-warning text-dark ms-2">${exam.price}</span>`;
 
         $container.append(`
           <div class="col">

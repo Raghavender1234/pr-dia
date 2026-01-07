@@ -131,8 +131,10 @@ def register_organization():
     admin_email = data.get('email')
     password = data.get('password')
     plan_identifier = data.get('plan_id')
+    currency = data.get('currency', 'inr')
 
-    razorpay_plan_id = current_app.config.get('RAZORPAY_PLANS', {}).get(str(plan_identifier))
+    razorpay_plan_id = current_app.config.get('RAZORPAY_PLANS', {}).get(str(plan_identifier), {}).get(currency)
+
 
     print(f"  - Org Name: {org_name}")
     print(f"  - Org Code: {org_code}")

@@ -4,6 +4,8 @@ from app.models import Exam, Organization, Plan          # ← your Exam & Organ
 from sqlalchemy import or_                          # ← for the OR filter
 from flask import g  # For accessing global context
 
+
+
 public_api_bp = Blueprint(
     'public_api',
     __name__,
@@ -65,7 +67,7 @@ def search_exams():
         "description": exam.description,
         "organization_name": exam.organization.name,
         "is_free": exam.is_free,
-        "price": str(exam.price) if exam.price else "0.00",
+        "price": exam.price if exam.price else "Free",
         "is_verified": exam.organization.is_verified
     } for exam in unique_exams]
 
@@ -85,13 +87,13 @@ def get_public_plans():
         serialized_plans = [{
             "id": plan.id,
             "name": plan.name,
-            "price": str(plan.monthly_price)
+            "price": plan.monthly_price
         } for plan in plans]
         return jsonify(serialized_plans)
         
     except Exception as e:
         current_app.logger.error(f"Error fetching public plans: {e}")
-        return jsonify({"message": "Could not load subscription plans."}), 500
+        return jsonify({"message": "Could not load subscription plans."}) , 500
 
 from app.utils.email_utils import send_email
 

@@ -297,6 +297,16 @@
                   </div>
 
                   <hr class="my-3">
+                  <div class="col-12">
+                    <label class="form-label">Select Currency</label>
+                    <div class="btn-group w-100" role="group" id="currencyToggle">
+                      <input type="radio" class="btn-check" name="currency" id="currencyINR" value="inr" autocomplete="off" checked>
+                      <label class="btn btn-outline-primary" for="currencyINR">INR (<span>₹</span>)</label>
+
+                      <input type="radio" class="btn-check" name="currency" id="currencyUSD" value="usd" autocomplete="off">
+                      <label class="btn btn-outline-primary" for="currencyUSD">USD ($)</label>
+                    </div>
+                  </div>
                   <div class="col-12 form-floating">
                     <select class="form-select" id="orgPlan" name="plan" required>
                       <option disabled selected value="">Loading plans...</option>
@@ -422,29 +432,43 @@ $(function() {
   $userTypeToggle.on('change', showCorrectForm);
   showCorrectForm();
 
+  let plansData = [];
+  const USD_EXCHANGE_RATE = 83;
+
+  const getSelectedCurrency = () => $('#currencyToggle input[name="currency"]:checked').val() || 'inr';
+
   // Populate plans dropdown only if the select exists
-  const populatePlansDropdown = async () => {
+  const populatePlansDropdown = () => {
     const $select = $('#orgPlan');
     if ($select.length === 0) return;
+
+    const selectedCurrency = getSelectedCurrency();
+    
+    $select.empty().append('<option disabled selected value="">Select a plan</option>');
+    plansData.forEach(plan => {
+      const price = selectedCurrency === 'usd' ? (plan.price / USD_EXCHANGE_RATE).toFixed(2) : plan.price;
+      const currencySymbol = selectedCurrency === 'usd' ? '$' : '₹';
+      const optionText = `${plan.name} - ${currencySymbol}${price} / month`;
+      $select.append(new Option(optionText, plan.id));
+    });
+  };
+
+  const fetchPlans = async () => {
     try {
-      const response = await fetch('/api/public/plans');
-      const json = await safeJson(response);
-      const plans = json.plans || json;
-
-      if (!Array.isArray(plans) || !response.ok) {
-        throw new Error('Could not load subscription plans.');
-      }
-
-      $select.empty().append('<option disabled selected value="">Select a plan</option>');
-      plans.forEach(plan => {
-        const optionText = `${plan.name} - ₹${plan.price} / month`;
-        $select.append(new Option(optionText, plan.id));
-      });
+        const response = await fetch('/api/public/plans');
+        const json = await safeJson(response);
+        plansData = json.plans || json;
+        if (!Array.isArray(plansData) || !response.ok) {
+            throw new Error('Could not load subscription plans.');
+        }
+        populatePlansDropdown();
     } catch (error) {
-      console.error('Plan loading error:', error);
-      $select.html('<option disabled selected value="">Could not load plans</option>');
+        console.error('Plan loading error:', error);
+        $('#orgPlan').html('<option disabled selected value="">Could not load plans</option>');
     }
   };
+
+  $('#currencyToggle input[name="currency"]').on('change', populatePlansDropdown);
 
   // Organization registration + Razorpay subscription flow
   $('#orgRegisterForm').on('submit', async function (e) {
@@ -461,7 +485,8 @@ $(function() {
         code: $('#orgCode').val(),
         email: $('#orgEmail').val(),
         password: $('#orgPassword').val(),
-        plan_id: parseInt($('#orgPlan').val())
+        plan_id: parseInt($('#orgPlan').val()),
+        currency: getSelectedCurrency()
       };
 
       const response = await fetch('/api/auth/register-organization', {
@@ -520,7 +545,7 @@ $(function() {
   };
 
   // Initialize
-  populatePlansDropdown();
+  fetchPlans();
   {% endif %}
 });
 </script>
