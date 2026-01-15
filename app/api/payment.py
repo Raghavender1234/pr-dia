@@ -192,9 +192,9 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
         client = get_razorpay_client()
         country_code = get_country_code()
         if country_code == 'IN':
-            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_INR')
+            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_INR') or current_app.config.get('AI_ASSISTANT_PLAN_ID')
         else:
-            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_USD')
+            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_USD') or current_app.config.get('AI_ASSISTANT_PLAN_ID')
         
         current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
@@ -243,9 +243,9 @@ def create_ai_subscription_order():
         client = get_razorpay_client()
         country_code = get_country_code()
         if country_code == 'IN':
-            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_INR')
+            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_INR') or current_app.config.get('AI_TUTOR_PLAN_ID')
         else:
-            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_USD')
+            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_USD') or current_app.config.get('AI_TUTOR_PLAN_ID')
 
         current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
