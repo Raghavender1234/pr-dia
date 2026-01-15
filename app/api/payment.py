@@ -190,11 +190,11 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
 
     try:
         client = get_razorpay_client()
-        country_code = get_country_code()
-        if country_code == 'IN':
-            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_INR') or current_app.config.get('AI_ASSISTANT_PLAN_ID')
-        else:
-            plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID_USD') or current_app.config.get('AI_ASSISTANT_PLAN_ID')
+        plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID')
+
+        if not plan_id:
+            current_app.logger.error("AI Assistant subscription plan is not configured. Please define AI_ASSISTANT_PLAN_ID in your config.")
+            return jsonify({"message": "AI Assistant subscription service is not configured. Please contact support."}), 500
         
         current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
 
@@ -241,24 +241,33 @@ def create_ai_subscription_order():
 
     try:
         client = get_razorpay_client()
-        country_code = get_country_code()
-        if country_code == 'IN':
-            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_INR') or current_app.config.get('AI_TUTOR_PLAN_ID')
-        else:
-            plan_id = current_app.config.get('AI_TUTOR_PLAN_ID_USD') or current_app.config.get('AI_TUTOR_PLAN_ID')
+        
+        data = request.get_json() or {}
 
-        current_app.logger.info(f"Attempting to create subscription with plan_id: {plan_id}")
+        # ALWAYS use the INR Plan ID from your config
+        plan_id = current_app.config.get('AI_TUTOR_PLAN_ID')
 
-        subscription = client.subscription.create({
+        if not plan_id:
+            current_app.logger.error("AI Tutor Plan ID missing in config.")
+            return jsonify({"message": "Subscription service misconfigured."}), 500
+
+        # FORCE Razorpay to treat this as an INR transaction 
+        # even if the user is in the UK/USA. Their bank handles the swap.
+        subscription_data = {
             'plan_id': plan_id,
             'total_count': 12,
             'quantity': 1,
+            'customer_notify': 1,
             'notes': {
                 'type': 'ai_tutor_student',
-                'user_id': user_id
+                'user_id': user_id,
+                'original_currency_preference': data.get('currency', 'INR') # Log preference but don't charge in it
             }
-        })
+        }
 
+        subscription = client.subscription.create(subscription_data)
+
+        # Update or create the local subscription record
         sub = StudentAISubscription.query.filter_by(student_user_id=user.id).first()
         if not sub:
             sub = StudentAISubscription(student_user_id=user.id)
@@ -269,27 +278,106 @@ def create_ai_subscription_order():
         db.session.commit()
 
         return jsonify({
-            "message": "AI Tutor subscription created. Proceed to payment.",
             "subscription_id": subscription['id'],
-            "razorpay_key_id": os.getenv('RAZORPAY_KEY_ID')
+            "razorpay_key_id": current_app.config.get('RAZORPAY_KEY_ID'),
+            "amount_inr": subscription.get('amount'), # Useful for frontend display
+            "currency": "INR" # Tell frontend to invoke Razorpay Checkout in INR
         }), 200
 
     except Exception as e:
         db.session.rollback()
-        current_app.logger.error(f"Error creating AI subscription: {e}", exc_info=True)
-        return jsonify({"message": "Could not initiate subscription payment."}), 500
-
+        current_app.logger.error(f"Razorpay Sub Error: {str(e)}")
+        return jsonify({"message": "Could not initiate payment."}), 500
 
 # ---------- Exam purchase endpoints (unchanged) ----------
 
 @payment_bp.route('/create-exam-order', methods=['POST'])
 @jwt_required()
 def create_exam_payment_order():
-    # ... (this function remains unchanged)
-    pass
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    exam_id = data.get('exam_id')
 
+    exam = Exam.query.get_or_404(exam_id)
+    
+    # Check if student already bought it
+    existing = StudentExam.query.filter_by(student_user_id=user_id, exam_id=exam_id).first()
+    if existing and existing.payment_status == 'completed':
+        return jsonify({"message": "You already have access to this exam."}), 400
+
+    try:
+        client = get_razorpay_client()
+        
+        # LOGIC: Even if frontend shows USD, we charge in INR.
+        # Razorpay amounts are in PAISA (1 INR = 100 Paisa)
+        amount_in_paisa = int(exam.price * 100) 
+
+        order_data = {
+            'amount': amount_in_paisa,
+            'currency': 'INR', # Force INR to match your Razorpay account type
+            'receipt': f"receipt_exam_{exam_id}_{user_id}",
+            'notes': {
+                'exam_id': exam_id,
+                'user_id': user_id,
+                'type': 'exam_purchase'
+            }
+        }
+
+        razorpay_order = client.order.create(data=order_data)
+
+        # We don't save to DB yet; we wait for verification
+        return jsonify({
+            "order_id": razorpay_order['id'],
+            "amount": amount_in_paisa,
+            "currency": "INR",
+            "razorpay_key_id": current_app.config.get('RAZORPAY_KEY_ID')
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Exam Order Error: {str(e)}")
+        return jsonify({"message": "Failed to initiate exam payment."}), 500
 @payment_bp.route('/verify-exam-payment', methods=['POST'])
 @jwt_required()
 def verify_exam_payment():
-    # ... (this function remains unchanged)
-    pass
+    user_id = get_jwt_identity()
+    data = request.get_json()
+
+    # These are sent by the Razorpay Checkout Modal after success
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_order_id = data.get('razorpay_order_id')
+    razorpay_signature = data.get('razorpay_signature')
+    exam_id = data.get('exam_id')
+
+    try:
+        client = get_razorpay_client()
+        
+        # 1. VERIFY SIGNATURE (Security Check)
+        params_dict = {
+            'razorpay_order_id': razorpay_order_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+        client.utility.verify_payment_signature(params_dict)
+
+        # 2. UPDATE DATABASE
+        # Check if record exists, else create
+        student_exam = StudentExam.query.filter_by(student_user_id=user_id, exam_id=exam_id).first()
+        if not student_exam:
+            student_exam = StudentExam(student_user_id=user_id, exam_id=exam_id)
+            db.session.add(student_exam)
+
+        student_exam.payment_status = 'completed'
+        student_exam.razorpay_payment_id = razorpay_payment_id
+        student_exam.purchase_date = datetime.utcnow()
+        
+        db.session.commit()
+
+        return jsonify({"status": "success", "message": "Payment verified. Exam unlocked."}), 200
+
+    except razorpay.errors.SignatureVerificationError:
+        current_app.logger.warning(f"Payment verification failed for User {user_id}")
+        return jsonify({"status": "failure", "message": "Invalid payment signature."}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Verification Error: {str(e)}")
+        return jsonify({"status": "error", "message": "Internal verification error."}), 500

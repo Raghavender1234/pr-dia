@@ -215,7 +215,11 @@ $('#subscribeBtn').on('click', async function () {
   try {
     // 1) Create an order on the server
     const orderRes  = await window.authenticatedFetch('/api/payment/create-ai-subscription-order', {
-      method: 'POST'
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
     });
     const orderData = await orderRes.json();
     if (!orderRes.ok) throw new Error(orderData.message || 'Unable to create order');
