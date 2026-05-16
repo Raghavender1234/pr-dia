@@ -381,3 +381,96 @@ def verify_exam_payment():
         db.session.rollback()
         current_app.logger.error(f"Verification Error: {str(e)}")
         return jsonify({"status": "error", "message": "Internal verification error."}), 500
+
+@payment_bp.route('/verify-ai-subscription', methods=['POST'])
+@jwt_required()
+def verify_ai_subscription():
+    user_id = get_jwt_identity()
+    data = request.get_json()
+
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_subscription_id = data.get('razorpay_subscription_id')
+    razorpay_signature = data.get('razorpay_signature')
+
+    try:
+        client = get_razorpay_client()
+        
+        # 1. VERIFY SIGNATURE specifically for subscriptions
+        params_dict = {
+            'razorpay_subscription_id': razorpay_subscription_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+        client.utility.verify_subscription_payment_signature(params_dict)
+
+        # 2. UPDATE DATABASE
+        # Check Student AI Subscription
+        student_sub = StudentAISubscription.query.filter_by(
+            razorpay_subscription_id=razorpay_subscription_id, 
+            student_user_id=user_id
+        ).first()
+        
+        if student_sub:
+            student_sub.status = 'active'
+            db.session.commit()
+            return jsonify({"status": "success", "message": "Student AI Subscription verified and activated."}), 200
+
+        # Check Organization AI Subscription
+        org_sub = OrganizationAISubscription.query.filter_by(razorpay_subscription_id=razorpay_subscription_id).first()
+        if org_sub:
+            org_sub.status = 'active'
+            if org_sub.organization:
+                org_sub.organization.is_ai_premium = True
+            db.session.commit()
+            return jsonify({"status": "success", "message": "Organization AI Assistant verified and activated."}), 200
+
+        return jsonify({"status": "error", "message": "Subscription record not found."}), 404
+
+    except razorpay.errors.SignatureVerificationError:
+        current_app.logger.warning(f"Subscription verification failed for User {user_id}")
+        return jsonify({"status": "failure", "message": "Invalid payment signature."}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Subscription Verification Error: {str(e)}")
+        return jsonify({"status": "error", "message": "Internal verification error."}), 500
+
+
+@payment_bp.route('/verify-org-subscription', methods=['POST'])
+def verify_org_subscription():
+    """Verifies the main organization subscription (Basic, Pro, Premium). No JWT required as user just registered."""
+    data = request.get_json()
+
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_subscription_id = data.get('razorpay_subscription_id')
+    razorpay_signature = data.get('razorpay_signature')
+
+    try:
+        client = get_razorpay_client()
+        params_dict = {
+            'razorpay_subscription_id': razorpay_subscription_id,
+            'razorpay_payment_id': razorpay_payment_id,
+            'razorpay_signature': razorpay_signature
+        }
+        client.utility.verify_subscription_payment_signature(params_dict)
+
+        org = Organization.query.filter_by(razorpay_subscription_id=razorpay_subscription_id).first()
+        if org:
+            org.status = 'active'
+            if org.memberships:
+                main_admin_membership = next((m for m in org.memberships if m.user.user_type == 'main_co_admin'), None)
+                if main_admin_membership:
+                    main_admin_membership.is_active = True
+                    if main_admin_membership.user:
+                        main_admin_membership.user.status = 'active'
+            db.session.commit()
+            return jsonify({"status": "success", "message": "Organization subscription verified and activated."}), 200
+
+        return jsonify({"status": "error", "message": "Organization not found."}), 404
+
+    except razorpay.errors.SignatureVerificationError:
+        current_app.logger.warning(f"Org Subscription verification failed.")
+        return jsonify({"status": "failure", "message": "Invalid payment signature."}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Org Subscription Verification Error: {str(e)}")
+        return jsonify({"status": "error", "message": "Internal verification error."}), 500

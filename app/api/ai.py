@@ -86,12 +86,23 @@ A student is studying the "{topic_name}" topic.
 *   **Maintain Difficulty:** The new passage and questions should be at a "{difficulty}" difficulty level.
 *   **Create Plausible Distractors:** The incorrect options should be challenging and relate to the passage's nuances.
 
-**Formatting Rules:**
-*   Each sub-question must have 4 options (A, B, C, D).
-*   Clearly label the correct answer for each sub-question with `(Correct)`.
-*   Format as plain text.
+**CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
+1. Do NOT wrap your entire response in a markdown code block (do not use ```).
+2. Write the passage text first.
+3. Each sub-question MUST start exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
+4. Each sub-question MUST have exactly 4 options. They MUST start with "A) ", "B) ", "C) ", "D) ".
+5. Append exactly "(Correct)" to the end of the correct option's text.
 
-**Original Passage Example:**
+**EXAMPLE EXACT FORMAT:**
+Here is the new passage text...
+
+1. What is the main idea of the passage?
+A) Option one
+B) Option two (Correct)
+C) Option three
+D) Option four
+
+**Original Passage:**
 {passage_text}
 '''
     else:
@@ -130,12 +141,20 @@ First, analyze the original question provided at the end. Does it contain any of
     *   All questions must be strictly relevant to the "{topic_name}".
     *   Incorrect options (distractors) should be challenging and based on common misconceptions.
 
-**Formatting Rules:**
-*   Use Markdown for formatting (bolding, lists).
-*   Each question must have 4 options (A, B, C, D).
-*   Mark the single correct option in each with `(Correct)`.
+**CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
+1. Do NOT wrap your entire response in a markdown code block (do not use ```).
+2. Each question MUST begin exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
+3. Each question MUST provide exactly four options starting with "A) ", "B) ", "C) ", "D) ".
+4. You MUST mark the correct option by appending exactly "(Correct)" at the very end of the option text.
 
-**Original Question:**
+**EXAMPLE EXACT FORMAT:**
+1. What is the value of $x$ in $2x = 4$?
+A) 1
+B) 2 (Correct)
+C) 3
+D) 4
+
+**Original Question to Base Off Of:**
 {original_question}
 '''
 
@@ -551,8 +570,8 @@ def explain_question_differently(current_user, **kwargs):
     prompt = f'''A student is reviewing a question and needs a different perspective. 
     The question is: '{question_text}'. 
     The correct explanation is: '{explanation_text}'. 
-    Please explain the core concept behind this answer in a simpler way. 
-    You can use a real-world analogy if it helps. Do not just rephrase the original explanation.'''
+    Please explain the core concept behind this answer in a witty and funny way, but ensure it remains highly sensible, educational, and easy to understand for a student. 
+    Use a clever real-world analogy if it helps make the concept stick. Do not just rephrase the original explanation.'''
 
     try:
         resp = client.chat.completions.create(

@@ -226,11 +226,10 @@ $('#subscribeBtn').on('click', async function () {
 
     const options = {
       key:       orderData.razorpay_key_id,   // from your API
-      amount:    orderData.amount,
       currency:  'INR',
       name:      'DIA AI Tutor',
       description: 'Monthly AI subscription',
-      order_id:  orderData.order_id,
+      subscription_id: orderData.subscription_id,
       prefill:   orderData.prefill || {},     // optional if you return it
       notes:     orderData.notes || {},
       theme:     { color: '#0d6efd' },
@@ -242,7 +241,7 @@ $('#subscribeBtn').on('click', async function () {
             method: 'POST',
             body: JSON.stringify({
               razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_subscription_id: response.razorpay_subscription_id,
               razorpay_signature:  response.razorpay_signature
             })
           });

@@ -924,7 +924,178 @@ $reportForm.on('submit', async function (e) {
   }
 });
 
-    // --- NEW: Generate Similar Questions (AI) ---\r\n$generateAIBtn.on(\'click\', async function (e) {\r\n  e.preventDefault();\r\n\r\n  const btn = this;\r\n  if (btn.disabled) return; // prevent duplicate clicks\r\n\r\n  const currentQuestion = allQuestions?.[currentQuestionIndex];\r\n  if (!currentQuestion) {\r\n    alert(\'No active question to generate from.\');\r\n    return;\r\n  }\r\n\r\n  // Open modal + show loading\r\n  aiGeneratedModal.show();\r\n  $aiContent.hide().html(\'\'); // Use .html() to clear previous content\r\n  $aiLoading.show();\r\n  btn.disabled = true;\r\n  btn.setAttribute(\'aria-busy\', \'true\');\r\n\r\n  const payload = {\r\n    question_type: currentQuestion.question_type || currentQuestion.type || null,\r\n    question_text: currentQuestion.question_text || currentQuestion.text || \'\',\r\n    passage_text:\r\n      (currentQuestion.comprehension_passage && currentQuestion.comprehension_passage.passage_text) ||\r\n      currentQuestion.passage_text ||\r\n      null,\r\n    difficulty: currentQuestion.difficulty_level || currentQuestion.difficulty || null,\r\n    topic_name: \"{{ topic.name }}\",\r\n    subject_name: \"{{ topic.subject.name }}\",\r\n    exam_name: \"{{ topic.subject.exam.name }}\"\r\n  };\r\n\r\n  try {\r\n    const res = await window.authenticatedFetch(\'/api/ai/generate_questions\', {\r\n      method: \'POST\',\r\n      headers: { \'Content-Type\': \'application/json\' },\r\n      body: JSON.stringify(payload)\r\n    });\r\n\r\n    let data;\r\n    try {\r\n      data = await res.json();\r\n    } catch {\r\n      throw new Error(\'Invalid server response (not JSON).\');\r\n    }\r\n\r\n    if (!res.ok) {\r\n      throw new Error(data.message || `Failed to generate questions (HTTP ${res.status}).`);\r\n    }\r\n\r\n    const out = data.generated || data.text || \'No content returned.\';\r\n    parseAndRenderGeneratedQuestions(out);\r\n\r\n  } catch (err) {\r\n    console.error(err);\r\n    $aiContent.text(`An error occurred: ${err.message}`);\r\n  } finally {\r\n    $aiLoading.hide();\r\n    $aiContent.show();\r\n    btn.disabled = false;\r\n    btn.removeAttribute(\'aria-busy\');\r\n  }\r\n});\r\n\r\nfunction parseAndRenderGeneratedQuestions(markdown) {\r\n    $aiContent.html(\'\'); // Clear previous content\r\n    const questionBlocks = markdown.split(/\\n(?=\\d+\\.\\s)/).filter(b => b.trim());\r\n\r\n    if (questionBlocks.length === 0 && markdown.trim()) {\r\n        // If no numbered questions, render as a single block\r\n        const singleBlock = $(\'<div class=\"generated-question-item card mb-3\"></div>\');\r\n        const cardBody = $(\'<div class=\"card-body\"></div>\').text(markdown);\r\n        singleBlock.append(cardBody);\r\n        $aiContent.append(singleBlock);\r\n    } else {\r\n        questionBlocks.forEach((block, index) => {\r\n            const questionData = parseQuestionBlock(block);\r\n            if (!questionData) return;\r\n\r\n            const $item = $(\'<div class=\"generated-question-item card mb-3\"></div>\');\r\n            const $cardBody = $(\'<div class=\"card-body\"></div>\');\r\n\r\n            const $questionText = $(\'<p class=\"fw-bold\"></p>\').text(questionData.question_text);\r\n            $cardBody.append($questionText);\r\n\r\n            const $optionsList = $(\'<ul class=\"list-unstyled mb-3\"></ul>\');\r\n            questionData.options.forEach(opt => {\r\n                const $optionItem = $(\'<li></li>\').text(opt.text);\r\n                if (opt.is_correct) {\r\n                    $optionItem.addClass(\'text-success fw-bold\').prepend(\'<i class=\"bi bi-check-circle-fill me-2\"></i>\');\r\n                }\r\n                $optionsList.append($optionItem);\r\n            });\r\n            $cardBody.append($optionsList);\r\n\r\n            const $saveBtn = $(\'<button class=\"btn btn-sm btn-outline-primary save-gen-q-btn\"><i class=\"bi bi-save me-1\"></i>Save for Practice</button>\');\r\n            $saveBtn.data(\'question-data\', JSON.stringify(questionData));\r\n            $cardBody.append($saveBtn);\r\n\r\n            $item.append($cardBody);\r\n            $aiContent.append($item);\r\n        });\r\n    }\r\n\r\n    // Typeset the newly added content\r\n    const root = document.getElementById(\'ai-content\');\r\n    if (window.MathJax?.typesetPromise) {\r\n        MathJax.typesetPromise([root]).catch(console.error);\r\n    } else if (typeof window.typesetMath === \'function\') {\r\n        window.typesetMath(root);\r\n    }\r\n}\r\n\r\nfunction parseQuestionBlock(block) {\r\n    const lines = block.trim().split(\'\\n\');\r\n    const questionMatch = lines[0].match(/^\\d+\\.\\s*(.*)/);\r\n    if (!questionMatch) return null;\r\n\r\n    const question_text = questionMatch[1].trim();\r\n    const options = [];\r\n    const optionRegex = /^[A-D]\s?[.)]\s*(.*)/;\r\n\r\n    for (let i = 1; i < lines.length; i++) {\r\n        const line = lines[i].trim();\r\n        const match = line.match(optionRegex);\r\n        if (match) {\r\n            let text = match[1].trim();\r\n            const is_correct = text.endsWith(\'(Correct)\');\r\n            if (is_correct) {\r\n                text = text.replace(\'(Correct)\', \'\').trim();\r\n            }\r\n            options.push({ text, is_correct });\r\n        }\r\n    }\r\n\r\n    if (options.length !== 4) return null; // Basic validation\r\n\r\n    return { question_text, options };\r\n}\r\n\r\n$(document).on(\'click\', \'.save-gen-q-btn\', async function() {\r\n    const $btn = $(this);\r\n    const questionData = JSON.parse($btn.data(\'question-data\'));\r\n\r\n    const payload = {\r\n        topic_id: currentTopicId,\r\n        question_text: questionData.question_text,\r\n        options: questionData.options,\r\n        difficulty_level: allQuestions[currentQuestionIndex]?.difficulty_level || \'medium\'\r\n    };\r\n\r\n    $btn.prop(\'disabled\', true).html(\'<i class=\"bi bi-hourglass-split me-1\"></i>Saving...\');\r\n\r\n    try {\r\n        const res = await window.authenticatedFetch(\'/api/ai/save-generated-question\', {\r\n            method: \'POST\',\r\n            headers: { \'Content-Type\': \'application/json\' },\r\n            body: JSON.stringify(payload)\r\n        });\r\n        const result = await res.json();\r\n        if (!res.ok) throw new Error(result.message);\r\n\r\n        window.showToast(result.message, \'success\');\r\n        $btn.removeClass(\'btn-outline-primary\').addClass(\'btn-success\').html(\'<i class=\"bi bi-check-lg me-1\"></i>Saved\');\r\n\r\n    } catch (err) {\r\n        window.showToast(err.message || \'Could not save question.\', \'danger\');\r\n        $btn.prop(\'disabled\', false).html(\'<i class=\"bi bi-save me-1\"></i>Save for Practice\');\r\n    }\r\n});\r\n
+    // --- NEW: Generate Similar Questions (AI) ---
+    $generateAIBtn.on('click', async function (e) {
+        e.preventDefault();
+
+        const btn = this;
+        if (btn.disabled) return; // prevent duplicate clicks
+
+        const currentQuestion = allQuestions?.[currentQuestionIndex];
+        if (!currentQuestion) {
+            alert('No active question to generate from.');
+            return;
+        }
+
+        // Open modal + show loading
+        aiGeneratedModal.show();
+        $aiContent.hide().html(''); // Use .html() to clear previous content
+        $aiLoading.show();
+        btn.disabled = true;
+        btn.setAttribute('aria-busy', 'true');
+
+        const payload = {
+            question_type: currentQuestion.question_type || currentQuestion.type || null,
+            question_text: currentQuestion.question_text || currentQuestion.text || '',
+            passage_text: (currentQuestion.comprehension_passage && currentQuestion.comprehension_passage.passage_text) || currentQuestion.passage_text || null,
+            difficulty: currentQuestion.difficulty_level || currentQuestion.difficulty || null,
+            topic_name: "{{ topic.name }}",
+            subject_name: "{{ topic.subject.name }}",
+            exam_name: "{{ topic.subject.exam.name }}"
+        };
+
+        try {
+            const res = await window.authenticatedFetch('/api/ai/generate_questions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            let data;
+            try {
+                data = await res.json();
+            } catch {
+                throw new Error('Invalid server response (not JSON).');
+            }
+
+            if (!res.ok) {
+                throw new Error(data.message || `Failed to generate questions (HTTP ${res.status}).`);
+            }
+
+            const out = data.generated || data.text || 'No content returned.';
+            parseAndRenderGeneratedQuestions(out);
+
+        } catch (err) {
+            console.error(err);
+            $aiContent.html(`<div class="alert alert-danger">An error occurred: ${err.message}</div>`);
+        } finally {
+            $aiLoading.hide();
+            $aiContent.show();
+            btn.disabled = false;
+            btn.removeAttribute('aria-busy');
+        }
+    });
+
+    function parseAndRenderGeneratedQuestions(markdown) {
+        $aiContent.html(''); // Clear previous content
+        const questionBlocks = markdown.split(/\n(?=\d+\.\s)/).filter(b => b.trim());
+
+        if (questionBlocks.length === 0 && markdown.trim()) {
+            // If no numbered questions, render as a single block
+            const singleBlock = $('<div class="generated-question-item card mb-3"></div>');
+            const cardBody = $('<div class="card-body"></div>').text(markdown);
+            singleBlock.append(cardBody);
+            $aiContent.append(singleBlock);
+        } else {
+            questionBlocks.forEach((block, index) => {
+                const questionData = parseQuestionBlock(block);
+                if (!questionData) return;
+
+                const $item = $('<div class="generated-question-item card mb-3"></div>');
+                const $cardBody = $('<div class="card-body"></div>');
+
+                const $questionText = $('<p class="fw-bold"></p>').text(questionData.question_text);
+                $cardBody.append($questionText);
+
+                const $optionsList = $('<ul class="list-unstyled mb-3"></ul>');
+                questionData.options.forEach(opt => {
+                    const $optionItem = $('<li></li>').text(opt.text);
+                    if (opt.is_correct) {
+                        $optionItem.addClass('text-success fw-bold').prepend('<i class="bi bi-check-circle-fill me-2"></i> ');
+                    }
+                    $optionsList.append($optionItem);
+                });
+                $cardBody.append($optionsList);
+
+                const $saveBtn = $('<button class="btn btn-sm btn-outline-primary save-gen-q-btn"><i class="bi bi-save me-1"></i>Save for Practice</button>');
+                $saveBtn.data('question-data', JSON.stringify(questionData));
+                $cardBody.append($saveBtn);
+
+                $item.append($cardBody);
+                $aiContent.append($item);
+            });
+        }
+
+        // Typeset the newly added content
+        const root = document.getElementById('ai-content');
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            MathJax.typesetPromise([root]).catch(console.error);
+        } else if (typeof window.typesetMath === 'function') {
+            window.typesetMath(root);
+        }
+    }
+
+    function parseQuestionBlock(block) {
+        const lines = block.trim().split('\n');
+        const questionMatch = lines[0].match(/^\d+\.\s*(.*)/) || lines[0].match(/^\*{0,2}Q\d*.*?\s*(.*)/) || [null, lines[0]];
+        const question_text = (questionMatch[1] || lines[0]).trim();
+
+        const options = [];
+        const optionRegex = /^[-*]?\s*([A-D])\s*[\.\)]\s*(.*)/i;
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            const match = line.match(optionRegex);
+            if (match) {
+                let text = match[2].trim();
+                let is_correct = false;
+                
+                if (text.endsWith('(Correct)') || text.endsWith('Correct') || text.endsWith('*')) {
+                    is_correct = true;
+                    text = text.replace(/\(Correct\)$|Correct$|\*$/, '').trim();
+                } else if (line.toLowerCase().includes('(correct)')) {
+                    is_correct = true;
+                    text = text.replace(/\(correct\)/i, '').trim();
+                }
+                options.push({ text, is_correct });
+            }
+        }
+
+        if (options.length === 0) return null;
+
+        return { question_text, options };
+    }
+
+    $(document).on('click', '.save-gen-q-btn', async function() {
+        const $btn = $(this);
+        const questionData = JSON.parse($btn.data('question-data'));
+
+        const payload = {
+            topic_id: currentTopicId,
+            question_text: questionData.question_text,
+            options: questionData.options,
+            difficulty_level: allQuestions[currentQuestionIndex]?.difficulty_level || 'medium'
+        };
+
+        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+
+        try {
+            const res = await window.authenticatedFetch('/api/ai/save-generated-question', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message);
+
+            window.showToast(result.message, 'success');
+            $btn.removeClass('btn-outline-primary').addClass('btn-success').html('<i class="bi bi-check-lg me-1"></i>Saved');
+
+        } catch (err) {
+            window.showToast(err.message || 'Could not save question.', 'danger');
+            $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save for Practice');
+        }
+    });
 
     // --- NEW: Explain Differently (AI) ---
     $(document).on('click', '.explain-differently-btn', async function() {
