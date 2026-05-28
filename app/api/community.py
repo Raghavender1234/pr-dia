@@ -5,7 +5,6 @@ from app.models.community import ForumPost, ForumReply
 from app.models.class_management import Notification
 from app.models.organization import OrganizationMembership
 from app.models.user import User
-from app.api.main_co_admin import _upload_file_to_s3
 from app.utils.membership import can_access_internal_org_features
 
 community_bp = Blueprint('community_api', __name__, url_prefix='/api/community')

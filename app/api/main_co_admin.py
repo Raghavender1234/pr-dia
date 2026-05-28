@@ -19,7 +19,6 @@ from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 import base64
 from app.extensions import scheduler
-from app.tasks import analyze_mock_test_performance
 from app.models.class_management import Notification
 import os
 import uuid
@@ -1759,6 +1758,7 @@ def manage_mock_tests(current_user, organization, **kwargs):
 
         # --- THIS IS THE NEW SCHEDULING LOGIC ---
         if new_test.is_live_test and new_test.live_end_time:
+            from app.tasks import analyze_mock_test_performance
             # Schedule the analysis to run 10 minutes after the test ends
             run_time = new_test.live_end_time + timedelta(minutes=10)
             
@@ -1867,6 +1867,7 @@ def manage_single_mock_test(current_user, organization, test_id, **kwargs):
 
         # --- THIS IS THE NEW SCHEDULING LOGIC ---
         if test.is_live_test and test.live_end_time:
+            from app.tasks import analyze_mock_test_performance
             run_time = test.live_end_time + timedelta(minutes=10)
             job_id = f'analyze_mock_test_{test.id}'
             
@@ -1974,6 +1975,7 @@ def generate_mock_test_report(current_user, organization, test_id, **kwargs):
     test.report_status = 'pending'
     db.session.commit()
 
+    from app.tasks import analyze_mock_test_performance
     # Enqueue the background task
     job_id = f'analyze_mock_test_{test.id}'
     scheduler.add_job(
