@@ -21,6 +21,7 @@ from app.api.decorators import premium_feature_required, super_admin_required, s
 import json
 from app.models.community import ForumPost, ForumReply
 from app.models.class_management import Class, ClassParticipant
+from app.utils.membership import can_access_internal_org_features, is_internal_membership
 
 frontend_bp = Blueprint('frontend', __name__)
 
@@ -30,7 +31,8 @@ def get_user_context():
         'is_logged_in': False, 'user_type': None, 'user_name': None,
         'access_token': None, 'organization_name': None, 'organization_id': None,
         'dashboard_url': url_for('frontend.index'),
-        'is_premium': False, 'org_status': None
+        'is_premium': False, 'org_status': None,
+        'membership_access_type': None, 'is_internal_student': False
     }
 
     access_token = session.get('access_token')
@@ -77,6 +79,17 @@ def get_user_context():
                     user_context['organization_id'] = organization.id
                     user_context['organization_name'] = organization.name
                     user_context['org_status'] = organization.status
+                    membership = OrganizationMembership.query.filter_by(
+                        user_id=session_user_id,
+                        organization_id=organization.id,
+                        is_active=True
+                    ).first()
+                    if membership:
+                        user_context['membership_access_type'] = membership.access_type
+                        user_context['is_internal_student'] = (
+                            user_context['user_type'] == 'student'
+                            and is_internal_membership(membership)
+                        )
 
             user_type = user_context['user_type']
             if user_type:
@@ -322,6 +335,9 @@ def student_class_schedule():
     if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') != 'student':
         flash('Access denied. Please log in as a student.', 'danger')
         return redirect(url_for('frontend.login'))
+    if not g.user_context.get('is_internal_student'):
+        flash('Class schedules are available only to internally invited students.', 'warning')
+        return redirect(url_for(g.user_context.get('dashboard_url')))
     return render_template('student/class_schedule.html', **g.user_context)
 
 @frontend_bp.route('/student/organizations')
@@ -892,7 +908,15 @@ def view_locked_attempts():
         flash("You do not have permission to access this page.", "danger")
         return redirect(url_for('frontend.login'))
     return render_template('admin/locked_attempts.html')
-        
+
+
+@frontend_bp.route('/admin/learning-intelligence')
+def learning_intelligence_page():
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin']:
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('frontend.login'))
+    return render_template('admin/learning_intelligence.html')
+         
 @frontend_bp.route('/admin/grade-submissions')
 def grade_submissions_page():
     if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin', 'super_admin']:
@@ -966,6 +990,9 @@ def forum_home():
     if not g.user_context.get('is_logged_in'):
         flash("You must be logged in to access the forum.", "warning")
         return redirect(url_for('frontend.login'))
+    if g.user_context.get('user_type') == 'student' and not g.user_context.get('is_internal_student'):
+        flash("Community access is available only to internally invited students.", "warning")
+        return redirect(url_for(g.user_context.get('dashboard_url')))
     
     return render_template('community/forum.html')
 
@@ -973,7 +1000,10 @@ def forum_home():
 @frontend_bp.route('/forum/post/<int:post_id>')
 def view_forum_post(post_id):
     """Renders the page for a single forum post."""
-    
+    if g.user_context.get('user_type') == 'student' and not g.user_context.get('is_internal_student'):
+        flash("Community access is available only to internally invited students.", "warning")
+        return redirect(url_for(g.user_context.get('dashboard_url')))
+
     post = ForumPost.query.get_or_404(post_id)
     
     return render_template('community/view_post.html', post=post)
@@ -1017,12 +1047,21 @@ def live_class_view(class_id):
     live_class = Class.query.get_or_404(class_id)
     user_id = g.user_context.get('user_id')
     user_type = g.user_context.get('user_type')
+    membership = OrganizationMembership.query.filter_by(
+        user_id=user_id,
+        organization_id=live_class.organization_id,
+        is_active=True
+    ).first()
 
     # THIS IS THE FIX: Use the correct context for security checks
     is_admin = user_type in ['main_co_admin', 'co_admin']
     participant = ClassParticipant.query.filter_by(
         class_id=class_id, user_id=user_id
     ).first()
+
+    if not can_access_internal_org_features(User.query.get(user_id), membership):
+        flash("Live classes are available only to internally invited students.", "danger")
+        return redirect(url_for(g.user_context.get('dashboard_url')))
 
     if not participant and not is_admin:
         flash("You are not enrolled in this class.", "danger")

@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}Learning Intelligence{% endblock %}
+
+{% block head_extra %}
+<style>
+  .li-shell { max-width: 1440px; margin: 0 auto; padding: 1.5rem; }
+  .li-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
+  .li-title { margin: 0; font-size: 1.75rem; font-weight: 700; color: #1f2937; }
+  .li-subtitle { margin: .25rem 0 0; color: #6b7280; }
+  .li-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+  .li-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 14px rgba(15, 23, 42, .06); }
+  .li-stat { padding: 1rem; min-height: 104px; }
+  .li-stat small { display: block; color: #6b7280; font-weight: 600; text-transform: uppercase; font-size: .72rem; }
+  .li-stat strong { display: block; color: #111827; font-size: 1.65rem; line-height: 1.1; margin-top: .45rem; }
+  .li-stat span { display: block; color: #6b7280; font-size: .82rem; margin-top: .25rem; }
+  .li-section { padding: 1rem; }
+  .li-section h2 { font-size: 1rem; font-weight: 700; color: #1f2937; margin: 0 0 .9rem; }
+  .li-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 1rem; }
+  .li-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .li-table th { color: #6b7280; font-size: .75rem; text-transform: uppercase; letter-spacing: .02em; border-bottom: 1px solid #e5e7eb; padding: .65rem; text-align: left; }
+  .li-table td { border-bottom: 1px solid #f3f4f6; padding: .7rem .65rem; vertical-align: middle; }
+  .li-table tr:last-child td { border-bottom: 0; }
+  .li-badge { display: inline-flex; align-items: center; padding: .2rem .45rem; border-radius: 6px; font-size: .75rem; font-weight: 700; }
+  .li-badge.ready { color: #065f46; background: #d1fae5; }
+  .li-badge.watch { color: #92400e; background: #fef3c7; }
+  .li-badge.attention { color: #991b1b; background: #fee2e2; }
+  .li-progress { height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; min-width: 90px; }
+  .li-progress > span { display: block; height: 100%; background: #2563eb; border-radius: inherit; }
+  .li-topic { display: grid; grid-template-columns: minmax(120px, 1fr) 86px; gap: .75rem; align-items: center; padding: .7rem 0; border-bottom: 1px solid #f3f4f6; }
+  .li-topic:last-child { border-bottom: 0; }
+  .li-topic-title { font-weight: 700; color: #1f2937; }
+  .li-topic-meta { color: #6b7280; font-size: .82rem; margin-top: .15rem; }
+  .li-empty { color: #6b7280; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; padding: 1rem; text-align: center; }
+  .li-stack { display: grid; gap: 1rem; }
+  .li-action { padding: .75rem 0; border-bottom: 1px solid #f3f4f6; }
+  .li-action:last-child { border-bottom: 0; }
+  .li-action strong { display: block; color: #1f2937; }
+  .li-action p { margin: .2rem 0 0; color: #6b7280; font-size: .86rem; }
+  .li-loading { display: flex; justify-content: center; align-items: center; min-height: 300px; }
+  @media (max-width: 1100px) {
+    .li-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .li-layout { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .li-shell { padding: 1rem; }
+    .li-header { flex-direction: column; }
+    .li-grid { grid-template-columns: 1fr; }
+    .li-table { font-size: .82rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="li-shell">
+  <div class="li-header">
+    <div>
+      <h1 class="li-title">Learning Intelligence</h1>
+      <p class="li-subtitle">Internal student readiness, weak topics, at-risk learners, and remedial actions.</p>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" id="refreshIntelBtn">
+      <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+    </button>
+  </div>
+
+  <div id="intelMessage"></div>
+  <div id="intelLoading" class="li-card li-loading">
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+  </div>
+
+  <div id="intelContent" class="d-none">
+    <div class="li-grid">
+      <div class="li-card li-stat"><small>Internal Students</small><strong id="internalStudents">0</strong><span>Invited college learners</span></div>
+      <div class="li-card li-stat"><small>Active 14 Days</small><strong id="activeLearners">0</strong><span>Recent test activity</span></div>
+      <div class="li-card li-stat"><small>Completed Attempts</small><strong id="completedAttempts">0</strong><span>Internal mock attempts</span></div>
+      <div class="li-card li-stat"><small>Average Accuracy</small><strong id="averageAccuracy">0%</strong><span>Score vs possible marks</span></div>
+      <div class="li-card li-stat"><small>At Risk</small><strong id="atRiskCount">0</strong><span>Needs faculty attention</span></div>
+    </div>
+
+    <div class="li-layout">
+      <div class="li-stack">
+        <div class="li-card li-section">
+          <h2>Exam Readiness</h2>
+          <div class="table-responsive">
+            <table class="li-table">
+              <thead>
+                <tr>
+                  <th>Exam</th>
+                  <th>Readiness</th>
+                  <th>Accuracy</th>
+                  <th>Pass Rate</th>
+                  <th>Weak Topics</th>
+                  <th>Attempts</th>
+                </tr>
+              </thead>
+              <tbody id="examReadinessRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="li-card li-section">
+          <h2>At-Risk Students</h2>
+          <div class="table-responsive">
+            <table class="li-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Accuracy</th>
+                  <th>Attempts</th>
+                  <th>Failed</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="atRiskRows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="li-card li-section">
+          <h2>Recent Mock Reports</h2>
+          <div class="table-responsive">
+            <table class="li-table">
+              <thead>
+                <tr>
+                  <th>Mock Test</th>
+                  <th>Exam</th>
+                  <th>Attempts</th>
+                  <th>Average</th>
+                  <th>Pass Rate</th>
+                </tr>
+              </thead>
+              <tbody id="recentReportRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="li-stack">
+        <div class="li-card li-section">
+          <h2>Weakest Topics</h2>
+          <div id="weakTopicRows"></div>
+        </div>
+
+        <div class="li-card li-section">
+          <h2>Suggested Remedial Actions</h2>
+          <div id="remedialRows"></div>
+        </div>
+
+        <div class="li-card li-section">
+          <h2>Question Quality Flags</h2>
+          <div id="qualityRows"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const $loading = $('#intelLoading');
+  const $content = $('#intelContent');
+  const $message = $('#intelMessage');
+
+  const escapeHtml = (value) => $('<div>').text(value ?? '').html();
+  const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
+  const statusClass = (status) => {
+    if (status === 'Ready') return 'ready';
+    if (status === 'Watch') return 'watch';
+    return 'attention';
+  };
+  const emptyRow = (colspan, text) => `<tr><td colspan="${colspan}"><div class="li-empty">${text}</div></td></tr>`;
+  const emptyBlock = (text) => `<div class="li-empty">${text}</div>`;
+
+  function renderSummary(summary) {
+    $('#internalStudents').text(summary.internal_students || 0);
+    $('#activeLearners').text(summary.active_learners_14d || 0);
+    $('#completedAttempts').text(summary.completed_attempts || 0);
+    $('#averageAccuracy').text(pct(summary.average_accuracy));
+    $('#atRiskCount').text(summary.at_risk_students || 0);
+  }
+
+  function renderExamReadiness(rows) {
+    const html = rows.length ? rows.map(row => `
+      <tr>
+        <td><strong>${escapeHtml(row.exam_name)}</strong><br><small class="text-muted">${row.active_learners} active learners</small></td>
+        <td><span class="li-badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span><br><small>${pct(row.readiness_score)}</small></td>
+        <td><div class="li-progress"><span style="width:${Math.min(row.average_accuracy || 0, 100)}%"></span></div><small>${pct(row.average_accuracy)}</small></td>
+        <td>${pct(row.pass_rate)}</td>
+        <td>${row.weak_topic_count || 0}</td>
+        <td>${row.attempts || 0}</td>
+      </tr>
+    `).join('') : emptyRow(6, 'No completed internal mock-test attempts yet.');
+    $('#examReadinessRows').html(html);
+  }
+
+  function renderAtRisk(rows) {
+    const html = rows.length ? rows.map(row => `
+      <tr>
+        <td><strong>${escapeHtml(row.name)}</strong><br><small class="text-muted">${escapeHtml(row.email)}</small></td>
+        <td>${pct(row.average_accuracy)}</td>
+        <td>${row.attempts || 0}</td>
+        <td>${row.failed_tests || 0}</td>
+        <td>${escapeHtml(row.reason)}</td>
+      </tr>
+    `).join('') : emptyRow(5, 'No internal students are currently flagged.');
+    $('#atRiskRows').html(html);
+  }
+
+  function renderReports(rows) {
+    const html = rows.length ? rows.map(row => `
+      <tr>
+        <td><strong>${escapeHtml(row.mock_test_title)}</strong></td>
+        <td>${escapeHtml(row.exam_name)}</td>
+        <td>${row.total_attempts || 0}</td>
+        <td>${pct(row.average_score)}</td>
+        <td>${pct(row.pass_rate)}</td>
+      </tr>
+    `).join('') : emptyRow(5, 'No generated mock-test reports yet.');
+    $('#recentReportRows').html(html);
+  }
+
+  function renderWeakTopics(rows) {
+    const html = rows.length ? rows.map(row => `
+      <div class="li-topic">
+        <div>
+          <div class="li-topic-title">${escapeHtml(row.topic_name)}</div>
+          <div class="li-topic-meta">${escapeHtml(row.subject_name)} · ${escapeHtml(row.exam_name)} · ${row.answers} answers</div>
+        </div>
+        <div>
+          <div class="li-progress"><span style="width:${Math.min(row.accuracy || 0, 100)}%; background:${row.accuracy < 40 ? '#dc2626' : '#d97706'}"></span></div>
+          <small>${pct(row.accuracy)}</small>
+        </div>
+      </div>
+    `).join('') : emptyBlock('No weak-topic signal yet.');
+    $('#weakTopicRows').html(html);
+  }
+
+  function renderActions(rows) {
+    const html = rows.length ? rows.map(row => `
+      <div class="li-action">
+        <span class="li-badge ${row.priority === 'High' ? 'attention' : 'watch'}">${escapeHtml(row.priority)}</span>
+        <strong class="mt-2">${escapeHtml(row.topic_name)}</strong>
+        <p>${escapeHtml(row.suggested_action)}</p>
+        <p>${escapeHtml(row.subject_name)} · ${row.affected_students} affected students · ${pct(row.accuracy)}</p>
+      </div>
+    `).join('') : emptyBlock('No remedial action needed yet.');
+    $('#remedialRows').html(html);
+  }
+
+  function renderQuality(rows) {
+    const html = rows.length ? rows.map(row => `
+      <div class="li-action">
+        <strong>Question #${row.question_id}</strong>
+        <p>${escapeHtml(row.topic_name)} · ${pct(row.miss_rate)} miss rate · ${row.answers} answers</p>
+      </div>
+    `).join('') : emptyBlock('No question quality flags yet.');
+    $('#qualityRows').html(html);
+  }
+
+  async function loadIntelligence() {
+    $loading.removeClass('d-none');
+    $content.addClass('d-none');
+    $message.empty();
+
+    try {
+      const response = await window.authenticatedFetch('/api/main-co-admin/learning-intelligence');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Could not load learning intelligence.');
+
+      renderSummary(data.summary || {});
+      renderExamReadiness(data.exam_readiness || []);
+      renderAtRisk(data.at_risk_students || []);
+      renderReports(data.recent_reports || []);
+      renderWeakTopics(data.weakest_topics || []);
+      renderActions(data.remedial_actions || []);
+      renderQuality(data.question_quality_flags || []);
+      $content.removeClass('d-none');
+    } catch (error) {
+      $message.html(`<div class="alert alert-danger">${escapeHtml(error.message)}</div>`);
+    } finally {
+      $loading.addClass('d-none');
+    }
+  }
+
+  $('#refreshIntelBtn').on('click', loadIntelligence);
+  loadIntelligence();
+});
+</script>
+{% endblock %}

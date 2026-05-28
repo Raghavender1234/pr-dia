@@ -1412,11 +1412,13 @@ def enroll_in_exam(current_user, **kwargs):
     db.session.commit()
 
     # --- Enrollment Logic: UPDATE or CREATE ---
+    is_invited = membership.access_type == 'internal'
+    
     try:
-        # Case 1: Free Exam
-        if exam.is_free:
+        # Case 1: Free Exam or Invited Student
+        if exam.is_free or is_invited:
             if enrollment:
-                enrollment.access_status = 'free_access'
+                enrollment.access_status = 'free_access' if exam.is_free else 'admin_granted'
                 enrollment.purchased_at = datetime.utcnow()
                 enrollment.expires_at = None
                 enrollment.membership_id = membership.id # <-- FIX: Add ID on update too
@@ -1424,7 +1426,7 @@ def enroll_in_exam(current_user, **kwargs):
                 enrollment = StudentExam(
                     student_user_id=current_user.id,
                     exam_id=exam.id,
-                    access_status='free_access',
+                    access_status='free_access' if exam.is_free else 'admin_granted',
                     purchased_at=datetime.utcnow(),
                     membership_id=membership.id  # <-- FIX: Pass the ID here
                 )
@@ -1573,12 +1575,21 @@ def get_available_exams(current_user, **kwargs):
 
         available_exams = query.all()
         
+        # Get organizations where the user is an internally invited member
+        internal_org_ids = {
+            m.organization_id for m in OrganizationMembership.query.filter_by(
+                user_id=current_user.id,
+                is_active=True,
+                access_type='internal'
+            ).all()
+        }
+        
         results = [{
             "id": e.id,
             "name": e.name,
             "organization_name": e.organization.name,
-            "is_free": e.is_free,
-            "price": format_price(e.price, country_code) if e.price else "Free"
+            "is_free": e.is_free or (e.organization_id in internal_org_ids),
+            "price": "Free" if e.is_free or (e.organization_id in internal_org_ids) else format_price(e.price, country_code)
         } for e in available_exams]
         
         return jsonify(results), 200

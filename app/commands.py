@@ -34,6 +34,8 @@ def send_reminders():
         
         students_in_org = User.query.join(OrganizationMembership).filter(
             OrganizationMembership.organization_id == cls.organization_id,
+            OrganizationMembership.is_active == True,
+            OrganizationMembership.access_type == 'internal',
             User.user_type == 'student'
         ).all()
 

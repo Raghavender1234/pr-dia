@@ -560,6 +560,11 @@ window.MathJax = {
                                         <i class="bi bi-camera-video-fill text-danger"></i> Live Class Schedule
                                     </a>
                                 </li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('frontend.learning_intelligence_page', **org_param) }}">
+                                        <i class="bi bi-activity text-success"></i> Learning Intelligence
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -630,12 +635,17 @@ window.MathJax = {
                                     <!-- Notifications will be dynamically loaded here -->
                                 </div>
                                 <div class="notification-footer p-2 border-top">
+                                    <button class="btn btn-sm btn-outline-primary w-100 mb-2" id="enableBrowserNotificationsBtn" style="display: none;">
+                                        <i class="bi bi-bell-fill me-1"></i> Enable Browser Notifications
+                                    </button>
                                     <a href="{{ url_for('frontend.all_notifications_page') }}" class="btn btn-sm btn-outline-secondary w-100 mb-2">
                                         <i class="bi bi-list-ul me-1"></i> See All Notifications
                                     </a>
-                                    <button class="btn btn-sm btn-primary w-100" id="composeNotificationBtn">
-                                        <i class="bi bi-pencil-square me-1"></i> Compose New Message
-                                    </button>
+                                    {% if g.user_context.user_type != 'student' or g.user_context.is_internal_student %}
+                                        <button class="btn btn-sm btn-primary w-100" id="composeNotificationBtn">
+                                            <i class="bi bi-pencil-square me-1"></i> Compose New Message
+                                        </button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </li>
@@ -658,12 +668,14 @@ window.MathJax = {
                                         <span>My Profile</span>
                                     </a>
                                 </li>
-                                <li>
-                                    <a class="dropdown-item" href="{{ url_for('frontend.forum_home', **org_param) }}">
-                                        <i class="bi bi-chat-left-dots-fill text-primary"></i>
-                                        <span>Community Forum</span>
-                                    </a>
-                                </li>
+                                {% if g.user_context.user_type != 'student' or g.user_context.is_internal_student %}
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('frontend.forum_home', **org_param) }}">
+                                            <i class="bi bi-chat-left-dots-fill text-primary"></i>
+                                            <span>Community Forum</span>
+                                        </a>
+                                    </li>
+                                {% endif %}
                                 <li>
                                     <a class="dropdown-item" href="{{ url_for('frontend.student_transactions', **org_param) }}">
                                         <i class="bi bi-receipt text-success"></i>
@@ -1049,19 +1061,85 @@ document.addEventListener('DOMContentLoaded', function() {
     const panel = document.getElementById('notificationPanel');
     const dot = document.getElementById('notificationDot');
     const list = document.getElementById('notificationList');
+    const permissionButton = document.getElementById('enableBrowserNotificationsBtn');
     let isPanelOpen = false;
-    
-    if (!bell || !panel || !dot || !list) return;
-    
-    async function fetchNotifications() {
-        try {
-        const response = await authenticatedFetch('/api/notifications/?unread_only=true');
+    let hasLoadedNotificationSnapshot = false;
+    let knownNotificationIds = new Set(JSON.parse(sessionStorage.getItem('dia_seen_notification_ids') || '[]'));
+     
+     if (!bell || !panel || !dot || !list) return;
+
+    function updateNotificationPermissionButton() {
+        if (!permissionButton || !('Notification' in window)) return;
+        permissionButton.style.display = Notification.permission === 'default' ? 'block' : 'none';
+    }
+
+    function rememberNotificationIds(notifications) {
+        notifications.forEach(n => knownNotificationIds.add(String(n.id)));
+        sessionStorage.setItem(
+            'dia_seen_notification_ids',
+            JSON.stringify(Array.from(knownNotificationIds).slice(-100))
+        );
+    }
+
+    function showBrowserNotification(notification) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+        const browserNotification = new Notification(notification.title || 'New notification', {
+            body: notification.message || '',
+            icon: "{{ url_for('static', filename='images/favicon.svg') }}",
+            tag: `dia-notification-${notification.id}`
+        });
+
+        browserNotification.onclick = function() {
+            window.focus();
+            window.location.href = "{{ url_for('frontend.all_notifications_page') }}";
+            browserNotification.close();
+        };
+    }
+
+    function notifyForNewUnreadItems(notifications) {
+        if (!Array.isArray(notifications)) return;
+
+        const unreadItems = notifications.filter(n => !n.is_read);
+        if (hasLoadedNotificationSnapshot) {
+            unreadItems.forEach(n => {
+                const id = String(n.id);
+                if (!knownNotificationIds.has(id)) {
+                    showBrowserNotification(n);
+                }
+            });
+        }
+
+        rememberNotificationIds(unreadItems);
+        hasLoadedNotificationSnapshot = true;
+    }
+
+    if (permissionButton && 'Notification' in window) {
+        permissionButton.addEventListener('click', async function(event) {
+            event.stopPropagation();
+            const permission = await Notification.requestPermission();
+            updateNotificationPermissionButton();
+            if (permission === 'granted') {
+                showToast('Browser notifications enabled.', 'success');
+                fetchNotifications();
+            } else {
+                showToast('Browser notifications were not enabled.', 'warning');
+            }
+        });
+    }
+
+    updateNotificationPermissionButton();
+     
+     async function fetchNotifications() {
+         try {
+         const response = await authenticatedFetch('/api/notifications/?unread_only=true');
             if (!response.ok) {
                 throw new Error('Failed to fetch notifications');
             }
-            const data = await response.json();
-            
-            // Show/hide notification dot
+             const data = await response.json();
+            notifyForNewUnreadItems(data.notifications || []);
+             
+             // Show/hide notification dot
             if (data.unread_count > 0) {
                 dot.style.display = 'block';
             } else {

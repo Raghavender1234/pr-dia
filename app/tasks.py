@@ -8,7 +8,7 @@ from .models.reports import MockTestReport, TopicPerformanceSummary
 from .models.student_progress import StudentTestAttempt, StudentQuestionResponse
 from .models.question import Question
 from .models.topic import Topic
-from sqlalchemy import func
+from sqlalchemy import func, case
 from datetime import datetime
 
 # --- NEW: Define the limit for free reports ---
@@ -32,13 +32,21 @@ def send_class_reminders(class_id):
         students_in_org = User.query.join(OrganizationMembership).filter(
             OrganizationMembership.organization_id == organization_id,
             OrganizationMembership.is_active == True,
+            OrganizationMembership.access_type == 'internal',
             User.user_type == 'student'
         ).all()
 
         print(f"Sending reminders for class '{live_class.title}' to {len(students_in_org)} students.")
 
         for student in students_in_org:
-            # You can make this link point to your live class page
+            existing_reminder = Notification.query.filter_by(
+                user_id=student.id,
+                class_id=live_class.id,
+                notification_type='class_reminder'
+            ).first()
+            if existing_reminder:
+                continue
+
             class_url = f"/class/{live_class.id}/live" 
 
             notification = Notification(
@@ -71,22 +79,20 @@ def analyze_mock_test_performance(mock_test_id):
 
         try:
             organization = mock_test.exam.organization
-            plan = organization.plan
-
-            # --- THIS IS THE NEW FREEMIUM LOGIC ---
-            is_premium_ai_plan = plan and "AI Assistant" in plan.features # Check if the org has the AI plan
+            is_premium_ai_plan = bool(getattr(organization, 'is_ai_premium', False))
 
             if not is_premium_ai_plan:
                 # For free users, check their monthly report usage
-                current_month = datetime.utcnow().strftime('%Y-%m')
+                month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 reports_this_month = MockTestReport.query.filter(
                     MockTestReport.organization_id == organization.id,
-                    db.func.date_trunc('month', MockTestReport.generated_at) == datetime.strptime(current_month + '-01', '%Y-%m-%d')
+                    MockTestReport.generated_at >= month_start
                 ).count()
 
                 if reports_this_month >= FREE_TIER_REPORT_LIMIT:
                     print(f"Org {organization.id} has reached its free report limit for the month. Skipping analysis.")
-                    # Optionally, we could still create a notification telling them to upgrade
+                    mock_test.report_status = 'failed'
+                    db.session.commit()
                     return
             # --- END OF NEW LOGIC ---
 
@@ -134,7 +140,7 @@ def analyze_mock_test_performance(mock_test_id):
                 Question.topic_id,
                 Topic.name,
                 func.count(StudentQuestionResponse.id).label('total_responses'),
-                func.sum(db.case([(StudentQuestionResponse.is_correct == True, 1)], else_=0)).label('correct_responses')
+                func.sum(case((StudentQuestionResponse.is_correct == True, 1), else_=0)).label('correct_responses')
             ).join(Question, StudentQuestionResponse.question_id == Question.id) \
             .join(Topic, Question.topic_id == Topic.id) \
             .filter(StudentQuestionResponse.attempt_id.in_(attempt_ids)) \

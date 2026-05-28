@@ -5,11 +5,20 @@ from app.models.class_management import Notification
 from app.models.organization import OrganizationMembership
 from app.extensions import db
 from datetime import datetime
-from sqlalchemy import or_, and_, func, select
+from sqlalchemy import or_, and_, func, select, not_
 from .decorators import org_member_required, admin_role_required, student_required, org_member_flexible
 from app.models.user import User
+from app.utils.membership import can_access_internal_org_features
 
 notification_bp = Blueprint('notification_api', __name__, url_prefix='/api/notifications')
+INTERNAL_NOTIFICATION_TYPES = [
+    'announcement',
+    'class_reminder',
+    'community_post',
+    'community_reply',
+    'direct_message',
+    'direct_message_reply'
+]
 
 def _current_user():
     user_id = get_jwt_identity()
@@ -34,6 +43,18 @@ def get_notifications():
             Notification.sender_user_id == user.id
         )
     )
+
+    if user.user_type == 'student':
+        public_org_ids = [
+            membership.organization_id
+            for membership in OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).all()
+            if membership.access_type != 'internal'
+        ]
+        if public_org_ids:
+            base_query = base_query.filter(not_(and_(
+                Notification.organization_id.in_(public_org_ids),
+                Notification.notification_type.in_(INTERNAL_NOTIFICATION_TYPES)
+            )))
 
     # If the user is an admin and is busy, filter out notifications from students
     if user.user_type in ['main_co_admin', 'co_admin'] and user.availability_status == 'busy':
@@ -81,10 +102,16 @@ def get_notifications():
     notifications = paginated_notifications.items
     
     # IMPORTANT: Only count notifications where user is the RECIPIENT
-    unread_count = Notification.query.filter(
+    unread_count_query = Notification.query.filter(
         Notification.user_id == user.id,  # User is recipient
         Notification.read_at.is_(None)
-    ).count()
+    )
+    if user.user_type == 'student' and public_org_ids:
+        unread_count_query = unread_count_query.filter(not_(and_(
+            Notification.organization_id.in_(public_org_ids),
+            Notification.notification_type.in_(INTERNAL_NOTIFICATION_TYPES)
+        )))
+    unread_count = unread_count_query.count()
 
     def serialize_reply(reply):
         return {
@@ -154,11 +181,23 @@ def mark_notifications_read():
 def get_users_for_tagging(current_user, organization, **kwargs):
     """Fetches a list of all users in the current organization for the tagging feature."""
     query = request.args.get('query', '').strip().lower()
+    current_membership = OrganizationMembership.query.filter_by(
+        user_id=current_user.id,
+        organization_id=organization.id,
+        is_active=True
+    ).first()
+
+    if not can_access_internal_org_features(current_user, current_membership):
+        return jsonify({"message": "Community messaging is available only to internally invited students."}), 403
 
     base_query = OrganizationMembership.query.filter(
         OrganizationMembership.organization_id == organization.id,
         OrganizationMembership.is_active == True,
-        OrganizationMembership.user_id != current_user.id
+        OrganizationMembership.user_id != current_user.id,
+        or_(
+            OrganizationMembership.access_type == 'internal',
+            OrganizationMembership.user.has(User.user_type != 'student')
+        )
     )
 
     if query:
@@ -195,6 +234,7 @@ def send_broadcast_notification(current_user, organization, **kwargs):
     student_members = OrganizationMembership.query.join(User).filter(
         OrganizationMembership.organization_id == organization.id,
         OrganizationMembership.is_active == True,
+        OrganizationMembership.access_type == 'internal',
         User.user_type == 'student'
     ).all()
 
@@ -240,7 +280,11 @@ def send_admin_direct_notification(current_user, organization, **kwargs):
         valid_recipients = User.query.join(OrganizationMembership).filter(
             User.id.in_(recipient_ids),
             OrganizationMembership.organization_id == organization.id,
-            OrganizationMembership.is_active == True
+            OrganizationMembership.is_active == True,
+            or_(
+                User.user_type != 'student',
+                OrganizationMembership.access_type == 'internal'
+            )
         ).all()
 
         if not valid_recipients:
@@ -298,15 +342,26 @@ def send_direct_notification(current_user, **kwargs):
             return jsonify({"message": "Invalid recipient IDs format."}), 400
 
         # For security, verify that all recipients are in the same organization as the sender.
-        sender_org_id = current_user.memberships[0].organization_id if current_user.memberships else None
-        if not sender_org_id:
-            return jsonify({"message": "You must belong to an organization to send messages."}), 403
+        sender_membership = next(
+            (
+                membership for membership in current_user.memberships
+                if membership.is_active and membership.access_type == 'internal'
+            ),
+            None
+        )
+        if not sender_membership:
+            return jsonify({"message": "Community messaging is available only to internally invited students."}), 403
+        sender_org_id = sender_membership.organization_id
 
         # This ensures a student can't message users outside their own organization
         valid_recipients = User.query.join(OrganizationMembership).filter(
             User.id.in_(recipient_ids),
             OrganizationMembership.organization_id == sender_org_id,
-            OrganizationMembership.is_active == True
+            OrganizationMembership.is_active == True,
+            or_(
+                User.user_type != 'student',
+                OrganizationMembership.access_type == 'internal'
+            )
         ).all()
 
         if not valid_recipients:

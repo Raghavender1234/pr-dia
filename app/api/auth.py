@@ -363,7 +363,7 @@ def join_organization():
         membership.is_active = True
         message = "Successfully reactivated membership for organization"
     else:
-        membership = OrganizationMembership(user_id=user_id, organization_id=org.id, is_active=True)
+        membership = OrganizationMembership(user_id=user_id, organization_id=org.id, is_active=True, access_type='public')
         db.session.add(membership)
         message = "Successfully joined organization"
 

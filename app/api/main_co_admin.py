@@ -279,11 +279,11 @@ def serialize_topic_content(content):
     # Normalize URL-ish values for outbound payload
     raw_value = content.content_value or ""
     ctype = (content.content_type or "").strip().lower()
-    if ctype in ("pdf", "video", "link"):
+    if ctype in ("pdf", "video", "video_loop", "link", "image", "gif"):
         raw_value = ensure_scheme(raw_value)
 
     resolved = None
-    if ctype in ("pdf", "video", "link"):
+    if ctype in ("pdf", "video", "video_loop", "link", "image", "gif"):
         resolved = to_embed_url(ctype, raw_value)
 
     return {
@@ -539,6 +539,287 @@ def get_exam_performance_trends(current_user, organization, **kwargs):
     except Exception as e:
         current_app.logger.error(f"Error fetching exam performance trends: {e}", exc_info=True)
         return jsonify({"message": "Could not calculate performance data."} ), 500
+
+
+def _pct(numerator, denominator):
+    if not denominator:
+        return 0
+    return round((float(numerator or 0) / float(denominator)) * 100, 2)
+
+
+def _readiness_label(score):
+    if score >= 75:
+        return "Ready"
+    if score >= 55:
+        return "Watch"
+    return "Needs Attention"
+
+
+@main_co_admin_bp.route('/learning-intelligence', methods=['GET'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def get_learning_intelligence(current_user, organization, **kwargs):
+    """Aggregates learning health signals for internal college students."""
+    try:
+        cutoff_14_days = datetime.utcnow() - timedelta(days=14)
+
+        internal_memberships = OrganizationMembership.query.join(User).filter(
+            OrganizationMembership.organization_id == organization.id,
+            OrganizationMembership.is_active == True,
+            OrganizationMembership.access_type == 'internal',
+            User.user_type == 'student'
+        ).all()
+        internal_membership_ids = [m.id for m in internal_memberships]
+        internal_student_ids = [m.user_id for m in internal_memberships]
+
+        if not internal_membership_ids:
+            return jsonify({
+                "summary": {
+                    "internal_students": 0,
+                    "active_learners_14d": 0,
+                    "completed_attempts": 0,
+                    "average_accuracy": 0,
+                    "at_risk_students": 0
+                },
+                "exam_readiness": [],
+                "weakest_topics": [],
+                "at_risk_students": [],
+                "recent_reports": [],
+                "remedial_actions": [],
+                "question_quality_flags": []
+            }), 200
+
+        completed_attempts = StudentTestAttempt.query.join(MockTest).join(Exam).filter(
+            StudentTestAttempt.membership_id.in_(internal_membership_ids),
+            StudentTestAttempt.status == 'completed',
+            Exam.organization_id == organization.id
+        ).all()
+
+        active_learners_14d = len({
+            attempt.student_user_id
+            for attempt in completed_attempts
+            if attempt.completed_at and attempt.completed_at >= cutoff_14_days
+        })
+
+        total_score = sum(float(attempt.score or 0) for attempt in completed_attempts)
+        total_possible = sum(float(attempt.total_possible_score or attempt.mock_test.total_marks or 0) for attempt in completed_attempts)
+        average_accuracy = _pct(total_score, total_possible)
+
+        exam_rows = db.session.query(
+            Exam.id,
+            Exam.name,
+            func.count(StudentTestAttempt.id).label('attempt_count'),
+            func.count(func.distinct(StudentTestAttempt.student_user_id)).label('learner_count'),
+            func.sum(StudentTestAttempt.score).label('score_sum'),
+            func.sum(func.coalesce(StudentTestAttempt.total_possible_score, MockTest.total_marks, 0)).label('possible_sum'),
+            func.sum(case((StudentTestAttempt.score >= MockTest.passing_marks, 1), else_=0)).label('passed_count')
+        ).join(MockTest, MockTest.exam_id == Exam.id)\
+         .join(StudentTestAttempt, StudentTestAttempt.mock_test_id == MockTest.id)\
+         .filter(
+            Exam.organization_id == organization.id,
+            Exam.deleted_at.is_(None),
+            StudentTestAttempt.membership_id.in_(internal_membership_ids),
+            StudentTestAttempt.status == 'completed'
+         ).group_by(Exam.id, Exam.name).order_by(Exam.name).all()
+
+        weakest_topic_rows = db.session.query(
+            Exam.id.label('exam_id'),
+            Exam.name.label('exam_name'),
+            Subject.name.label('subject_name'),
+            Topic.id.label('topic_id'),
+            Topic.name.label('topic_name'),
+            func.count(StudentQuestionResponse.id).label('total_answers'),
+            func.sum(case((StudentQuestionResponse.is_correct == True, 1), else_=0)).label('correct_answers'),
+            func.avg(StudentQuestionResponse.time_taken).label('avg_time_seconds'),
+            func.count(func.distinct(StudentTestAttempt.student_user_id)).label('student_count')
+        ).select_from(StudentQuestionResponse)\
+         .join(StudentTestAttempt, StudentTestAttempt.id == StudentQuestionResponse.attempt_id)\
+         .join(Question, Question.id == StudentQuestionResponse.question_id)\
+         .join(Topic, Topic.id == Question.topic_id)\
+         .join(Subject, Subject.id == Topic.subject_id)\
+         .join(Exam, Exam.id == Subject.exam_id)\
+         .filter(
+            Exam.organization_id == organization.id,
+            StudentTestAttempt.membership_id.in_(internal_membership_ids),
+            StudentTestAttempt.status == 'completed',
+            StudentQuestionResponse.is_correct.isnot(None),
+            Topic.deleted_at.is_(None),
+            Subject.deleted_at.is_(None),
+            Exam.deleted_at.is_(None)
+         ).group_by(Exam.id, Exam.name, Subject.name, Topic.id, Topic.name).all()
+
+        topic_accuracy_by_exam = {}
+        weakest_topics = []
+        for row in weakest_topic_rows:
+            accuracy = _pct(row.correct_answers, row.total_answers)
+            topic_accuracy_by_exam.setdefault(row.exam_id, []).append(accuracy)
+            if row.total_answers >= 3:
+                weakest_topics.append({
+                    "exam_name": row.exam_name,
+                    "subject_name": row.subject_name,
+                    "topic_name": row.topic_name,
+                    "accuracy": accuracy,
+                    "answers": int(row.total_answers or 0),
+                    "student_count": int(row.student_count or 0),
+                    "avg_time_seconds": round(float(row.avg_time_seconds or 0), 1)
+                })
+        weakest_topics = sorted(weakest_topics, key=lambda item: (item["accuracy"], -item["answers"]))[:10]
+
+        exam_readiness = []
+        for row in exam_rows:
+            accuracy = _pct(row.score_sum, row.possible_sum)
+            pass_rate = _pct(row.passed_count, row.attempt_count)
+            weak_topic_count = len([acc for acc in topic_accuracy_by_exam.get(row.id, []) if acc < 50])
+            readiness_score = round((accuracy * 0.55) + (pass_rate * 0.35) + (max(0, 100 - weak_topic_count * 10) * 0.10), 2)
+            exam_readiness.append({
+                "exam_id": row.id,
+                "exam_name": row.name,
+                "attempts": int(row.attempt_count or 0),
+                "active_learners": int(row.learner_count or 0),
+                "average_accuracy": accuracy,
+                "pass_rate": pass_rate,
+                "weak_topic_count": weak_topic_count,
+                "readiness_score": readiness_score,
+                "status": _readiness_label(readiness_score)
+            })
+
+        student_rows = db.session.query(
+            User.id,
+            User.first_name,
+            User.last_name,
+            User.email,
+            func.count(StudentTestAttempt.id).label('attempt_count'),
+            func.sum(StudentTestAttempt.score).label('score_sum'),
+            func.sum(func.coalesce(StudentTestAttempt.total_possible_score, MockTest.total_marks, 0)).label('possible_sum'),
+            func.sum(case((StudentTestAttempt.score < MockTest.passing_marks, 1), else_=0)).label('failed_count'),
+            func.max(StudentTestAttempt.completed_at).label('last_activity')
+        ).select_from(User)\
+         .join(StudentTestAttempt, StudentTestAttempt.student_user_id == User.id)\
+         .join(MockTest, MockTest.id == StudentTestAttempt.mock_test_id)\
+         .join(Exam, Exam.id == MockTest.exam_id)\
+         .filter(
+            User.id.in_(internal_student_ids),
+            StudentTestAttempt.membership_id.in_(internal_membership_ids),
+            StudentTestAttempt.status == 'completed',
+            Exam.organization_id == organization.id
+         ).group_by(User.id, User.first_name, User.last_name, User.email).all()
+
+        students_with_attempts = {row.id for row in student_rows}
+        at_risk_students = []
+        for row in student_rows:
+            accuracy = _pct(row.score_sum, row.possible_sum)
+            days_inactive = (datetime.utcnow() - row.last_activity).days if row.last_activity else None
+            reasons = []
+            if accuracy < 50:
+                reasons.append("low accuracy")
+            if (row.failed_count or 0) >= 2:
+                reasons.append("multiple failed tests")
+            if days_inactive is not None and days_inactive >= 14:
+                reasons.append("inactive for 14+ days")
+            if reasons:
+                at_risk_students.append({
+                    "student_id": row.id,
+                    "name": f"{row.first_name} {row.last_name}",
+                    "email": row.email,
+                    "attempts": int(row.attempt_count or 0),
+                    "average_accuracy": accuracy,
+                    "failed_tests": int(row.failed_count or 0),
+                    "last_activity": row.last_activity.isoformat() if row.last_activity else None,
+                    "reason": ", ".join(reasons)
+                })
+
+        for membership in internal_memberships:
+            if membership.user_id not in students_with_attempts:
+                at_risk_students.append({
+                    "student_id": membership.user_id,
+                    "name": f"{membership.user.first_name} {membership.user.last_name}",
+                    "email": membership.user.email,
+                    "attempts": 0,
+                    "average_accuracy": 0,
+                    "failed_tests": 0,
+                    "last_activity": None,
+                    "reason": "no completed mock tests"
+                })
+
+        at_risk_students = sorted(
+            at_risk_students,
+            key=lambda item: (item["attempts"] > 0, item["average_accuracy"], -item["failed_tests"])
+        )[:10]
+
+        recent_reports = MockTestReport.query.join(MockTest).join(Exam).filter(
+            MockTestReport.organization_id == organization.id,
+            Exam.organization_id == organization.id
+        ).order_by(MockTestReport.generated_at.desc()).limit(5).all()
+
+        report_data = [{
+            "mock_test_title": report.mock_test.title,
+            "exam_name": report.mock_test.exam.name,
+            "generated_at": report.generated_at.isoformat() if report.generated_at else None,
+            "total_attempts": report.total_attempts,
+            "average_score": round(float(report.average_score or 0), 2),
+            "pass_rate": round(float(report.pass_rate or 0), 2)
+        } for report in recent_reports]
+
+        remedial_actions = [{
+            "priority": "High" if topic["accuracy"] < 40 else "Medium",
+            "exam_name": topic["exam_name"],
+            "subject_name": topic["subject_name"],
+            "topic_name": topic["topic_name"],
+            "suggested_action": "Schedule a remedial class and assign a focused practice quiz.",
+            "affected_students": topic["student_count"],
+            "accuracy": topic["accuracy"]
+        } for topic in weakest_topics[:5]]
+
+        question_quality_rows = db.session.query(
+            Question.id,
+            Topic.name.label('topic_name'),
+            func.count(StudentQuestionResponse.id).label('answers'),
+            func.sum(case((StudentQuestionResponse.is_correct == False, 1), else_=0)).label('wrong_answers'),
+            func.avg(StudentQuestionResponse.time_taken).label('avg_time_seconds')
+        ).select_from(StudentQuestionResponse)\
+         .join(StudentTestAttempt, StudentTestAttempt.id == StudentQuestionResponse.attempt_id)\
+         .join(Question, Question.id == StudentQuestionResponse.question_id)\
+         .join(Topic, Topic.id == Question.topic_id)\
+         .join(Subject, Subject.id == Topic.subject_id)\
+         .join(Exam, Exam.id == Subject.exam_id)\
+         .filter(
+            Exam.organization_id == organization.id,
+            StudentTestAttempt.membership_id.in_(internal_membership_ids),
+            StudentTestAttempt.status == 'completed',
+            StudentQuestionResponse.is_correct.isnot(None)
+         ).group_by(Question.id, Topic.name).having(func.count(StudentQuestionResponse.id) >= 5).limit(10).all()
+
+        question_quality_flags = []
+        for row in question_quality_rows:
+            miss_rate = _pct(row.wrong_answers, row.answers)
+            if miss_rate >= 80:
+                question_quality_flags.append({
+                    "question_id": row.id,
+                    "topic_name": row.topic_name,
+                    "answers": int(row.answers or 0),
+                    "miss_rate": miss_rate,
+                    "avg_time_seconds": round(float(row.avg_time_seconds or 0), 1),
+                    "signal": "High miss rate"
+                })
+
+        return jsonify({
+            "summary": {
+                "internal_students": len(internal_student_ids),
+                "active_learners_14d": active_learners_14d,
+                "completed_attempts": len(completed_attempts),
+                "average_accuracy": average_accuracy,
+                "at_risk_students": len(at_risk_students)
+            },
+            "exam_readiness": exam_readiness,
+            "weakest_topics": weakest_topics,
+            "at_risk_students": at_risk_students,
+            "recent_reports": report_data,
+            "remedial_actions": remedial_actions,
+            "question_quality_flags": question_quality_flags
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error building learning intelligence: {e}", exc_info=True)
+        return jsonify({"message": "Could not calculate learning intelligence."}), 500
 
 @main_co_admin_bp.route('/exams', methods=['GET', 'POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
@@ -835,12 +1116,12 @@ def topic_contents(current_user, organization, topic_id, **kwargs):
     try:
         # Normalize content_type to lowercase and trim
         ctype = (data.get('content_type') or 'text').strip().lower()
-        if ctype not in ('text', 'pdf', 'video', 'link'):
+        if ctype not in ('text', 'pdf', 'video', 'video_loop', 'link', 'image', 'gif'):
             # fallback to 'link' for unknown non-text if a URL is present, else 'text'
             ctype = 'link' if data.get('content_value') else 'text'
 
         value = data.get('content_value')
-        if ctype in ('pdf', 'video', 'link'):
+        if ctype in ('pdf', 'video', 'video_loop', 'link', "image", "gif"):
             value = ensure_scheme(value)
 
         new_item = TopicContent(
@@ -891,16 +1172,16 @@ def manage_single_topic_content(current_user, organization, content_id, **kwargs
 
         # determine final content_type first (normalize to lowercase)
         final_type = (data.get('content_type', content.content_type) or 'text').strip().lower()
-        if final_type not in ('text', 'pdf', 'video', 'link'):
+        if final_type not in ('text', 'pdf', 'video', 'video_loop', 'link', 'image', 'gif'):
             final_type = content.content_type or 'text'
             final_type = final_type.strip().lower()
-            if final_type not in ('text', 'pdf', 'video', 'link'):
+            if final_type not in ('text', 'pdf', 'video', 'video_loop', 'link', 'image', 'gif'):
                 final_type = 'text'
         content.content_type = final_type
 
         if 'content_value' in data:
             val = data['content_value']
-            if final_type in ('pdf', 'video', 'link'):
+            if final_type in ('pdf', 'video', 'video_loop', 'link', 'image', 'gif'):
                 val = ensure_scheme(val)
             content.content_value = val
 
@@ -1700,6 +1981,7 @@ def generate_mock_test_report(current_user, organization, test_id, **kwargs):
         func=analyze_mock_test_performance,
         args=[test.id],
         trigger='date',
+        run_date=datetime.utcnow() + timedelta(seconds=1),
         replace_existing=True
     )
 
@@ -2921,7 +3203,7 @@ def handle_video_upload(current_user, organization, **kwargs):
         upload_result = _upload_file_to_s3(
             file,
             subfolder="topic_videos",
-            allowed_extensions=['mp4', 'mov', 'avi', 'wmv', 'webm'],
+            allowed_extensions=['mp4', 'mov', 'avi', 'wmv', 'webm', 'gif'],
             max_bytes=current_app.config['MAX_VIDEO_UPLOAD_SIZE']
         )
         
