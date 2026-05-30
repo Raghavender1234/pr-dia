@@ -112,6 +112,7 @@ def create_class_instances(data, current_user, organization):
     timezone_name = data.get('timezone') or 'UTC'
     start_time_naive_utc = parse_datetime_to_naive_utc(data.get('scheduled_at'), timezone_name)
     duration_minutes = int(data.get('duration_minutes') or 60)
+    audience = data.get('audience', 'internal_only')
     if duration_minutes <= 0:
         raise ValueError('duration_minutes must be greater than zero')
 
@@ -131,6 +132,7 @@ def create_class_instances(data, current_user, organization):
             duration_minutes=duration_minutes,
             timezone=timezone_name,
             meeting_link=data.get('meeting_link'),
+            audience=audience,
             created_by=current_user.id
         )
         db.session.add(new_class)
@@ -272,10 +274,14 @@ def get_classes_for_organization(organization_id):
     
     if not membership:
         return jsonify({'error': 'Access denied'}), 403
-    if not can_access_internal_org_features(user, membership):
-        return jsonify({'error': 'Class schedules are available only to internally invited students.'}), 403
 
-    classes = Class.query.filter_by(organization_id=organization_id).all()
+    is_internal = can_access_internal_org_features(user, membership)
+    query = Class.query.filter_by(organization_id=organization_id)
+    
+    if not is_internal:
+        query = query.filter_by(audience='public')
+        
+    classes = query.all()
 
     calendar_events = []
     for cls in classes:

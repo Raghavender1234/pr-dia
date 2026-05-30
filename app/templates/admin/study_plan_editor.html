@@ -46,6 +46,16 @@
                     <textarea class="form-control" id="planDescription" rows="2" placeholder="A brief description of this study plan"></textarea>
                 </div>
             </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label for="planVisibility" class="form-label fw-bold">Audience Visibility</label>
+                    <select id="planVisibility" class="form-select">
+                        <option value="internal_only" selected>Internal Enrolled Students Only</option>
+                        <option value="public">Public (Visible to External Guests)</option>
+                    </select>
+                    <div class="form-text">Public plans can be viewed by anyone outside of your enrolled cohorts.</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -371,6 +381,7 @@ window.pageInit = function() {
             
             $planName.val(planData.name);
             $planDescription.val(planData.description);
+            $('#planVisibility').val(data.visibility || 'internal_only');
             renderPlan();
         } catch (error) {
             console.error("Failed to load study plan", error);
@@ -561,6 +572,7 @@ window.pageInit = function() {
         const payload = {
             name: planName,
             description: planDescription,
+            visibility: $('#planVisibility').val(),
             items: planData.items
         };
         

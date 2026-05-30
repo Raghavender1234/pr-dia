@@ -3447,6 +3447,7 @@ def confirm_grade(current_user, organization, response_id, **kwargs):
 def update_study_plan(current_user, organization, exam_id, **kwargs):
     data = request.get_json()
     plan_name = data.get('name')
+    visibility = data.get('visibility', 'internal_only')
     items_data = data.get('items', [])
     
     if not plan_name:
@@ -3456,12 +3457,13 @@ def update_study_plan(current_user, organization, exam_id, **kwargs):
     study_plan = StudyPlan.query.filter_by(exam_id=exam_id).first()
     
     if not study_plan:
-        study_plan = StudyPlan(exam_id=exam_id, name=plan_name, created_by_user_id=current_user.id)
+        study_plan = StudyPlan(exam_id=exam_id, name=plan_name, created_by_user_id=current_user.id, visibility=visibility)
         db.session.add(study_plan)
         db.session.flush()
     else:
         study_plan.name = plan_name
         study_plan.description = data.get('description', study_plan.description)
+        study_plan.visibility = visibility
     
     # Delete old items to replace with the new list
     StudyPlanItem.query.filter_by(study_plan_id=study_plan.id).delete()
@@ -3491,7 +3493,7 @@ def get_study_plan(current_user, organization, exam_id, **kwargs):
     study_plan = StudyPlan.query.filter_by(exam_id=exam_id).first()
     if not study_plan:
         # Return empty structure if no plan exists yet
-        return jsonify({"name": "", "description": "", "items": []}), 200
+        return jsonify({"name": "", "description": "", "visibility": "internal_only", "items": []}), 200
 
     # Load items with topic/mock_test for display; order by date then explicit order
     items = (
@@ -3525,6 +3527,7 @@ def get_study_plan(current_user, organization, exam_id, **kwargs):
     return jsonify({
         "name": study_plan.name,
         "description": study_plan.description,
+        "visibility": getattr(study_plan, 'visibility', 'internal_only'),
         "items": serialized_items
     }), 200
 

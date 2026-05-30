@@ -3163,6 +3163,15 @@ def _get_organization_study_plan(exam_id, user_id, exam):
         if not study_plan:
             return jsonify({"success": False, "message": "No organization study plan available."}), 404
 
+        # Evaluate visibility
+        membership = OrganizationMembership.query.filter_by(
+            user_id=user_id, organization_id=exam.organization_id, is_active=True
+        ).first()
+        is_internal = membership and membership.access_type == 'internal'
+        visibility = getattr(study_plan, 'visibility', 'internal_only')
+        if visibility == 'internal_only' and not is_internal:
+            return jsonify({"success": False, "message": "This study plan is reserved for internally enrolled students only."}), 403
+
         # Collect item IDs for this plan (to scope completion correctly)
         plan_item_ids = {it.id for it in study_plan.items}
 

@@ -506,6 +506,15 @@
                     <input type="url" class="form-control" id="classMeetingLink" name="meeting_link" placeholder="https://meet.google.com/...">
                     <small class="text-muted">e.g., Google Meet, Zoom, or Microsoft Teams link</small>
                 </div>
+
+                <div class="form-group">
+                    <label for="classAudience" class="form-label fw-bold">Class Audience</label>
+                    <select id="classAudience" class="form-control" name="audience">
+                        <option value="internal_only" selected>Private (Internal Cohort Only)</option>
+                        <option value="public">Public Event (Marketing / All Students)</option>
+                    </select>
+                    <small class="text-muted d-block mt-1">Public classes can be seen by independent learners outside of your enrolled cohorts.</small>
+                </div>
                 
                 <div class="row">
                     <div class="col-md-6 form-group">
@@ -962,6 +971,7 @@ document.addEventListener('DOMContentLoaded', function () {
       title: document.getElementById('classTitle').value,
       description: document.getElementById('classDescription').value || '',
       meeting_link: document.getElementById('classMeetingLink').value || '',
+      audience: document.getElementById('classAudience').value || 'internal_only',
       duration_minutes: duration,
       organization_id: organizationId,
       scheduled_at: startUTC,
