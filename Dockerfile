@@ -7,6 +7,7 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=wsgi.py
+ENV MPLCONFIGDIR=/tmp/matplotlib
 
 # Install system dependencies (needed for building some Python packages)
 RUN apt-get update && apt-get install -y --no-install-recommends \
