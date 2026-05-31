@@ -4317,14 +4317,27 @@ def manage_assignments(current_user, organization, **kwargs):
                 'description': a.description,
                 'due_date': a.due_date.isoformat() if a.due_date else None,
                 'max_marks': str(a.max_marks),
+                'attachment_url': a.attachment_url,
                 'submissions_count': submissions_count,
                 'graded_count': graded_count
             })
         return jsonify(result), 200
 
     if request.method == 'POST':
-        data = request.get_json()
+        # Handle both multipart form data (with file) and json
+        if request.content_type and request.content_type.startswith('multipart/form-data'):
+            data = request.form
+            file = request.files.get('file')
+        else:
+            data = request.get_json()
+            file = None
+            
         try:
+            attachment_url = None
+            if file and file.filename != '':
+                upload_result = _upload_file_to_s3(file, subfolder="assignment_attachments")
+                attachment_url = upload_result.get("url")
+
             due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
             new_assignment = Assignment(
                 organization_id=organization.id,
@@ -4332,6 +4345,7 @@ def manage_assignments(current_user, organization, **kwargs):
                 description=data.get('description'),
                 due_date=due_date.replace(tzinfo=None),
                 max_marks=float(data.get('max_marks', 100)),
+                attachment_url=attachment_url,
                 created_by_user_id=current_user.id
             )
             db.session.add(new_assignment)

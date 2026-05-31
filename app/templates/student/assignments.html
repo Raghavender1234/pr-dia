@@ -44,8 +44,8 @@
                         <textarea class="form-control" name="submission_text" rows="4" placeholder="Type your answer here..."></textarea>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Attach File (PDF/Doc/Image)</label>
-                        <input type="file" class="form-control" name="file">
+                        <label class="form-label fw-bold">Attach File (Scanned PDF/Doc/Image)</label>
+                        <input type="file" class="form-control" name="file" accept=".pdf,.doc,.docx,.jpg,.png">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -70,6 +70,9 @@ $(document).ready(function() {
         let todoHtml = '', completedHtml = '';
         data.forEach(a => {
             const due = new Date(a.due_date);
+            const attachHtml = a.attachment_url ? 
+                `<a href="${a.attachment_url}" target="_blank" class="btn btn-sm btn-outline-info mt-2 me-2"><i class="bi bi-file-earmark-arrow-down"></i> View Attached Material</a>` : '';
+            
             if (!a.submission) {
                 // Not submitted
                 todoHtml += `
@@ -78,7 +81,8 @@ $(document).ready(function() {
                             <h5 class="card-title">${a.title}</h5>
                             <p class="text-muted small mb-2"><i class="bi bi-clock"></i> Due: ${due.toLocaleString()}</p>
                             <p class="card-text">${a.description || ''}</p>
-                            <button class="btn btn-primary mt-2" onclick="$('#submitAssignId').val(${a.id}); $('#submitModal').modal('show');">Submit Now</button>
+                            ${attachHtml}
+                            <button class="btn btn-primary btn-sm mt-2" onclick="$('#submitAssignId').val(${a.id}); $('#submitModal').modal('show');"><i class="bi bi-upload"></i> Submit Now</button>
                         </div>
                     </div></div>`;
             } else {

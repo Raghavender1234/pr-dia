@@ -11,6 +11,7 @@ class Assignment(db.Model):
     description = db.Column(db.Text, nullable=True)
     due_date = db.Column(db.DateTime, nullable=False)
     max_marks = db.Column(db.Numeric(5, 2), nullable=True)
+    attachment_url = db.Column(db.String(512), nullable=True)
     
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
