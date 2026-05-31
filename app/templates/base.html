@@ -539,6 +539,11 @@ window.MathJax = {
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('frontend.student_assignments_page', **org_param) }}">
+                                    <i class="bi bi-journal-check me-1"></i>My Assignments
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link fw-bold text-warning" href="{{ url_for('frontend.browse_all_exams', **org_param) }}">
                                     <i class="bi bi-search-heart me-1"></i>Find More Exams
                                 </a>
@@ -597,6 +602,12 @@ window.MathJax = {
                                 </li>
                                 {% endif %}
                             </ul>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('frontend.admin_assignments_page', **org_param) }}">
+                                <i class="bi bi-journal-text me-1"></i>Assignments
+                            </a>
                         </li>
 
                         {% if g.user_context.user_type == 'main_co_admin' %}
