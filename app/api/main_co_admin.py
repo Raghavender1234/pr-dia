@@ -8,6 +8,7 @@ from app.models.topic import Topic, TopicContent
 from app.models.student_progress import StudentExam, StudentAISubscription, StudentTestAttempt, StudentQuestionResponse, StudentWeeklyProgress
 from app.models.question import Question, MCQOption, ComprehensionPassage, ReportedContent
 from app.models.reports import MockTestReport, TopicPerformanceSummary
+from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.mock_test import MockTest, MockTestQuestion
 from .decorators import admin_role_required
 from sqlalchemy.exc import IntegrityError
@@ -4297,3 +4298,88 @@ def export_mock_test_pdf_report(current_user, organization, test_id, **kwargs):
     except Exception as e:
         current_app.logger.error(f"Failed to generate PDF report for mock test {test_id}: {e}", exc_info=True)
         return jsonify({"message": "An error occurred while generating the PDF report."} ), 500
+
+
+# --- ASSIGNMENT MANAGEMENT ---
+
+@main_co_admin_bp.route('/assignments', methods=['GET', 'POST'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def manage_assignments(current_user, organization, **kwargs):
+    if request.method == 'GET':
+        assignments = Assignment.query.filter_by(organization_id=organization.id).order_by(Assignment.due_date.desc()).all()
+        result = []
+        for a in assignments:
+            submissions_count = AssignmentSubmission.query.filter_by(assignment_id=a.id).count()
+            graded_count = AssignmentSubmission.query.filter_by(assignment_id=a.id, status='graded').count()
+            result.append({
+                'id': a.id,
+                'title': a.title,
+                'description': a.description,
+                'due_date': a.due_date.isoformat() if a.due_date else None,
+                'max_marks': str(a.max_marks),
+                'submissions_count': submissions_count,
+                'graded_count': graded_count
+            })
+        return jsonify(result), 200
+
+    if request.method == 'POST':
+        data = request.get_json()
+        try:
+            due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
+            new_assignment = Assignment(
+                organization_id=organization.id,
+                title=data['title'],
+                description=data.get('description'),
+                due_date=due_date.replace(tzinfo=None),
+                max_marks=float(data.get('max_marks', 100)),
+                created_by_user_id=current_user.id
+            )
+            db.session.add(new_assignment)
+            db.session.commit()
+            return jsonify({"message": "Assignment created successfully!"}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"message": f"Error creating assignment: {str(e)}"}), 500
+
+@main_co_admin_bp.route('/assignments/<int:assignment_id>/submissions', methods=['GET'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def get_assignment_submissions(current_user, organization, assignment_id, **kwargs):
+    assignment = Assignment.query.filter_by(id=assignment_id, organization_id=organization.id).first_or_404()
+    submissions = AssignmentSubmission.query.filter_by(assignment_id=assignment.id).all()
+    
+    data = [{
+        "id": sub.id,
+        "student_email": User.query.get(sub.student_user_id).email,
+        "student_name": f"{User.query.get(sub.student_user_id).first_name} {User.query.get(sub.student_user_id).last_name}",
+        "submission_text": sub.submission_text,
+        "file_url": sub.file_url,
+        "status": sub.status,
+        "marks_awarded": str(sub.marks_awarded) if sub.marks_awarded is not None else None,
+        "feedback": sub.feedback,
+        "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None
+    } for sub in submissions]
+    
+    return jsonify({"assignment_title": assignment.title, "max_marks": str(assignment.max_marks), "data": data}), 200
+
+@main_co_admin_bp.route('/assignments/submissions/<int:submission_id>/grade', methods=['POST'])
+@admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
+def grade_assignment_submission(current_user, organization, submission_id, **kwargs):
+    data = request.get_json()
+    submission = AssignmentSubmission.query.get_or_404(submission_id)
+    
+    # Authorization check
+    if submission.assignment.organization_id != organization.id:
+        return jsonify({"message": "Unauthorized"}), 403
+
+    try:
+        submission.marks_awarded = float(data['marks'])
+        submission.feedback = data.get('feedback', '')
+        submission.status = 'graded'
+        submission.graded_at = datetime.utcnow()
+        submission.graded_by_admin_id = current_user.id
+        
+        db.session.commit()
+        return jsonify({"message": "Grade submitted successfully!"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": f"Failed to grade: {str(e)}"}), 500

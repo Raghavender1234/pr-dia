@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Grade Submissions{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('frontend.admin_assignments_page') }}">Assignments</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Grade</li>
+        </ol>
+    </nav>
+
+    <h2 class="mb-4">Grade Submissions: <span class="text-primary" id="assignTitle">Loading...</span></h2>
+    
+    <div id="pageMessage" class="mb-3"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="submissionsTable" class="table table-hover align-middle" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+const ASSIGNMENT_ID = {{ assignment_id }};
+$(document).ready(function() {
+    const table = $('#submissionsTable').DataTable({
+        ajax: function(data, callback, settings) {
+            window.authenticatedFetch(`/api/main-co-admin/assignments/${ASSIGNMENT_ID}/submissions`)
+                .then(res => res.json())
+                .then(json => {
+                    $('#assignTitle').text(`${json.assignment_title} (Max: ${json.max_marks})`);
+                    callback({data: json.data});
+                });
+        },
+        columns: [
+            { data: 'student_name', title: 'Student', render: (data, type, row) => `<strong>${data}</strong><br><small class="text-muted">${row.student_email}</small>` },
+            { data: 'submitted_at', title: 'Submitted On', render: data => new Date(data).toLocaleString() },
+            { 
+                data: null, 
+                title: 'Response', 
+                render: (data, type, row) => {
+                    let res = '';
+                    if(row.submission_text) res += `<div class="small p-2 bg-light border rounded mb-1" style="max-height:100px; overflow-y:auto;">${row.submission_text}</div>`;
+                    if(row.file_url) res += `<a href="${row.file_url}" target="_blank" class="btn btn-sm btn-outline-info"><i class="bi bi-file-earmark-pdf"></i> View File</a>`;
+                    return res || '<em class="text-muted">No content</em>';
+                }
+            },
+            {
+                data: 'status',
+                title: 'Status',
+                render: data => data === 'graded' ? '<span class="badge bg-success">Graded</span>' : (data === 'late' ? '<span class="badge bg-danger">Late</span>' : '<span class="badge bg-warning text-dark">Pending</span>')
+            },
+            {
+                data: null,
+                title: 'Grading Actions',
+                orderable: false,
+                render: function(data, type, row) {
+                    const score = row.marks_awarded || '';
+                    const feedback = row.feedback || '';
+                    return `
+                        <div class="grading-form" data-id="${row.id}">
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text">Score</span>
+                                <input type="number" class="form-control score-input" value="${score}" step="0.5" required>
+                            </div>
+                            <textarea class="form-control form-control-sm feedback-input mb-1" rows="2" placeholder="Feedback...">${feedback}</textarea>
+                            <button class="btn btn-sm btn-success w-100 submit-grade-btn">Save Grade</button>
+                        </div>
+                    `;
+                }
+            }
+        ]
+    });
+
+    $('#submissionsTable').on('click', '.submit-grade-btn', async function() {
+        const $form = $(this).closest('.grading-form');
+        const payload = {
+            marks: $form.find('.score-input').val(),
+            feedback: $form.find('.feedback-input').val()
+        };
+        await window.authenticatedFetch(`/api/main-co-admin/assignments/submissions/${$form.data('id')}/grade`, { method: 'POST', body: JSON.stringify(payload) });
+        table.ajax.reload(null, false);
+    });
+});
+</script>
+{% endblock %}

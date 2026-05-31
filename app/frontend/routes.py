@@ -14,6 +14,7 @@ from app.models.exam import Exam    # <<< ADD
 from app.models.mock_test import MockTest
 from app.models.user import User
 from app.api.student import generate_advanced_study_plan
+from app.models.assignment import Assignment
 from app.models.student_progress import StudentTestAttempt, StudentAISubscription
 from app.api.main_co_admin import DEFAULT_FAQ_TEMPLATE, DEFAULT_CONTACT_TEMPLATE
 from app.models.student_progress import StudentAISubscription, StudentExam
@@ -917,6 +918,28 @@ def learning_intelligence_page():
         return redirect(url_for('frontend.login'))
     return render_template('admin/learning_intelligence.html')
          
+@frontend_bp.route('/admin/assignments')
+def admin_assignments_page():
+    """Renders the Assignment management page for admins."""
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin']:
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('frontend.login'))
+    return render_template('admin/assignments.html', **g.user_context)
+
+@frontend_bp.route('/admin/assignments/<int:assignment_id>/grade')
+def admin_grade_assignments_page(assignment_id):
+    """Renders the Grading page for a specific assignment."""
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin']:
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('frontend.login'))
+    return render_template('admin/grade_assignments.html', assignment_id=assignment_id, **g.user_context)
+
+@frontend_bp.route('/student/assignments')
+def student_assignments_page():
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') != 'student':
+        return redirect(url_for('frontend.login'))
+    return render_template('student/assignments.html', **g.user_context)
+
 @frontend_bp.route('/admin/grade-submissions')
 def grade_submissions_page():
     if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin', 'super_admin']:

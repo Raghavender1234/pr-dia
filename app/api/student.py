@@ -10,6 +10,7 @@ from app.models.subject import Subject
 from app.models.topic import Topic, TopicContent
 from app.models.question import Question, MCQOption, ComprehensionPassage
 from app.models.student_progress import StudentReviewedQuestion
+from app.models.assignment import Assignment, AssignmentSubmission
 from app.models.mock_test import MockTest, MockTestQuestion # Will be used for mock test logic
 from app.models.student_progress import StudentExam, StudentTestAttempt, StudentQuestionResponse, StudentReviewedQuestion, StudentAISubscription, StudentTopicPractice
 from collections import defaultdict
@@ -29,6 +30,7 @@ import statistics
 from app.api.decorators import premium_feature_required
 from app.api.ai_progress import ensure_weekly_snapshot as _ensure_weekly_snapshot
 from app.api.ai_progress import recent_week_summaries as _recent_week_summaries
+from app.api.main_co_admin import _upload_file_to_s3
 
 
 
