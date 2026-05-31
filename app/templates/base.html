@@ -538,11 +538,13 @@ window.MathJax = {
                                     <i class="bi bi-clipboard-data me-1"></i>Mock Tests
                                 </a>
                             </li>
+                            {% if g.user_context.is_internal_student %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('frontend.student_assignments_page', **org_param) }}">
                                     <i class="bi bi-journal-check me-1"></i>My Assignments
                                 </a>
                             </li>
+                            {% endif %}
                             <li class="nav-item">
                                 <a class="nav-link fw-bold text-warning" href="{{ url_for('frontend.browse_all_exams', **org_param) }}">
                                     <i class="bi bi-search-heart me-1"></i>Find More Exams

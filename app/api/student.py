@@ -4001,3 +4001,92 @@ def report_organization(current_user, org_id, **kwargs):
     db.session.commit()
     
     return jsonify({"message": "Thank you. Your report has been submitted to our moderation team."}), 200
+
+# --- ASSIGNMENT MANAGEMENT ---
+
+@student_api_bp.route('/assignments', methods=['GET'])
+@student_required()
+def get_student_assignments(current_user, **kwargs):
+    # Only fetch assignments for organizations where the student is an 'internal' member
+    internal_memberships = OrganizationMembership.query.filter_by(
+        user_id=current_user.id,
+        is_active=True,
+        access_type='internal'
+    ).all()
+    
+    if not internal_memberships:
+        return jsonify([])
+        
+    org_ids = [m.organization_id for m in internal_memberships]
+    assignments = Assignment.query.filter(Assignment.organization_id.in_(org_ids)).order_by(Assignment.due_date.asc()).all()
+    
+    result = []
+    for a in assignments:
+        submission = AssignmentSubmission.query.filter_by(assignment_id=a.id, student_user_id=current_user.id).first()
+        sub_data = None
+        if submission:
+            sub_data = {
+                "id": submission.id,
+                "status": submission.status,
+                "marks_awarded": str(submission.marks_awarded) if submission.marks_awarded is not None else None,
+                "feedback": submission.feedback,
+                "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None
+            }
+            
+        result.append({
+            "id": a.id,
+            "title": a.title,
+            "description": a.description,
+            "due_date": a.due_date.isoformat() if a.due_date else None,
+            "max_marks": str(a.max_marks),
+            "attachment_url": a.attachment_url,
+            "submission": sub_data
+        })
+        
+    return jsonify(result), 200
+
+@student_api_bp.route('/assignments/<int:assignment_id>/submit', methods=['POST'])
+@student_required()
+def submit_assignment(current_user, assignment_id, **kwargs):
+    assignment = Assignment.query.get_or_404(assignment_id)
+    
+    # Verify internal membership
+    membership = OrganizationMembership.query.filter_by(
+        user_id=current_user.id,
+        organization_id=assignment.organization_id,
+        is_active=True,
+        access_type='internal'
+    ).first()
+
+    if not membership:
+        return jsonify({"message": "You do not have permission to submit this assignment."}), 403
+
+    existing_sub = AssignmentSubmission.query.filter_by(assignment_id=assignment_id, student_user_id=current_user.id).first()
+    if existing_sub:
+        return jsonify({"message": "You have already submitted this assignment."}), 400
+
+    submission_text = request.form.get('submission_text')
+    file = request.files.get('file')
+    file_url = None
+
+    if file and file.filename != '':
+        upload_result = _upload_file_to_s3(file, subfolder="assignment_submissions")
+        file_url = upload_result.get("url")
+
+    # Check if the assignment is submitted past the strict deadline
+    status = 'submitted'
+    if datetime.utcnow() > assignment.due_date:
+        status = 'late'
+
+    new_sub = AssignmentSubmission(
+        assignment_id=assignment.id,
+        student_user_id=current_user.id,
+        submission_text=submission_text,
+        file_url=file_url,
+        status=status
+    )
+    
+    db.session.add(new_sub)
+    db.session.commit()
+    
+    return jsonify({"message": "Assignment submitted successfully!"}), 201

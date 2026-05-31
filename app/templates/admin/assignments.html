@@ -86,7 +86,7 @@ $(document).ready(function() {
                 data: 'title', 
                 title: 'Assignment Title', 
                 render: (data, type, row) => {
-                    let res = `<strong>${data}</strong>`;
+                    let res = `<a href="/admin/assignments/${row.id}/grade" class="text-decoration-none text-primary fs-5 fw-bold">${data}</a>`;
                     if(row.attachment_url) res += `<br><a href="${row.attachment_url}" target="_blank" class="badge bg-info text-decoration-none mt-1"><i class="bi bi-paperclip"></i> View Attachment</a>`;
                     return res;
                 } 
