@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Assignments{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">Assignments</h2>
+            <p class="text-muted mb-0">Create, manage and grade student assignments and essays.</p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createAssignmentModal">
+            <i class="bi bi-plus-lg me-1"></i> New Assignment
+        </button>
+    </div>
+
+    <div id="pageMessage" class="mb-3"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="assignmentsTable" class="table table-hover align-middle" width="100%"></table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Assignment Modal -->
+<div class="modal fade" id="createAssignmentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Create New Assignment</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="createAssignmentForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="title" required placeholder="e.g. Essay on Climate Change">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Description</label>
+                        <textarea class="form-control" name="description" rows="3" placeholder="Provide instructions..."></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Due Date <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" name="due_date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Max Marks</label>
+                            <input type="number" class="form-control" name="max_marks" value="100" min="1">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="saveAssignmentBtn">Save Assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+$(document).ready(function() {
+    const table = $('#assignmentsTable').DataTable({
+        ajax: {
+            url: '/api/main-co-admin/assignments',
+            dataSrc: ''
+        },
+        columns: [
+            { data: 'title', title: 'Assignment Title', render: data => `<strong>${data}</strong>` },
+            { data: 'due_date', title: 'Due Date', render: data => new Date(data).toLocaleString() },
+            { data: 'max_marks', title: 'Max Marks' },
+            { 
+                data: null, 
+                title: 'Progress',
+                render: (data, type, row) => `
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-secondary me-1">${row.submissions_count} Submitted</span>
+                        <span class="badge bg-success">${row.graded_count} Graded</span>
+                    </div>
+                `
+            },
+            {
+                data: 'id',
+                title: 'Actions',
+                orderable: false,
+                render: id => `<a href="/admin/assignments/${id}/grade" class="btn btn-sm btn-outline-primary">Grade Submissions</a>`
+            }
+        ],
+        order: [[1, 'desc']]
+    });
+
+    $('#createAssignmentForm').on('submit', async function(e) {
+        e.preventDefault();
+        const payload = Object.fromEntries(new FormData(this).entries());
+        payload.due_date = new Date(payload.due_date).toISOString(); // To UTC
+        
+        try {
+            await window.authenticatedFetch('/api/main-co-admin/assignments', { method: 'POST', body: JSON.stringify(payload) });
+            $('#createAssignmentModal').modal('hide');
+            table.ajax.reload();
+        } catch(err) {
+            alert('Failed to create assignment.');
+        }
+    });
+});
+</script>
+{% endblock %}
