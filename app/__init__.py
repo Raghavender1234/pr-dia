@@ -7,7 +7,6 @@ from flask_cors import CORS
 from .config import Config
 from .extensions import db, mail, jwt, migrate, scheduler
 from datetime import datetime
-from flask_session import Session
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .models import Organization
@@ -42,7 +41,6 @@ def create_app(config_class=Config):
     # if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     #     scheduler.start()
     CORS(app)
-    Session(app)
 
     # --- Configure Logging ---
     if not app.debug and not app.testing:
@@ -139,15 +137,17 @@ def create_app(config_class=Config):
         # --- Error handlers ---
         @app.errorhandler(404)
         def not_found_error(error):
-            # Always return JSON (frontend removed)
-            return jsonify({"message": "Resource not found."}), 404
+            if request.path.startswith('/api/'):
+                return jsonify({"message": "Resource not found."}), 404
+            return "<h2>404 - Page Not Found</h2>", 404
 
         @app.errorhandler(500)
         def internal_server_error(error):
             db.session.rollback()
             app.logger.exception(f"Internal Server Error (500): {request.url}")
-            # Always return JSON (frontend removed)
-            return jsonify({"message": "An internal server error occurred."}), 500
+            if request.path.startswith('/api/'):
+                return jsonify({"message": "An internal server error occurred."}), 500
+            return "<h2>500 - Internal Server Error</h2>", 500
 
     from . import commands
     commands.register_commands(app)

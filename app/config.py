@@ -31,7 +31,6 @@ class Config:
     # --- Session Cookie Settings ---
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
-    SESSION_TYPE = 'filesystem'
     SESSION_PERMANENT = False
     
     # Set secure cookies in production
