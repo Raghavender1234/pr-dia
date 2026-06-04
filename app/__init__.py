@@ -67,7 +67,7 @@ def create_app(config_class=Config):
         from .api.payment import payment_bp
         from .api.ai import ai_bp
         from .api.public import public_api_bp
-        # from .frontend.routes import frontend_bp  # Frontend removed
+        from .frontend.routes import frontend_bp
         from .api.class_routes import class_bp
         from .api.notification_routes import notification_bp
         
@@ -83,17 +83,11 @@ def create_app(config_class=Config):
         app.register_blueprint(payment_bp)
         app.register_blueprint(ai_bp)
         app.register_blueprint(public_api_bp)
-        # app.register_blueprint(frontend_bp)  # Frontend removed
+        app.register_blueprint(frontend_bp)
         app.register_blueprint(ai_progress_bp)
         app.register_blueprint(community_bp)
         app.register_blueprint(class_bp)
         app.register_blueprint(notification_bp, strict_slashes=False)
-
-        # --- Health Check Route (for deployment) ---
-        @app.route('/', methods=['GET'])
-        def health_check():
-            """Health check endpoint for deployment verification."""
-            return jsonify({"status": "healthy", "message": "DIA Backend is running"}), 200
 
         # --- Request Hooks ---
         @app.before_request
@@ -102,9 +96,9 @@ def create_app(config_class=Config):
             Handles subdomain detection and sets up the global user context (g).
             This runs before every single request.
             """
-            # from .frontend.routes import get_user_context  # Frontend removed
+            from .frontend.routes import get_user_context
             
-            g.user_context = {}  # get_user_context()  # Frontend removed
+            g.user_context = get_user_context()
             g.current_organization = None
 
             host = request.host.split(':')[0]
