@@ -2742,6 +2742,142 @@ def invite_user_to_org(current_user, organization, **kwargs):
     db.session.commit()
     return jsonify({"message": "New user account created and invited successfully."} ), 201
 
+@main_co_admin_bp.route('/users/import', methods=['POST'])
+@admin_role_required(allowed_roles=['main_co_admin'])
+def import_users_to_org(current_user, organization, **kwargs):
+    """
+    Bulk imports users to the organization from a CSV or XLSX file.
+    Expects columns: email, first_name, last_name, password (optional).
+    """
+    if 'file' not in request.files:
+        return jsonify({"message": "No file part in the request."}), 400
+
+    file = request.files['file']
+    filename = file.filename or ""
+    if not (filename.endswith('.csv') or filename.endswith('.xlsx')):
+        return jsonify({"message": "Please upload a valid .csv or .xlsx file."}), 400
+
+    plan = getattr(organization, 'plan', None)
+    max_invited = getattr(plan, 'max_invited_students', None)
+    current_count = getattr(organization, 'current_invited_student_count', 0) or 0
+
+    try:
+        def _normalize_row_keys(row_dict):
+            norm = {}
+            for k, v in row_dict.items():
+                if k is None: continue
+                key = str(k).strip().lower()
+                if isinstance(v, str):
+                    norm[key] = v.strip()
+                else:
+                    norm[key] = v
+            return norm
+
+        rows = []
+        if filename.endswith('.xlsx'):
+            workbook = openpyxl.load_workbook(file)
+            sheet = workbook.active
+            headers = [(str(cell.value or "").strip().lower()) for cell in sheet[1]]
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                row_dict = {headers[i]: row[i] for i in range(min(len(headers), len(row)))}
+                rows.append(_normalize_row_keys(row_dict))
+        else:
+            try:
+                file.stream.seek(0)
+            except Exception:
+                pass
+            stream = io.StringIO(file.stream.read().decode("utf-8"), newline=None)
+            csv_reader = csv.DictReader(stream)
+            rows = [_normalize_row_keys(r) for r in csv_reader]
+
+        if not rows:
+            return jsonify({"message": "No data rows found in the file."}), 400
+
+        added_count = 0
+        skipped_count = 0
+        errors = []
+
+        for index, row in enumerate(rows, start=2):
+            email = str(row.get('email') or '').strip().lower()
+            if not email:
+                skipped_count += 1
+                errors.append(f"Row {index}: Missing email.")
+                continue
+
+            user_type = 'student'
+
+            if max_invited is not None and current_count >= max_invited:
+                errors.append(f"Limit reached ({max_invited}). Stopped at row {index}.")
+                break
+
+            user = User.query.filter_by(email=email).first()
+            is_student_invite = (user.user_type.lower() == 'student') if user else (user_type == 'student')
+
+            if user:
+                existing_membership = OrganizationMembership.query.filter_by(
+                    user_id=user.id,
+                    organization_id=organization.id
+                ).first()
+                if existing_membership:
+                    skipped_count += 1
+                    errors.append(f"Row {index}: User '{email}' is already a member.")
+                    continue
+
+                membership = OrganizationMembership(
+                    user_id=user.id,
+                    organization_id=organization.id,
+                    access_type='internal'
+                )
+                db.session.add(membership)
+                if is_student_invite and max_invited is not None:
+                    current_count += 1
+                added_count += 1
+            else:
+                first_name = str(row.get('first_name') or '').strip()
+                last_name = str(row.get('last_name') or '').strip()
+                password = str(row.get('password') or 'Default@123').strip()
+
+                if not first_name or not last_name:
+                    skipped_count += 1
+                    errors.append(f"Row {index}: Missing first_name or last_name for new user '{email}'.")
+                    continue
+
+                new_user = User(
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    user_type=user_type
+                )
+                new_user.set_password(password)
+                db.session.add(new_user)
+                db.session.flush()
+
+                membership = OrganizationMembership(
+                    user_id=new_user.id,
+                    organization_id=organization.id,
+                    access_type='internal'
+                )
+                db.session.add(membership)
+                if is_student_invite and max_invited is not None:
+                    current_count += 1
+                added_count += 1
+
+        if max_invited is not None:
+            organization.current_invited_student_count = current_count
+            
+        db.session.commit()
+
+        message = f"Import complete. Added: {added_count}, Skipped: {skipped_count}."
+        if errors:
+            message += " Details: " + " | ".join(errors[:5]) + ("..." if len(errors) > 5 else "")
+
+        return jsonify({"message": message}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"User import failed: {e}", exc_info=True)
+        return jsonify({"message": f"Import failed: {str(e)}"}), 500
+
 @main_co_admin_bp.route('/organization/users/<int:user_id>/status', methods=['PUT'])
 @admin_role_required(allowed_roles=['main_co_admin'])
 def update_org_user_status(current_user, organization, user_id, **kwargs):
