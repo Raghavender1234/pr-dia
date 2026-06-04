@@ -547,6 +547,15 @@ def question_management(topic_id):
         **g.user_context
     )
 
+@frontend_bp.route('/admin/learning-intelligence')
+def learning_intelligence_page():
+    """Renders the learning intelligence dashboard for admins."""
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin']:
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('frontend.login'))
+        
+    return render_template('admin/learning_intelligence.html', **g.user_context)
+
 @frontend_bp.route('/student/my-review-list')
 @jwt_required(optional=True) # Use optional=True so g.user_context is populated
 def student_review_list():
