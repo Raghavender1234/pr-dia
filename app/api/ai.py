@@ -495,7 +495,7 @@ def current_affairs():
         # Optional: ensure student has access to this exam
         access = StudentExam.query.filter(
             StudentExam.student_user_id == user_id,
-            StudentExam.exam_id == exam_.id,
+            StudentExam.exam_id == exam.id,
             StudentExam.access_status.in_(['purchased','free_access','admin_granted'])
         ).first()
         if not access:
@@ -514,29 +514,23 @@ def current_affairs():
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
 
         prompt = f'''
-You are an exam coach. Generate exactly 10 multiple-choice questions (MCQs) for **{exam.name}**
-focused on **{subject_name} / Current Affairs**, relevant to events from the last 30 days (as of {today_str}).
+You are an exam coach. Generate exactly 10 multiple-choice questions (MCQs) for the '{exam.name}' exam,
+focused on '{subject_name} / Current Affairs', relevant to events from the last 30 days (as of {today_str}).
 
-Rules:
-- Each question should be 1–2 lines.
-- 4 options (A–D). Mark the correct option by appending a single asterisk (*) at the end of that option line.
-- Mix National/International, Economy, Science/Tech, Sports, Govt Schemes, Appointments, Summits, Reports.
-- Difficulty: moderate and exam-appropriate.
-- Output plain text only. Format exactly like:
+**CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
+1.  Do NOT wrap your response in a markdown code block.
+2.  Use HTML for all text formatting (e.g., `<b>` for bold). Do NOT use Markdown symbols.
+3.  Each question must start with a number followed by a period (e.g., "1. ").
+4.  Provide exactly four options, each starting with A), B), C), and D).
+5.  **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
+6.  Mix topics like National/International, Economy, Science/Tech, Sports, and Government Schemes.
 
-1. Question text?
-A) Option 1
-B) Option 2*
-C) Option 3
-D) Option 4
-
-2. Question text?
-A) ...
-B) ...*
-C) ...
-D) ...
-
-(continue until 10)
+**EXAMPLE OF PERFECT FORMATTING:**
+1.  What recent initiative was launched by the Indian government to promote digital literacy in rural areas?
+    A) Digital India Mission
+    B) Pradhan Mantri Gramin Digital Saksharta Abhiyan (PMGDISHA) (Correct)
+    C) Skill India
+    D) Make in India
 '''
 
         resp = client.chat.completions.create(

@@ -5,6 +5,8 @@ services:
     repo: https://github.com/Raghavender1234/pr-dia.git
     branch: main
     healthCheckPath: /
+    healthCheckProtocol: http
+    initialDeployTimeout: 300
     envVars:
       - key: SECRET_KEY
         sync: false

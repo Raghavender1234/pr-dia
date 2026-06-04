@@ -36,7 +36,9 @@ def create_app(config_class=Config):
     jwt.init_app(app)
     mail.init_app(app)
     scheduler.init_app(app)
-    # Disable scheduler at startup - causing timeout on deployment
+    # IMPORTANT: The scheduler is NOT started here.
+    # Starting the scheduler within the app factory causes issues with WSGI servers
+    # like Gunicorn that use multiple worker processes, leading to deployment timeouts.
     # if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
     #     scheduler.start()
     CORS(app)
@@ -86,6 +88,12 @@ def create_app(config_class=Config):
         app.register_blueprint(community_bp)
         app.register_blueprint(class_bp)
         app.register_blueprint(notification_bp, strict_slashes=False)
+
+        # --- Health Check Route (for deployment) ---
+        @app.route('/', methods=['GET'])
+        def health_check():
+            """Health check endpoint for deployment verification."""
+            return jsonify({"status": "healthy", "message": "DIA Backend is running"}), 200
 
         # --- Request Hooks ---
         @app.before_request

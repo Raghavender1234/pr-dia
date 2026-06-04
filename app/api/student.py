@@ -562,7 +562,15 @@ def get_available_mock_tests(current_user, **kwargs):
         if not enrolled_exam_ids:
             return jsonify([]), 200
 
-        # Base query for available mock tests
+        # Subquery to find all mock test IDs that have at least one open-ended question
+        open_ended_test_ids_sq = db.session.query(MockTest.id).join(
+            MockTestQuestion, MockTest.id == MockTestQuestion.mock_test_id
+        ).join(
+            Question, MockTestQuestion.question_id == Question.id
+        ).filter(
+            Question.question_type == 'OpenEnded'
+        ).distinct().subquery()
+
         query = MockTest.query.filter(
             MockTest.status == 'active',
             MockTest.deleted_at.is_(None),
@@ -572,15 +580,13 @@ def get_available_mock_tests(current_user, **kwargs):
         if org_id:
             query = query.join(Exam).filter(Exam.organization_id == org_id)
 
-        mock_tests = query.all()
+        query = query.add_column(MockTest.id.in_(db.select([open_ended_test_ids_sq.c.id])).label('has_open_ended'))
+        mock_tests_and_flags = query.all()
 
         output = []
-        for mt in mock_tests:
+        for mt, has_open_ended in mock_tests_and_flags:
             # Your existing serializer for core test data
             test_data = serialize_mock_test_for_student(mt)
-            has_open_ended = any(
-                getattr(q, "question_type", None) == "OpenEnded" for q in getattr(mt, "questions", [])
-            )
 
             # Most recent attempt by this student for this test
             attempt = (
