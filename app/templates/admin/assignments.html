@@ -36,6 +36,12 @@
             <form id="createAssignmentForm" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="mb-3">
+                        <label class="form-label fw-bold">Course/Exam <small class="text-muted">(Optional)</small></label>
+                        <select name="exam_id" class="form-select" id="assignmentExamId">
+                            <option value="">-- General Organization Assignment --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold">Title <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="title" required placeholder="e.g. Essay on Climate Change">
                     </div>
@@ -113,6 +119,20 @@ $(document).ready(function() {
         order: [[1, 'desc']]
     });
 
+    // Load exams into the dropdown
+    const loadExamsForAssignments = async () => {
+        try {
+            const response = await window.authenticatedFetch('/api/main-co-admin/exams');
+            const exams = await response.json();
+            if (response.ok) {
+                const $select = $('#assignmentExamId');
+                exams.forEach(exam => $select.append(new Option(exam.name, exam.id)));
+            }
+        } catch (err) {
+            console.error("Failed to load exams:", err);
+        }
+    };
+
     $('#createAssignmentForm').on('submit', async function(e) {
         e.preventDefault();
         const formData = new FormData(this);
@@ -134,6 +154,9 @@ $(document).ready(function() {
             $('#assignSpinner').addClass('d-none');
         }
     });
+    
+    // Initialize the dropdown
+    loadExamsForAssignments();
 });
 </script>
 {% endblock %}
