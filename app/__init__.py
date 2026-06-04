@@ -136,17 +136,15 @@ def create_app(config_class=Config):
         # --- Error handlers ---
         @app.errorhandler(404)
         def not_found_error(error):
-            if request.path.startswith('/api/'):
-                return jsonify({"message": "Resource not found."}), 404
-            return render_template('errors/404.html'), 404
+            # Always return JSON (frontend removed)
+            return jsonify({"message": "Resource not found."}), 404
 
         @app.errorhandler(500)
         def internal_server_error(error):
             db.session.rollback()
             app.logger.exception(f"Internal Server Error (500): {request.url}")
-            if request.path.startswith('/api/'):
-                return jsonify({"message": "An internal server error occurred."}), 500
-            return render_template('errors/500.html'), 500
+            # Always return JSON (frontend removed)
+            return jsonify({"message": "An internal server error occurred."}), 500
 
     from . import commands
     commands.register_commands(app)
