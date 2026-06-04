@@ -36,8 +36,9 @@ def create_app(config_class=Config):
     jwt.init_app(app)
     mail.init_app(app)
     scheduler.init_app(app)
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        scheduler.start()
+    # Disable scheduler at startup - causing timeout on deployment
+    # if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    #     scheduler.start()
     CORS(app)
     Session(app)
 
