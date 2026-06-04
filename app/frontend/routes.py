@@ -895,6 +895,15 @@ def view_locked_attempts():
         return redirect(url_for('frontend.login'))
     return render_template('admin/locked_attempts.html')
         
+@frontend_bp.route('/admin/assignments')
+def admin_assignments_page():
+    """Renders the page for admins to manage assignments."""
+    if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin', 'super_admin']:
+        flash("You do not have permission to access this page.", "danger")
+        return redirect(url_for('frontend.login'))
+        
+    return render_template('admin/assignments.html')
+
 @frontend_bp.route('/admin/grade-submissions')
 def grade_submissions_page():
     if not g.user_context.get('is_logged_in') or g.user_context.get('user_type') not in ['main_co_admin', 'co_admin', 'super_admin']:
