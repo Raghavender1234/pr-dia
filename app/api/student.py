@@ -17,7 +17,7 @@ from collections import defaultdict
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from functools import wraps
 from datetime import datetime, timedelta, date, timezone 
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from .decorators import student_required
 from sqlalchemy.orm import joinedload, selectinload, subqueryload
 import traceback
@@ -4018,7 +4018,16 @@ def get_student_assignments(current_user, **kwargs):
         return jsonify([])
         
     org_ids = [m.organization_id for m in internal_memberships]
-    assignments = Assignment.query.filter(Assignment.organization_id.in_(org_ids)).order_by(Assignment.due_date.asc()).all()
+    
+    enrolled_exam_ids = {
+        se.exam_id for se in StudentExam.query.filter(
+            StudentExam.student_user_id == current_user.id,
+            StudentExam.access_status.in_(['purchased', 'free_access', 'admin_granted'])
+        ).all()
+    }
+    
+    condition = or_(Assignment.exam_id.is_(None), Assignment.exam_id.in_(enrolled_exam_ids)) if enrolled_exam_ids else Assignment.exam_id.is_(None)
+    assignments = Assignment.query.filter(Assignment.organization_id.in_(org_ids), condition).order_by(Assignment.due_date.asc()).all()
     
     result = []
     for a in assignments:
@@ -4036,6 +4045,7 @@ def get_student_assignments(current_user, **kwargs):
         result.append({
             "id": a.id,
             "title": a.title,
+            "exam_name": a.exam.name if getattr(a, 'exam', None) else "General",
             "description": a.description,
             "due_date": a.due_date.isoformat() if a.due_date else None,
             "max_marks": str(a.max_marks),

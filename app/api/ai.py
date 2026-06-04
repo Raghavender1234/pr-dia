@@ -87,8 +87,8 @@ A student is studying the "{topic_name}" topic.
 *   **Create Plausible Distractors:** The incorrect options should be challenging and relate to the passage's nuances.
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
-1. Do NOT wrap your entire response in a markdown code block (do not use ```).
-2. Write the passage text first.
+1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```). Use HTML tags (<b>, <h3>, <ul>, <li>) instead of markdown symbols (**, #) for formatting.
+2. Write the passage text first. 
 3. Each sub-question MUST start exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
 4. Each sub-question MUST have exactly 4 options. They MUST start with "A) ", "B) ", "C) ", "D) ".
 5. Append exactly "(Correct)" to the end of the correct option's text.
@@ -128,9 +128,9 @@ First, analyze the original question provided at the end. Does it contain any of
     *   If relevant to the `{topic_name}`, consider introducing diagrams, chemical equations, or mathematical formulas even if the original question didn't have them.
 
 3.  **Use Advanced Formatting (Where Appropriate):**
-    *   **Use Markdown for all formatting.**
+    *   **Use HTML for all text formatting** (e.g., `<h3>` for subheadings, `<ul>/<li>` for lists, `<b>` for bold). Do NOT use Markdown symbols like asterisks (`**`) or hashtags (`#`).
     *   **Mathematical/Chemical Equations:** ALWAYS enclose LaTeX expressions in double dollar signs (`$...$`). For example: `$2H_2 + O_2 \rightarrow 2H_2O$` or `$x = \frac{{-b \pm \sqrt{{b^2-4ac}}}}{{2a}}$`.
-    *   **Diagrams/Circuits:** For complex visuals that cannot be drawn with ASCII art, you MUST use the following format: `[GENERATE_IMAGE: A detailed, specific description of the image to be generated]`. The description should be sufficient for a text-to-image model to create an accurate and relevant image for the question. For simple diagrams, you can use ASCII art inside a code block.
+    *   **Diagrams/Circuits:** For complex visuals that cannot be drawn with ASCII art, you MUST use the following format: `[GENERATE_IMAGE: A detailed, specific description of the image to be generated]`. The description should be sufficient for a text-to-image model to create an accurate and relevant image for the question. For simple diagrams, you can use ASCII art inside a `<pre>` block.
 
 4.  **Vary the Question Style:**
     *   Go beyond simple "what is" questions. Ask "why," "how," or present a scenario for analysis.
@@ -142,7 +142,7 @@ First, analyze the original question provided at the end. Does it contain any of
     *   Incorrect options (distractors) should be challenging and based on common misconceptions.
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
-1. Do NOT wrap your entire response in a markdown code block (do not use ```).
+1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```).
 2. Each question MUST begin exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
 3. Each question MUST provide exactly four options starting with "A) ", "B) ", "C) ", "D) ".
 4. You MUST mark the correct option by appending exactly "(Correct)" at the very end of the option text.
@@ -186,9 +186,9 @@ D) 4
                 s3_url = _upload_image_to_s3(dalle_image_url)
 
                 if s3_url:
-                    # Replace placeholder with Markdown image
-                    markdown_image = f"![{image_prompt}]({s3_url})"
-                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", markdown_image, 1)
+                    # Replace placeholder with HTML image
+                    html_image = f'<img src="{s3_url}" alt="{image_prompt}" />'
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", html_image, 1)
                 else:
                     # If upload fails, replace with a note
                     generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
@@ -275,12 +275,14 @@ def handle_ai_chat():
     if user.user_type == 'student':
         system_prompt = (
             f"You are a friendly expert tutor named DIA helping {user.first_name} study for the '{exam_name}' exam, "
-            f"focusing on '{subject_name}'. Explain concepts clearly using daily-life analogies."
+            f"focusing on '{subject_name}'. Explain concepts clearly using daily-life analogies. "
+            "Format your responses using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, and <b> for bold text). Do NOT use markdown symbols like hashtags (#) or asterisks (*)."
         )
     else: # For admins
         system_prompt = (
             f"You are a professional content creation assistant helping an administrator named {user.first_name}. "
-            f"Your goal is to help them generate ideas for questions and content."
+            f"Your goal is to help them generate ideas for questions and content. "
+            "Format your responses using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, and <b> for bold text). Do NOT use markdown symbols like hashtags (#) or asterisks (*)."
         )
 
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_message}]
@@ -321,9 +323,9 @@ def generate_practice_from_chat():
         *   If the conversation involved topics from science (Physics, Chemistry) or Math, **you are encouraged to include relevant equations, formulas, or simple diagrams** to make the questions more practical and comprehensive.
 
     3.  **Formatting Guidelines:**
-        *   **Use Markdown for all formatting (bold, lists, etc.).**
+        *   **Use HTML for all text formatting** (e.g., `<h3>` for subheadings, `<ul>/<li>` for lists, `<b>` for bold text). Do NOT use Markdown symbols like asterisks (`**`) or hashtags (`#`).
         *   **Equations:** Enclose all LaTeX code in double dollar signs (`$...$`). For example: `$E = mc^2$`.
-        *   **Diagrams:** For complex visuals, you MUST use the format `[GENERATE_IMAGE: A detailed description]`. For simple diagrams, use ASCII art.
+        *   **Diagrams:** For complex visuals, you MUST use the format `[GENERATE_IMAGE: A detailed description]`. For simple diagrams, use HTML `<pre>` tags for ASCII art.
 
     **CRITICAL FORMATTING RULES:**
     1.  Each question must start with a number followed by a period (e.g., "1.").
@@ -369,9 +371,9 @@ def generate_practice_from_chat():
                 s3_url = _upload_image_to_s3(dalle_image_url)
 
                 if s3_url:
-                    # Replace placeholder with Markdown image
-                    markdown_image = f"![{image_prompt}]({s3_url})"
-                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", markdown_image, 1)
+                    # Replace placeholder with HTML image
+                    html_image = f'<img src="{s3_url}" alt="{image_prompt}" />'
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", html_image, 1)
                 else:
                     # If upload fails, replace with a note
                     generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
@@ -571,7 +573,8 @@ def explain_question_differently(current_user, **kwargs):
     The question is: '{question_text}'. 
     The correct explanation is: '{explanation_text}'. 
     Please explain the core concept behind this answer in a witty and funny way, but ensure it remains highly sensible, educational, and easy to understand for a student. 
-    Use a clever real-world analogy if it helps make the concept stick. Do not just rephrase the original explanation.'''
+    Use a clever real-world analogy if it helps make the concept stick. Do not just rephrase the original explanation.
+    Format your response using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, <b> for bold text). Do NOT use markdown symbols like asterisks (**) or hashtags (#).'''
 
     try:
         resp = client.chat.completions.create(

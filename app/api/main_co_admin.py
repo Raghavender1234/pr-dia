@@ -4306,7 +4306,10 @@ def export_mock_test_pdf_report(current_user, organization, test_id, **kwargs):
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
 def manage_assignments(current_user, organization, **kwargs):
     if request.method == 'GET':
-        assignments = Assignment.query.filter_by(organization_id=organization.id).order_by(Assignment.due_date.desc()).all()
+        query = Assignment.query.filter_by(organization_id=organization.id)
+        if current_user.user_type == 'co_admin':
+            query = query.filter_by(created_by_user_id=current_user.id)
+        assignments = query.order_by(Assignment.due_date.desc()).all()
         result = []
         for a in assignments:
             submissions_count = AssignmentSubmission.query.filter_by(assignment_id=a.id).count()
@@ -4314,6 +4317,7 @@ def manage_assignments(current_user, organization, **kwargs):
             result.append({
                 'id': a.id,
                 'title': a.title,
+                'exam_name': a.exam.name if getattr(a, 'exam', None) else "General",
                 'description': a.description,
                 'due_date': a.due_date.isoformat() if a.due_date else None,
                 'max_marks': str(a.max_marks),
@@ -4339,8 +4343,10 @@ def manage_assignments(current_user, organization, **kwargs):
                 attachment_url = upload_result.get("url")
 
             due_date = datetime.fromisoformat(data['due_date'].replace('Z', '+00:00'))
+            exam_id = data.get('exam_id')
             new_assignment = Assignment(
                 organization_id=organization.id,
+                exam_id=int(exam_id) if exam_id else None,
                 title=data['title'],
                 description=data.get('description'),
                 due_date=due_date.replace(tzinfo=None),

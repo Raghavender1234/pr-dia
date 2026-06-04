@@ -79,6 +79,7 @@ $(document).ready(function() {
                     <div class="col-md-6"><div class="card h-100 shadow-sm border-start border-4 border-warning">
                         <div class="card-body">
                             <h5 class="card-title">${a.title}</h5>
+                            <span class="badge bg-secondary mb-2">${a.exam_name}</span>
                             <p class="text-muted small mb-2"><i class="bi bi-clock"></i> Due: ${due.toLocaleString()}</p>
                             <p class="card-text">${a.description || ''}</p>
                             ${attachHtml}
@@ -95,6 +96,7 @@ $(document).ready(function() {
                     <div class="col-md-6"><div class="card h-100 shadow-sm border-start border-4 border-success">
                         <div class="card-body">
                             <h5 class="card-title">${a.title} <i class="bi bi-check-circle-fill text-success ms-2"></i></h5>
+                            <span class="badge bg-secondary mb-2">${a.exam_name}</span>
                             ${gradeHtml}
                         </div>
                     </div></div>`;
