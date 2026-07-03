@@ -351,6 +351,14 @@ body {
                                     </label>
                                 </div>
                             </div>
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="isInternalOnly">
+                                    <label class="form-check-label" for="isInternalOnly">
+                                        <i class="bi bi-shield-lock-fill me-1"></i> Internal Students Only (Invited Only)
+                                    </label>
+                                </div>
+                            </div>
                             <div class="input-group mb-4">
                                 <span class="input-group-text">
                                     <i class="bi bi-currency-rupee"></i>
@@ -437,6 +445,7 @@ $(function() {
     const $examDescription = $('#examDescription');
     const $examPrice = $('#examPrice');
     const $isFreeExam = $('#isFreeExam');
+    const $isInternalOnly = $('#isInternalOnly');
     const $submitBtn = $('#examSubmitBtn');
     const $cancelBtn = $('#cancelEditBtn');
     const $formTitle = $('#examFormTitle');
@@ -475,6 +484,7 @@ $(function() {
         $submitBtn.find('.button-text').text('Create Exam');
         $cancelBtn.addClass('d-none');
         $isFreeExam.prop('checked', false).trigger('change');
+        $isInternalOnly.prop('checked', false);
     };
 
     $isFreeExam.on('change', function() {
@@ -527,10 +537,16 @@ $(function() {
                     data: 'price', 
                     title: 'Pricing',
                     render: (data, type, row) => {
+                        let badges = '';
                         if (row.is_free) {
-                            return '<span class="badge bg-success">Free</span>';
+                            badges += '<span class="badge bg-success me-1">Free</span>';
+                        } else {
+                            badges += `<span class="badge bg-secondary me-1">₹${parseFloat(data).toFixed(2)}</span>`;
                         }
-                        return `<span class="badge bg-secondary">₹${parseFloat(data).toFixed(2)}</span>`;
+                        if (row.is_internal_only) {
+                            badges += '<span class="badge bg-danger me-1">Invited Only</span>';
+                        }
+                        return badges;
                     },
                     className: 'text-center'
                 },
@@ -599,7 +615,8 @@ $(function() {
             name: $examName.val().trim(),
             description: $examDescription.val().trim(),
             is_free: $isFreeExam.is(':checked'),
-            price: $isFreeExam.is(':checked') ? 0.00 : parseFloat($examPrice.val())
+            price: $isFreeExam.is(':checked') ? 0.00 : parseFloat($examPrice.val()),
+            is_internal_only: $isInternalOnly.is(':checked')
         };
 
         try {
@@ -636,6 +653,7 @@ $(function() {
             $examDescription.val(data.description || '');
             $isFreeExam.prop('checked', data.is_free).trigger('change');
             $examPrice.val(parseFloat(data.price).toFixed(2));
+            $isInternalOnly.prop('checked', data.is_internal_only || false);
 
             $formTitle.html('<i class="bi bi-pencil-square me-2 text-warning"></i>Edit Exam');
             $submitBtn.find('.button-text').text('Update Exam');

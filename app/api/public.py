@@ -19,10 +19,11 @@ def search_exams():
     org_code_query = request.args.get('org_code', '', type=str)
     is_free_query = request.args.get('is_free', 'false', type=str).lower() == 'true'
 
-    # Base query joining Exam and Organization
+    # Base query joining Exam and Organization (exclude internal-only exams from public search)
     query = db.session.query(Exam).join(Organization).filter(
         Exam.deleted_at.is_(None),
-        Organization.status == 'active'
+        Organization.status == 'active',
+        Exam.is_internal_only == False
     )
 
     # Filter by subdomain if applicable

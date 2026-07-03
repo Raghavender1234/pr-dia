@@ -11,6 +11,7 @@ class Exam(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.Numeric(10, 2), default=0.00, nullable=False) # Price for students to access this exam
     is_free = db.Column(db.Boolean, default=False, nullable=False) # NEW: is_free field
+    is_internal_only = db.Column(db.Boolean, default=False, nullable=False) # NEW: is_internal_only field
     
     # Creator of the exam (Main Co-Admin)
     created_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)

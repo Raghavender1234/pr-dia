@@ -39,7 +39,7 @@ from bs4 import BeautifulSoup
 from docx.shared import Inches, Cm
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import zipfile
-from app.api.ai import client
+from app.api.ai import get_openai_client
 import bleach
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -240,6 +240,7 @@ def serialize_exam(exam):
         "description": exam.description,
         "price": str(exam.price),
         "is_free": exam.is_free,
+        "is_internal_only": getattr(exam, 'is_internal_only', False),
         "created_by_user_id": exam.created_by_user_id,
         "created_at": exam.created_at.isoformat() if hasattr(exam, 'created_at') else None,
         "updated_at": exam.updated_at.isoformat() if hasattr(exam, 'updated_at') else None
@@ -859,6 +860,7 @@ def manage_exams(current_user, organization, **kwargs):
             description=data.get('description'), 
             price=data.get('price', 0), 
             is_free=is_free, 
+            is_internal_only=data.get('is_internal_only', False),
             organization_id=organization.id, 
             created_by_user_id=current_user.id
         )
@@ -872,7 +874,14 @@ def manage_single_exam(current_user, organization, exam_id, **kwargs):
     exam = Exam.query.filter_by(id=exam_id, organization_id=organization.id, deleted_at=None).first_or_404()
     
     if request.method == 'GET':
-        return jsonify({ "id": exam.id, "name": exam.name, "description": exam.description, "price": str(exam.price), "is_free": exam.is_free }), 200
+        return jsonify({ 
+            "id": exam.id, 
+            "name": exam.name, 
+            "description": exam.description, 
+            "price": str(exam.price), 
+            "is_free": exam.is_free,
+            "is_internal_only": getattr(exam, 'is_internal_only', False)
+        }), 200
 
     if request.method == 'PUT':
         data = request.get_json()
@@ -901,6 +910,7 @@ def manage_single_exam(current_user, organization, exam_id, **kwargs):
         exam.description = data.get('description', exam.description)
         exam.is_free = is_being_made_free
         exam.price = 0.00 if exam.is_free else data.get('price', exam.price)
+        exam.is_internal_only = data.get('is_internal_only', exam.is_internal_only)
         db.session.commit()
         return jsonify({"message": "Exam updated successfully."} ), 200
 
@@ -3520,6 +3530,9 @@ def get_grading_queue(current_user, organization, **kwargs):
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin'])
 def get_ai_grade_suggestion(current_user, organization, response_id, **kwargs):
     response = StudentQuestionResponse.query.get_or_404(response_id)
+    if response.attempt.mock_test.exam.organization_id != organization.id:
+        return jsonify({"message": "Unauthorized"}), 403
+        
     question = response.question
 
     prompt = f"""
@@ -3534,7 +3547,7 @@ def get_ai_grade_suggestion(current_user, organization, response_id, **kwargs):
     """
 
     try:
-        ai_resp = client.chat.completions.create(
+        ai_resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
@@ -3563,7 +3576,8 @@ def confirm_grade(current_user, organization, response_id, **kwargs):
     final_feedback = data.get('feedback')
 
     response = StudentQuestionResponse.query.get_or_404(response_id)
-    # ... (security check) ...
+    if response.attempt.mock_test.exam.organization_id != organization.id:
+        return jsonify({"message": "Unauthorized"}), 403
     
     # Update the question response
     response.score = final_score

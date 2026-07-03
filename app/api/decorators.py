@@ -42,17 +42,18 @@ def admin_role_required(allowed_roles):
             if not user or user.user_type not in allowed_roles:
                 return jsonify({"message": "Permission denied for this role."}), 403
 
-            # 2. Check for an active membership in an active organization
-            membership = OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).first()
-            
-            if not membership or not membership.organization or membership.organization.status != 'active':
-                return jsonify({
-                    "message": "Access denied. User is not linked to an active organization membership."
-                }), 403
+            # 2. Check for an active membership in an active organization (skip for super_admin)
+            membership = None
+            if user.user_type != 'super_admin':
+                membership = OrganizationMembership.query.filter_by(user_id=user.id, is_active=True).first()
+                if not membership or not membership.organization or membership.organization.status != 'active':
+                    return jsonify({
+                        "message": "Access denied. User is not linked to an active organization membership."
+                    }), 403
 
             # 3. If all checks pass, add user and organization to the view function's arguments
             kwargs['current_user'] = user
-            kwargs['organization'] = membership.organization
+            kwargs['organization'] = membership.organization if membership else None
             return fn(*args, **kwargs)
         return decorator
     return wrapper

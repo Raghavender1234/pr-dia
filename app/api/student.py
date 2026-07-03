@@ -475,6 +475,16 @@ def get_topics_for_student(current_user, subject_id, **kwargs):
     if not membership:
         return jsonify({"message": "Your access to this organization's content is disabled."}), 403
 
+    # Verify that the student is actively enrolled in/purchased the parent exam
+    enrollment = StudentExam.query.filter(
+        StudentExam.student_user_id == current_user.id,
+        StudentExam.exam_id == subject.exam_id,
+        StudentExam.access_status.in_(['purchased', 'free_access', 'admin_granted'])
+    ).first()
+
+    if not enrollment:
+        return jsonify({"message": "You are not enrolled in the exam for this subject."}), 403
+
     # If the check passes, get the topics
     topics = Topic.query.filter_by(subject_id=subject_id, deleted_at=None).order_by(Topic.name).all()
     return jsonify([serialize_topic_for_student(topic, current_user.id) for topic in topics]), 200
@@ -501,6 +511,16 @@ def get_questions_for_topic_practice(current_user, topic_id, **kwargs):
 
         if not org_membership:
             return jsonify({"message": "You do not have access to this topic."}), 403
+
+        # Verify that the student is actively enrolled in/purchased the parent exam
+        enrollment = StudentExam.query.filter(
+            StudentExam.student_user_id == current_user.id,
+            StudentExam.exam_id == topic.subject.exam_id,
+            StudentExam.access_status.in_(['purchased', 'free_access', 'admin_granted'])
+        ).first()
+
+        if not enrollment:
+            return jsonify({"message": "You are not enrolled in the exam for this topic."}), 403
 
         all_question_ids_query = db.session.query(Question.id).filter_by(
             topic_id=topic_id, deleted_at=None, parent_question_id=None
@@ -675,6 +695,16 @@ def start_or_resume_attempt(current_user, mock_test_id, **kwargs):
 
     if not membership:
         return jsonify({"message": "You do not have access to this mock test."}), 403
+
+    # Verify that the student is actively enrolled in/purchased the parent exam
+    enrollment = StudentExam.query.filter(
+        StudentExam.student_user_id == current_user.id,
+        StudentExam.exam_id == mock_test.exam_id,
+        StudentExam.access_status.in_(['purchased', 'free_access', 'admin_granted'])
+    ).first()
+
+    if not enrollment:
+        return jsonify({"message": "You are not enrolled in the exam for this mock test."}), 403
 
     # Check for an existing attempt for this specific test
     existing_attempt = StudentTestAttempt.query.filter_by(
@@ -1405,6 +1435,11 @@ def enroll_in_exam(current_user, **kwargs):
         organization_id=organization_id
     ).first()
     
+    # Block access to internal-only exams for students who are not invited
+    if getattr(exam, 'is_internal_only', False):
+        if not membership or not membership.is_active or membership.access_type not in ['internal', 'admin_created']:
+            return jsonify({"message": "This exam is restricted to invited students only."}), 403
+    
     if not membership:
         membership = OrganizationMembership(  # <-- FIX: Assign to the 'membership' variable
             user_id=current_user.id, 
@@ -1583,14 +1618,23 @@ def get_available_exams(current_user, **kwargs):
 
         available_exams = query.all()
         
-        # Get organizations where the user is an internally invited member
+        # Get organizations where the user is an internally invited member (invited or admin created)
         internal_org_ids = {
-            m.organization_id for m in OrganizationMembership.query.filter_by(
-                user_id=current_user.id,
-                is_active=True,
-                access_type='internal'
+            m.organization_id for m in OrganizationMembership.query.filter(
+                OrganizationMembership.user_id == current_user.id,
+                OrganizationMembership.is_active == True,
+                OrganizationMembership.access_type.in_(['internal', 'admin_created'])
             ).all()
         }
+
+        # Filter out internal-only exams if the user is not an internally invited member of that organization
+        filtered_available_exams = []
+        for e in available_exams:
+            if getattr(e, 'is_internal_only', False):
+                if e.organization_id in internal_org_ids:
+                    filtered_available_exams.append(e)
+            else:
+                filtered_available_exams.append(e)
         
         results = [{
             "id": e.id,
@@ -1598,7 +1642,7 @@ def get_available_exams(current_user, **kwargs):
             "organization_name": e.organization.name,
             "is_free": e.is_free or (e.organization_id in internal_org_ids),
             "price": "Free" if e.is_free or (e.organization_id in internal_org_ids) else format_price(e.price, country_code)
-        } for e in available_exams]
+        } for e in filtered_available_exams]
         
         return jsonify(results), 200
         
@@ -1644,6 +1688,16 @@ def generate_practice_test(current_user, **kwargs):
         available_questions = base_query.join(Topic).join(Subject).filter(Subject.exam_id == scope_id).all()
     else:
         return jsonify({"message": "Invalid scope type."}), 400
+
+    # Verify that the student is actively enrolled in/purchased the parent exam
+    enrollment = StudentExam.query.filter(
+        StudentExam.student_user_id == current_user.id,
+        StudentExam.exam_id == exam_id,
+        StudentExam.access_status.in_(['purchased', 'free_access', 'admin_granted'])
+    ).first()
+
+    if not enrollment:
+        return jsonify({"message": "You are not enrolled in the exam for this practice test."}), 403
 
     # --- ADD MEMBERSHIP LOGIC ---
     # Find or create membership for the exam's organization
@@ -4076,6 +4130,16 @@ def submit_assignment(current_user, assignment_id, **kwargs):
 
     if not membership:
         return jsonify({"message": "You do not have permission to submit this assignment."}), 403
+
+    # If the assignment is associated with an exam, verify the student is enrolled
+    if assignment.exam_id:
+        access_record = StudentExam.query.filter(
+            StudentExam.student_user_id == current_user.id,
+            StudentExam.exam_id == assignment.exam_id,
+            StudentExam.access_status.in_(["purchased", "free_access", "admin_granted"])
+        ).first()
+        if not access_record:
+            return jsonify({"message": "You are not enrolled in the exam for this assignment."}), 403
 
     existing_sub = AssignmentSubmission.query.filter_by(assignment_id=assignment_id, student_user_id=current_user.id).first()
     if existing_sub:

@@ -20,8 +20,17 @@ from app.models.user import User
 
 ai_bp = Blueprint('ai_api', __name__, url_prefix='/api/ai')
 
-# One OpenAI client for this module
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Lazy loader for OpenAI client
+_openai_client = None
+
+def get_openai_client():
+    global _openai_client
+    if _openai_client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OpenAI API key is not configured (OPENAI_API_KEY).")
+        _openai_client = OpenAI(api_key=api_key)
+    return _openai_client
 CA_KEYWORDS_SUBJ = ['current affairs', 'general awareness', 'gk', 'general knowledge']
 CA_KEYWORDS_TOPIC = ['current affairs', 'current events', 'news', 'national affairs', 'international affairs']
 
@@ -159,7 +168,7 @@ D) 4
 '''
 
     try:
-        resp = client.chat.completions.create(
+        resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
@@ -173,7 +182,7 @@ D) 4
         for image_prompt in image_requests:
             try:
                 # Generate image with DALL-E
-                image_resp = client.images.generate(
+                image_resp = get_openai_client().images.generate(
                     model="dall-e-3",
                     prompt=image_prompt,
                     n=1,
@@ -222,7 +231,7 @@ Provide concise, encouraging feedback in 1–2 sentences. If there are mistakes,
 '''
 
     try:
-        resp = client.chat.completions.create(
+        resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
@@ -288,7 +297,7 @@ def handle_ai_chat():
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_message}]
 
     try:
-        resp = client.chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.7, max_tokens=600)
+        resp = get_openai_client().chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.7, max_tokens=600)
         reply = resp.choices[0].message.content
         return jsonify({"reply": reply}), 200
     except Exception as e:
@@ -344,7 +353,7 @@ def generate_practice_from_chat():
     '''
     
     try:
-        response = client.chat.completions.create(
+        response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": system_prompt}],
             temperature=0.7,
@@ -358,7 +367,7 @@ def generate_practice_from_chat():
         for image_prompt in image_requests:
             try:
                 # Generate image with DALL-E
-                image_resp = client.images.generate(
+                image_resp = get_openai_client().images.generate(
                     model="dall-e-3",
                     prompt=image_prompt,
                     n=1,
@@ -388,7 +397,7 @@ def generate_practice_from_chat():
 
 @ai_bp.route('/save-generated-question', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin', 'super_admin'])
-def save_generated_question(current_user, **kwargs):
+def save_generated_question(current_user, organization=None, **kwargs):
     if Question is None or MCQOption is None:
         return jsonify({"message": "Server model import path for Question/MCQOption is not configured."}), 500
 
@@ -402,6 +411,12 @@ def save_generated_question(current_user, **kwargs):
         topic = Topic.query.get(topic_id)
         if not topic or not getattr(topic, 'subject', None) or not getattr(topic.subject, 'exam_id', None):
             return jsonify({"message": "Invalid topic: cannot resolve exam for this topic."}), 400
+        
+        # Verify that topic belongs to the admin's organization (skip for super_admin)
+        if current_user.user_type != 'super_admin':
+            if organization is None or topic.subject.exam.organization_id != organization.id:
+                return jsonify({"message": "Unauthorized"}), 403
+                
         exam_id = topic.subject.exam_id
 
         existing = Question.query.filter_by(
@@ -533,7 +548,7 @@ focused on '{subject_name} / Current Affairs', relevant to events from the last 
     D) Make in India
 '''
 
-        resp = client.chat.completions.create(
+        resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4,
@@ -571,7 +586,7 @@ def explain_question_differently(current_user, **kwargs):
     Format your response using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, <b> for bold text). Do NOT use markdown symbols like asterisks (**) or hashtags (#).'''
 
     try:
-        resp = client.chat.completions.create(
+        resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,

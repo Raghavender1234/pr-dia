@@ -363,12 +363,33 @@ def verify_exam_payment():
         # Check if record exists, else create
         student_exam = StudentExam.query.filter_by(student_user_id=user_id, exam_id=exam_id).first()
         if not student_exam:
-            student_exam = StudentExam(student_user_id=user_id, exam_id=exam_id)
+            # We must resolve the membership_id
+            exam = Exam.query.get_or_404(exam_id)
+            membership = OrganizationMembership.query.filter_by(
+                user_id=user_id,
+                organization_id=exam.organization_id,
+                is_active=True
+            ).first()
+            if not membership:
+                membership = OrganizationMembership(
+                    user_id=user_id,
+                    organization_id=exam.organization_id,
+                    is_active=True,
+                    access_type='public'
+                )
+                db.session.add(membership)
+                db.session.flush()
+
+            student_exam = StudentExam(
+                student_user_id=user_id,
+                exam_id=exam_id,
+                membership_id=membership.id
+            )
             db.session.add(student_exam)
 
-        student_exam.payment_status = 'completed'
+        student_exam.access_status = 'purchased'
         student_exam.razorpay_payment_id = razorpay_payment_id
-        student_exam.purchase_date = datetime.utcnow()
+        student_exam.purchased_at = datetime.utcnow()
         
         db.session.commit()
 
