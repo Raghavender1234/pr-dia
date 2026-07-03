@@ -489,9 +489,23 @@ $(function() {
 
     $isFreeExam.on('change', function() {
         const isFree = $(this).is(':checked');
-        $examPrice.prop('disabled', isFree);
-        if (isFree) {
+        if ($isInternalOnly.is(':checked')) {
+            $examPrice.prop('disabled', true);
+        } else {
+            $examPrice.prop('disabled', isFree);
+        }
+        if (isFree || $isInternalOnly.is(':checked')) {
             $examPrice.val('0.00');
+        }
+    });
+
+    $isInternalOnly.on('change', function() {
+        const isInternal = $(this).is(':checked');
+        if (isInternal) {
+            $isFreeExam.prop('checked', false).prop('disabled', true).trigger('change');
+            $examPrice.prop('disabled', true).val('0.00');
+        } else {
+            $isFreeExam.prop('disabled', false).trigger('change');
         }
     });
 
@@ -651,9 +665,9 @@ $(function() {
             $examId.val(data.id);
             $examName.val(data.name);
             $examDescription.val(data.description || '');
+            $isInternalOnly.prop('checked', data.is_internal_only || false).trigger('change');
             $isFreeExam.prop('checked', data.is_free).trigger('change');
             $examPrice.val(parseFloat(data.price).toFixed(2));
-            $isInternalOnly.prop('checked', data.is_internal_only || false);
 
             $formTitle.html('<i class="bi bi-pencil-square me-2 text-warning"></i>Edit Exam');
             $submitBtn.find('.button-text').text('Update Exam');

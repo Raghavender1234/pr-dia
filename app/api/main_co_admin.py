@@ -209,8 +209,8 @@ def serialize_organization(org):
         "code": org.code,
         "plan": org.plan,
         "active": org.active,
-        "created_at": org.created_at.isoformat() if hasattr(org, 'created_at') else None,
-        "updated_at": org.updated_at.isoformat() if hasattr(org, 'updated_at') else None
+        "created_at": org.created_at.isoformat() if getattr(org, 'created_at', None) is not None else None,
+        "updated_at": org.updated_at.isoformat() if getattr(org, 'updated_at', None) is not None else None
     }
 
 def serialize_user(user):
@@ -242,8 +242,8 @@ def serialize_exam(exam):
         "is_free": exam.is_free,
         "is_internal_only": getattr(exam, 'is_internal_only', False),
         "created_by_user_id": exam.created_by_user_id,
-        "created_at": exam.created_at.isoformat() if hasattr(exam, 'created_at') else None,
-        "updated_at": exam.updated_at.isoformat() if hasattr(exam, 'updated_at') else None
+        "created_at": exam.created_at.isoformat() if getattr(exam, 'created_at', None) is not None else None,
+        "updated_at": exam.updated_at.isoformat() if getattr(exam, 'updated_at', None) is not None else None
     }
 
 def serialize_subject(subject):
@@ -254,8 +254,8 @@ def serialize_subject(subject):
         "description": subject.description,
         "created_by_user_id": subject.created_by_user_id,
         "topics_count": len(subject.topics) if hasattr(subject, 'topics') else 0,
-        "created_at": subject.created_at.isoformat() if hasattr(subject, 'created_at') else None,
-        "updated_at": subject.updated_at.isoformat() if hasattr(subject, 'updated_at') else None
+        "created_at": subject.created_at.isoformat() if getattr(subject, 'created_at', None) is not None else None,
+        "updated_at": subject.updated_at.isoformat() if getattr(subject, 'updated_at', None) is not None else None
     }
 
 def serialize_topic(topic, include_content=False):
@@ -267,8 +267,8 @@ def serialize_topic(topic, include_content=False):
         "questions_count": Question.query.filter_by(topic_id=topic.id, parent_question_id=None).count(),
         "contents_count": len(topic.contents) if hasattr(topic, 'contents') else 0,
         "created_by_user_id": topic.created_by_user_id,
-        "created_at": topic.created_at.isoformat() if hasattr(topic, 'created_at') else None,
-        "updated_at": topic.updated_at.isoformat() if hasattr(topic, 'updated_at') else None
+        "created_at": topic.created_at.isoformat() if getattr(topic, 'created_at', None) is not None else None,
+        "updated_at": topic.updated_at.isoformat() if getattr(topic, 'updated_at', None) is not None else None
     }
     if include_content and hasattr(topic, 'contents'):
         data["contents"] = [
