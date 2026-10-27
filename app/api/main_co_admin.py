@@ -51,10 +51,10 @@ from reportlab.lib.units import inch
 
 
 DEFAULT_CONTACT_TEMPLATE = {
-    "address": "2-3-703/a/2\nAmberpet, Hyderabad, Telangana\n500013, India",
-    "general_email": "brreddy16@gmail.com",
-    "support_email": "info@pr-dia.com",
-    "phone": "(+91) 8712896693, (+44) 07554849910"
+    "address": "Campus Administration Block\nTech City, 500001",
+    "general_email": os.getenv("CONTACT_EMAIL", "contact@openlms.dev"),
+    "support_email": os.getenv("SUPPORT_EMAIL", "support@openlms.dev"),
+    "phone": os.getenv("CONTACT_PHONE", "+1 (555) 019-2834")
 }
 
 
@@ -3225,7 +3225,20 @@ def _upload_file_to_s3(
     aws_secret_access_key = current_app.config['S3_SECRET']
 
     if not all([bucket_name, aws_region, aws_access_key_id, aws_secret_access_key]):
-        raise Exception("S3 credentials or configuration are missing from your environment.")
+        # Local Disk Fallback: allows running 100% offline without AWS S3
+        safe_filename = secure_filename(getattr(file, "filename", "upload.bin"))
+        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', subfolder.strip('/'))
+        os.makedirs(upload_dir, exist_ok=True)
+        unique_name = f"{uuid.uuid4().hex}_{safe_filename}"
+        filepath = os.path.join(upload_dir, unique_name)
+        if hasattr(file, 'save'):
+            file.save(filepath)
+        elif hasattr(file, 'read'):
+            file.seek(0)
+            with open(filepath, 'wb') as f_out:
+                f_out.write(file.read())
+        local_url = f"/static/uploads/{subfolder.strip('/')}/{unique_name}"
+        return {"url": local_url, "key": unique_name}
 
     # -------- Filename & validation --------
     safe_filename = secure_filename(getattr(file, "filename", "upload.bin"))
@@ -3896,8 +3909,15 @@ def _process_html_element(doc, paragraph, element, s3_client):
                 decoded_data = base64.b64decode(encoded)
                 image_stream = io.BytesIO(decoded_data)
             
-            # Case 2: Image is a full S3 URL
-            elif 's3.amazonaws.com' in image_url:
+            # Case 2: Image is a local static upload
+            elif image_url.startswith('/static/'):
+                local_path = os.path.join(current_app.root_path, image_url.lstrip('/'))
+                if os.path.exists(local_path):
+                    with open(local_path, 'rb') as f_img:
+                        image_stream = io.BytesIO(f_img.read())
+
+            # Case 3: Image is a full S3 URL
+            elif 's3.amazonaws.com' in image_url and s3_client:
                 bucket_name = current_app.config['S3_BUCKET']
                 # Ensure bucket_name is valid before splitting
                 if bucket_name and f"{bucket_name}.s3.amazonaws.com/" in image_url:
@@ -3908,7 +3928,7 @@ def _process_html_element(doc, paragraph, element, s3_client):
                 else:
                     raise ValueError("S3 bucket name not configured or URL format is unexpected.")
 
-            # Case 3: Image is a general public URL (fallback)
+            # Case 4: Image is a general public URL (fallback)
             else:
                 response = requests.get(image_url, stream=True, timeout=10)
                 response.raise_for_status()
@@ -3947,13 +3967,18 @@ def export_topic_questions_zip(current_user, organization, topic_id, **kwargs):
     if topic.subject.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
 
-    # --- NEW: Initialize S3 Client ---
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=current_app.config['S3_KEY'],
-        aws_secret_access_key=current_app.config['S3_SECRET'],
-        region_name=current_app.config.get('S3_REGION')
-    )
+    # Safe S3 Client Initialization (Optional)
+    s3_client = None
+    if current_app.config.get('S3_KEY') and current_app.config.get('S3_SECRET'):
+        try:
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=current_app.config['S3_KEY'],
+                aws_secret_access_key=current_app.config['S3_SECRET'],
+                region_name=current_app.config.get('S3_REGION')
+            )
+        except Exception:
+            s3_client = None
 
     # collect questions (top-level only)
     questions = Question.query.filter_by(
@@ -4094,13 +4119,18 @@ def export_mock_test_zip(current_user, organization, test_id, **kwargs):
     if mock_test.exam.organization_id != organization.id:
         return jsonify({"message": "Unauthorized"}), 403
 
-    # --- NEW: Initialize S3 Client ---
-    s3_client = boto3.client(
-        's3',
-        aws_access_key_id=current_app.config['S3_KEY'],
-        aws_secret_access_key=current_app.config['S3_SECRET'],
-        region_name=current_app.config.get('S3_REGION')
-    )
+    # Safe S3 Client Initialization (Optional)
+    s3_client = None
+    if current_app.config.get('S3_KEY') and current_app.config.get('S3_SECRET'):
+        try:
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=current_app.config['S3_KEY'],
+                aws_secret_access_key=current_app.config['S3_SECRET'],
+                region_name=current_app.config.get('S3_REGION')
+            )
+        except Exception:
+            s3_client = None
 
     mock_test_questions = MockTestQuestion.query.filter_by(
         mock_test_id=test_id

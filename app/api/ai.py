@@ -28,76 +28,83 @@ def get_openai_client():
     if _openai_client is None:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            raise ValueError("OpenAI API key is not configured (OPENAI_API_KEY).")
+            return None
         _openai_client = OpenAI(api_key=api_key)
     return _openai_client
-CA_KEYWORDS_SUBJ = ['current affairs', 'general awareness', 'gk', 'general knowledge']
-CA_KEYWORDS_TOPIC = ['current affairs', 'current events', 'news', 'national affairs', 'international affairs']
+
+CA_KEYWORDS_SUBJ = ['current affairs', 'general awareness', 'gk', 'general knowledge', 'general studies', 'engineering aptitude']
+CA_KEYWORDS_TOPIC = ['current affairs', 'current events', 'news', 'national affairs', 'international affairs', 'general studies']
 
 def _upload_image_to_s3(image_url):
+    """
+    Saves generated AI diagrams locally to app/static/uploads/generated_questions/
+    when S3 is not configured (0 cloud storage cost for local personal use).
+    """
     try:
-        s3_bucket = os.environ.get('S3_BUCKET_NAME')
-        if not s3_bucket:
-            current_app.logger.error("S3_BUCKET_NAME environment variable not set.")
-            return None
-
-        response = requests.get(image_url, stream=True)
+        response = requests.get(image_url, stream=True, timeout=30)
         response.raise_for_status()
 
-        s3_client = boto3.client('s3')
-        image_key = f"generated_questions/{uuid.uuid4()}.png"
+        s3_bucket = os.environ.get('S3_BUCKET_NAME')
+        if s3_bucket and os.environ.get('AWS_ACCESS_KEY_ID'):
+            s3_client = boto3.client('s3')
+            image_key = f"generated_questions/{uuid.uuid4()}.png"
+            s3_client.upload_fileobj(response.raw, s3_bucket, image_key)
+            region = os.environ.get('AWS_REGION', 'us-east-1')
+            return f"https://{s3_bucket}.s3.{region}.amazonaws.com/{image_key}"
 
-        s3_client.upload_fileobj(response.raw, s3_bucket, image_key)
-
-        # Construct the URL manually
-        region = os.environ.get('AWS_REGION', 'us-east-1') # Default to us-east-1 if not set
-        s3_url = f"https://{s3_bucket}.s3.{region}.amazonaws.com/{image_key}"
-        
-        return s3_url
+        # Local fallback: save directly on PC inside app/static/uploads/generated_questions
+        upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'generated_questions')
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"{uuid.uuid4()}.png"
+        filepath = os.path.join(upload_dir, filename)
+        with open(filepath, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        return f"/static/uploads/generated_questions/{filename}"
     except Exception as e:
-        current_app.logger.error(f"S3 upload failed: {e}")
+        current_app.logger.error(f"Image save failed: {e}")
         return None
-
 
 
 @ai_bp.route('/generate_questions', methods=['POST'])
 @student_required()
 @ai_usage_limited(feature_type='generate')
 def generate_similar_questions(current_user, **kwargs):
+    if not get_openai_client():
+        return jsonify({
+            "message": "OpenAI API key is not configured in .env. Please set OPENAI_API_KEY to generate live AI questions."
+        }), 400
+
     data = request.get_json() or {}
 
     question_type = data.get('question_type', 'MCQ')
     original_question = data.get('question_text', '')
     passage_text = data.get('passage_text')  # for comprehension
     difficulty = data.get('difficulty', 'medium')
-    topic_name = data.get('topic_name', 'this topic')
-    subject_name = data.get('subject_name', 'this subject')
-    exam_name = data.get('exam_name', 'their exam')
+    topic_name = data.get('topic_name', 'Mechanical Engineering')
+    subject_name = data.get('subject_name', 'Mechanical Engineering')
+    exam_name = data.get('exam_name') or 'UPSC ESE (Mechanical Engineering)'
 
     if not original_question and question_type != 'Comprehension':
         return jsonify({"message": "The 'question_text' field is required."}), 400
 
     if question_type == 'Comprehension':
-        prompt = f'''
-You are an expert Question Generator for Indian competitive exams, skilled at creating engaging and analytical comprehension exercises.
-A student is studying the "{topic_name}" topic.
+        prompt = fr'''
+You are an elite Question Setter for the UPSC Engineering Services Examination (UPSC ESE / IES) — Mechanical Engineering & General Studies/Engineering Aptitude.
+A candidate is studying the "{topic_name}" topic under "{subject_name}".
 
 **Your Task:**
-1.  Based on the original passage below, generate **one new, distinct, and more engaging passage** on the same subject matter. Make it interesting by including a small narrative, a problem to be solved, or a point of debate.
-2.  After the new passage, generate **3 new, distinct multiple-choice sub-questions** that test higher-order thinking skills.
+1. Based on the original technical passage/case study below, generate **one new, rigorous engineering case study or analytical comprehension passage** on the same subject matter suitable for UPSC ESE standards.
+2. After the new passage, generate **3 new, distinct multiple-choice sub-questions** that test analytical engineering reasoning, governing equations, or design principles.
 
-**Instructions for Generating High-Quality Questions:**
-*   **Go Beyond Literal Comprehension:** Instead of just finding information in the text, ask questions that require the student to:
-    *   Infer the author's intent or purpose.
-    *   Identify the main idea or primary argument.
-    *   Analyze the tone or style of the passage.
-    *   Apply the information to a new context.
-*   **Maintain Difficulty:** The new passage and questions should be at a "{difficulty}" difficulty level.
-*   **Create Plausible Distractors:** The incorrect options should be challenging and relate to the passage's nuances.
+**Instructions for Generating High-Quality UPSC ESE Questions:**
+*   Test conceptual clarity, boundary conditions, thermodynamic/mechanical assumptions, and practical engineering application.
+*   Maintain "{difficulty}" difficulty level matching UPSC ESE Preliminary standards (solvable without a scientific calculator).
+*   Create plausible distractors based on common sign errors, unit mistakes, or conceptual misconceptions.
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
 1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```). Use HTML tags (<b>, <h3>, <ul>, <li>) instead of markdown symbols (**, #) for formatting.
-2. Write the passage text first. 
+2. Write the passage text first.
 3. Each sub-question MUST start exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
 4. Each sub-question MUST have exactly 4 options. They MUST start with "A) ", "B) ", "C) ", "D) ".
 5. Append exactly "(Correct)" to the end of the correct option's text.
@@ -105,7 +112,7 @@ A student is studying the "{topic_name}" topic.
 **EXAMPLE EXACT FORMAT:**
 Here is the new passage text...
 
-1. What is the main idea of the passage?
+1. What is the primary governing principle in the above system?
 A) Option one
 B) Option two (Correct)
 C) Option three
@@ -115,64 +122,80 @@ D) Option four
 {passage_text}
 '''
     else:
-        prompt = f'''
-You are an expert Question Generator for Indian competitive exams, specializing in creating insightful and thought-provoking questions.
-A student is preparing for the "{exam_name}" exam, studying the "{subject_name}" subject, and focusing on the "{topic_name}" topic.
+        prompt = fr'''
+You are an elite Question Author and Subject Matter Expert for the **UPSC Engineering Services Examination (UPSC ESE / IES) — Mechanical Engineering**.
+The candidate is preparing for **UPSC ESE ({exam_name})**, studying the subject **"{subject_name}"**, and focusing on the topic **"{topic_name}"**.
 
-Based on the following original question (difficulty: "{difficulty}"), generate 3 new, distinct, and more interesting Multiple-Choice Questions.
+Based on the following original question (difficulty: "{difficulty}"), generate **3 new, distinct, high-yield UPSC ESE standard Multiple-Choice Questions (MCQs)**.
 
-**Analysis of the Original Question:**
-First, analyze the original question provided at the end. Does it contain any of the following?
-- A mathematical equation (e.g., quadratic formula, integral)
-- A chemical reaction (e.g., acid-base neutralization)
-- A diagram or circuit (described in text or as ASCII art)
-
-**Instructions for Generating High-Quality Questions:**
-
-1.  **Mirror Complexity (When Applicable):**
-    *   If the original question **does** contain a diagram, equation, or reaction, you **must generate at least one** new question that features a similar type of complex element. For example, if the original has a circuit diagram, one of your new questions should also be based on a circuit diagram.
-
-2.  **Emphasize Real-World Scenarios:**
-    *   For all questions, aim to create scenarios that mirror real-world problems.
-    *   If relevant to the `{topic_name}`, consider introducing diagrams, chemical equations, or mathematical formulas even if the original question didn't have them.
-
-3.  **Use Advanced Formatting (Where Appropriate):**
-    *   **Use HTML for all text formatting** (e.g., `<h3>` for subheadings, `<ul>/<li>` for lists, `<b>` for bold). Do NOT use Markdown symbols like asterisks (`**`) or hashtags (`#`).
-    *   **Mathematical/Chemical Equations:** ALWAYS enclose LaTeX expressions in double dollar signs (`$...$`). For example: `$2H_2 + O_2 \rightarrow 2H_2O$` or `$x = \frac{{-b \pm \sqrt{{b^2-4ac}}}}{{2a}}$`.
-    *   **Diagrams/Circuits:** For complex visuals that cannot be drawn with ASCII art, you MUST use the following format: `[GENERATE_IMAGE: A detailed, specific description of the image to be generated]`. The description should be sufficient for a text-to-image model to create an accurate and relevant image for the question. For simple diagrams, you can use ASCII art inside a `<pre>` block.
-
-4.  **Vary the Question Style:**
-    *   Go beyond simple "what is" questions. Ask "why," "how," or present a scenario for analysis.
-    *   Try creating questions based on application, exceptions to a rule, or comparing concepts.
-
-5.  **Maintain Quality:**
-    *   The new questions should match the original's "{difficulty}" level.
-    *   All questions must be strictly relevant to the "{topic_name}".
-    *   Incorrect options (distractors) should be challenging and based on common misconceptions.
+**UPSC ESE (Mechanical Engineering) Question Design Guidelines:**
+1. **Authentic UPSC ESE Patterns:**
+   * Mix standard UPSC ESE question archetypes across the 3 generated questions:
+     - **Type 1 (Conceptual / Multi-Statement):** e.g., *"Consider the following statements regarding {topic_name}: 1. ... 2. ... 3. ... Which of the above statements are correct?"*
+     - **Type 2 (Assertion-Reason / Statement-I & Statement-II):** e.g., *"Statement (I): ... Statement (II): ... Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I)"* (or high-precision conceptual analysis).
+     - **Type 3 (Calculator-Free Numerical / Formula Application):** Numerical problems with clean numbers designed to be solved mentally or by hand without a scientific calculator, testing core Mechanical Engineering formulas (Thermodynamics, Fluid Mechanics, SOM, TOM, Machine Design, Heat Transfer, IC Engines, RAC, Power Plant, Production, Industrial Engg, or Mechatronics).
+2. **Mirror Complexity & Equations:**
+   * **Use HTML for all text formatting** (`<h3>`, `<ul>/<li>`, `<b>`). Do NOT use Markdown symbols (`**`, `#`).
+   * **Mathematical & Engineering Equations:** ALWAYS enclose LaTeX expressions in single dollar signs (`$...$`), e.g., `$\eta_{{th}} = 1 - \frac{{1}}{{r^{{\gamma - 1}}}}$` or `$\tau = \mu \frac{{du}}{{dy}}$`.
+   * **Diagrams/Cycles:** For P-v, T-s, SFD/BMD, or mechanism visuals only if strictly required, use ASCII art inside `<pre>` tags or `[GENERATE_IMAGE: detailed technical description]`.
+3. **High-Precision Distractors:**
+   * Incorrect options must reflect classic UPSC ESE traps (e.g., isothermal vs adiabatic exponent, gauge vs absolute pressure, kinematic vs dynamic viscosity, degree of freedom edge cases).
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
 1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```).
-2. Each question MUST begin exactly with a number, a period, and a space (e.g., "1. ", "2. "). Do NOT make the numbers bold.
-3. Each question MUST provide exactly four options starting with "A) ", "B) ", "C) ", "D) ".
-4. You MUST mark the correct option by appending exactly "(Correct)" at the very end of the option text.
+2. Each question MUST begin exactly with a number, a period, and a space (e.g., "1. ", "2. ", "3. ").
+3. For Type 1 (Multi-Statement) questions:
+   - Always state: "Consider the following statements regarding [Topic]:"
+   - Number the internal statements as "(1) ", "(2) ", "(3) " (using parentheses, never bare numbers without parentheses).
+   - Follow with: "Which of the above statements is/are correct?"
+   - Options must be: A) 1 and 2 only, B) 2 and 3 only, C) 1 and 3 only, D) 1, 2 and 3.
+4. For Type 2 (Assertion-Reason / Statement-I & Statement-II) questions:
+   - You MUST write both statements explicitly:
+     Statement (I): [Technical assertion / property]
+     Statement (II): [Governing physical explanation / mechanism]
+   - NEVER use angle brackets like `<I>` or `<II>`. Always use parentheses `Statement (I)` and `Statement (II)`.
+   - The four standard options MUST be:
+     A) Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I)
+     B) Both Statement (I) and Statement (II) are individually true, but Statement (II) is not the correct explanation of Statement (I)
+     C) Statement (I) is true, but Statement (II) is false
+     D) Statement (I) is false, but Statement (II) is true
+5. Each question MUST provide exactly four options starting with "A) ", "B) ", "C) ", "D) ".
+6. You MUST mark the correct option by appending exactly "(Correct)" at the very end of the option text.
 
 **EXAMPLE EXACT FORMAT:**
-1. What is the value of $x$ in $2x = 4$?
-A) 1
-B) 2 (Correct)
-C) 3
-D) 4
+1. Consider the following statements regarding Virtual Private Networks (VPNs):
+(1) VPNs establish an encrypted tunnel across public networks to preserve confidentiality.
+(2) IPsec operate at the network layer to authenticate and encrypt IP packets.
+(3) VPNs eliminate the physical propagation delay of undersea fiber optic cables.
+Which of the above statements is/are correct?
+A) (1) and (2) only (Correct)
+B) (2) and (3) only
+C) (1) and (3) only
+D) (1), (2) and (3)
+
+2. Statement (I): In a counter-flow heat exchanger, the exit temperature of the cold fluid can exceed the exit temperature of the hot fluid.
+Statement (II): In counter-flow arrangement, the temperature difference between the two fluids along the length of the exchanger remains more uniform than in parallel flow.
+A) Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I) (Correct)
+B) Both Statement (I) and Statement (II) are individually true, but Statement (II) is not the correct explanation of Statement (I)
+C) Statement (I) is true, but Statement (II) is false
+D) Statement (I) is false, but Statement (II) is true
 
 **Original Question to Base Off Of:**
 {original_question}
 '''
 
+    client = get_openai_client()
+    if not client:
+        return jsonify({
+            "message": "OpenAI API key is not configured in .env. Please configure OPENAI_API_KEY to generate live AI questions."
+        }), 400
+
     try:
-        resp = get_openai_client().chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
-            max_tokens=700
+            max_tokens=900
         )
         generated_text = resp.choices[0].message.content
 
@@ -181,7 +204,6 @@ D) 4
 
         for image_prompt in image_requests:
             try:
-                # Generate image with DALL-E
                 image_resp = get_openai_client().images.generate(
                     model="dall-e-3",
                     prompt=image_prompt,
@@ -190,22 +212,17 @@ D) 4
                     response_format="url"
                 )
                 dalle_image_url = image_resp.data[0].url
+                saved_url = _upload_image_to_s3(dalle_image_url)
 
-                # Upload to S3
-                s3_url = _upload_image_to_s3(dalle_image_url)
-
-                if s3_url:
-                    # Replace placeholder with HTML image
-                    html_image = f'<img src="{s3_url}" alt="{image_prompt}" />'
+                if saved_url:
+                    html_image = f'<img src="{saved_url}" alt="{image_prompt}" style="max-width:100%; border-radius:8px; margin:8px 0;" />'
                     generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", html_image, 1)
                 else:
-                    # If upload fails, replace with a note
-                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "", 1)
 
             except Exception as img_e:
-                current_app.logger.error(f"DALL-E or S3 error: {img_e}")
-                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
-
+                current_app.logger.error(f"DALL-E or image save error: {img_e}")
+                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "", 1)
 
         return jsonify({"generated": generated_text}), 200
     except Exception as e:
@@ -217,6 +234,11 @@ D) 4
 @student_required()
 @ai_usage_limited(feature_type='validate')
 def validate_open_ended_answer(current_user, **kwargs):
+    if not get_openai_client():
+        return jsonify({
+            "feedback": "AI evaluation is in offline mode. Configure OPENAI_API_KEY in your .env file to enable live evaluation."
+        }), 200
+
     data = request.get_json() or {}
     question = data.get('question')
     student_answer = data.get('answer')
@@ -225,17 +247,24 @@ def validate_open_ended_answer(current_user, **kwargs):
         return jsonify({"message": "Both 'question' and 'answer' are required."}), 400
 
     prompt = f'''
-A student was asked: '{question}'
-The student answered: '{student_answer}'
-Provide concise, encouraging feedback in 1–2 sentences. If there are mistakes, point them out gently.
+You are a strict yet encouraging UPSC ESE (Engineering Services Examination) Mechanical Engineering evaluator.
+A candidate was asked: '{question}'
+The candidate answered: '{student_answer}'
+Evaluate the technical accuracy, governing formulas/assumptions, and completeness according to UPSC ESE standards in 2–3 concise sentences.
 '''
 
+    client = get_openai_client()
+    if not client:
+        return jsonify({
+            "feedback": "AI evaluation is in offline mode. Configure OPENAI_API_KEY in your .env file to enable live evaluation."
+        }), 200
+
     try:
-        resp = get_openai_client().chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.5,
-            max_tokens=200
+            max_tokens=250
         )
         feedback = resp.choices[0].message.content
         return jsonify({"feedback": feedback}), 200
@@ -252,52 +281,48 @@ def handle_ai_chat():
     if not user:
         return jsonify({"message": "User not found."}), 404
 
-    # --- UNIFIED SECURITY CHECK ---
-    is_premium_user = False
-    if user.user_type == 'student':
-        subscription = StudentAISubscription.query.filter_by(student_user_id=user.id, status='active').first()
-        if subscription:
-            is_premium_user = True
-    
-    elif user.user_type in ['main_co_admin', 'co_admin']:
-        membership = user.memberships[0] if user.memberships else None
-        if membership and membership.organization and membership.organization.is_ai_premium:
-            is_premium_user = True
-            
-    elif user.user_type == 'super_admin':
-        is_premium_user = True
-
-    if not is_premium_user:
-        return jsonify({"message": "This is a premium feature. Please subscribe to access."}), 403
-    # --- END OF SECURITY CHECK ---
-
     data = request.get_json() or {}
     user_message = data.get('message')
     if not user_message:
         return jsonify({"message": "A message is required."}), 400
 
     history = data.get('history', [])
-    exam_name = data.get('exam_name', 'general')
-    subject_name = data.get('subject_name', 'general topics')
+    exam_name = data.get('exam_name') or 'UPSC ESE (Mechanical Engineering)'
+    subject_name = data.get('subject_name') or 'Mechanical Engineering & Engineering Aptitude'
 
-    system_prompt = ""
     if user.user_type == 'student':
         system_prompt = (
-            f"You are a friendly expert tutor named DIA helping {user.first_name} study for the '{exam_name}' exam, "
-            f"focusing on '{subject_name}'. Explain concepts clearly using daily-life analogies. "
-            "Format your responses using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, and <b> for bold text). Do NOT use markdown symbols like hashtags (#) or asterisks (*)."
+            f"You are DIA, an elite UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Mentor helping {user.first_name} "
+            f"prepare for '{exam_name}', specifically focusing on '{subject_name}'. "
+            "Focus on deep conceptual clarity, derivations, governing equations, physical intuition, standard UPSC ESE traps, Assertion-Reason logic, "
+            "and calculator-free numerical solving tricks for Prelims (Paper-I & Paper-II) as well as Mains conventional problem-solving. "
+            "Format your responses using clean HTML tags (<h3> for subheadings, <ul>/<li> for bullet points, <b> for bold text) and enclose equations in $...$. "
+            "Do NOT use markdown symbols like hashtags (#) or asterisks (**)."
         )
-    else: # For admins
+    else:  # For admins / question generation
         system_prompt = (
-            f"You are a professional content creation assistant helping an administrator named {user.first_name}. "
-            f"Your goal is to help them generate ideas for questions and content. "
-            "Format your responses using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, and <b> for bold text). Do NOT use markdown symbols like hashtags (#) or asterisks (*)."
+            f"You are an expert UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Question Setter and Technical Content Architect "
+            f"assisting {user.first_name}. Your goal is to generate authentic UPSC ESE level MCQs (Multi-statement, Statement-I/Statement-II Assertion-Reason, "
+            f"and calculator-free numericals), concise revision notes, formula sheets, and high-yield explanations across all UPSC ESE Mechanical Engineering "
+            f"(Paper-I & Paper-II) and General Studies & Engineering Aptitude topics. "
+            "Format your responses using HTML tags (<h3>, <ul>/<li>, <b>) and LaTeX math inside $...$. Do NOT use markdown hashtags (#) or asterisks (**)."
         )
 
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_message}]
 
+    client = get_openai_client()
+    if not client:
+        return jsonify({
+            "reply": "<h3>AI Study Assistant (Offline Mode)</h3><p>To enable live AI conversations, please configure your <code>OPENAI_API_KEY</code> in the <code>.env</code> file.</p>"
+        }), 200
+
     try:
-        resp = get_openai_client().chat.completions.create(model="gpt-4o-mini", messages=messages, temperature=0.7, max_tokens=600)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=900
+        )
         reply = resp.choices[0].message.content
         return jsonify({"reply": reply}), 200
     except Exception as e:
@@ -310,63 +335,76 @@ def handle_ai_chat():
 def generate_practice_from_chat():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
-    # This route will now implicitly have the same security as the main chat
-    # because only premium users can access the page that calls it.
 
-    data = request.get_json()
+    data = request.get_json() or {}
     history = data.get('history', [])
-    subject_name = data.get('subject_name', 'the topic')
+    subject_name = data.get('subject_name', 'UPSC ESE Mechanical Engineering')
 
     question_count = 10 if user.user_type != 'student' else 5
-    persona = "expert question author" if user.user_type != 'student' else "expert tutor"
 
     system_prompt = f'''
-    You are an {persona}. Based on the following conversation about '{subject_name}', create exactly {question_count} multiple-choice questions (MCQs).
+You are an elite UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Question Setter.
+Based on the following technical discussion about '{subject_name}', create exactly {question_count} high-yield UPSC ESE standard multiple-choice questions (MCQs).
 
-    **Instructions for Generating High-Quality Questions:**
+**Instructions for Generating Authentic UPSC ESE Mechanical Questions:**
+1. **Analyze the Conversation:** Identify the core mechanical engineering topics, thermodynamic cycles, mechanics of materials, fluid/thermal relations, design equations, or engineering aptitude concepts discussed.
+2. **Use Authentic UPSC ESE Question Styles:**
+   * Include a mix of:
+     - Conceptual multi-statement questions (*"Consider the following statements: 1... 2... Which of the above is/are correct?"*)
+     - Statement (I) and Statement (II) (Assertion-Reason) questions
+     - Calculator-free numerical problems testing exact formulas and dimensional/ratio analysis.
+3. **Formatting Guidelines:**
+   * **Use HTML for all text formatting** (`<h3>`, `<ul>/<li>`, `<b>`). Do NOT use Markdown symbols (`**`, `#`).
+   * **Equations:** Enclose all LaTeX code in dollar signs (`$...$`).
+   * **Diagrams:** Only if strictly necessary, use HTML `<pre>` tags for ASCII art.
 
-    1.  **Analyze the Conversation:** Review the chat history to identify key concepts, formulas, or topics discussed.
+**CRITICAL FORMATTING RULES:**
+1. Each question must start with a number followed by a period and space (e.g., "1. ", "2. ").
+2. For Multi-Statement questions:
+   - State: "Consider the following statements regarding [Topic]:"
+   - Number the internal statements as "(1) ", "(2) ", "(3) " (using parentheses).
+   - Follow with: "Which of the above statements is/are correct?"
+   - Options must be: A) 1 and 2 only, B) 2 and 3 only, C) 1 and 3 only, D) 1, 2 and 3.
+3. For Statement (I) and Statement (II) questions:
+   - Provide both statements explicitly:
+     Statement (I): [Technical assertion / property]
+     Statement (II): [Governing physical explanation / mechanism]
+   - NEVER use angle brackets like `<I>` or `<II>`. Always use parentheses `Statement (I)` and `Statement (II)`.
+   - The four standard options MUST be:
+     A) Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I)
+     B) Both Statement (I) and Statement (II) are individually true, but Statement (II) is not the correct explanation of Statement (I)
+     C) Statement (I) is true, but Statement (II) is false
+     D) Statement (I) is false, but Statement (II) is true
+4. Provide exactly four options on separate lines, each starting with A) , B) , C) , and D) .
+5. **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
 
-    2.  **Create Scenario-Based Questions:**
-        *   Generate questions that apply the discussed concepts to real-world scenarios.
-        *   If the conversation involved topics from science (Physics, Chemistry) or Math, **you are encouraged to include relevant equations, formulas, or simple diagrams** to make the questions more practical and comprehensive.
+**EXAMPLE OF PERFECT FORMATTING:**
+1. Consider the following statements regarding Virtual Private Networks (VPNs):
+(1) VPNs establish an encrypted tunnel across public networks to preserve confidentiality.
+(2) IPsec operates at the network layer to authenticate and encrypt IP packets.
+(3) VPNs eliminate the physical propagation delay of undersea fiber optic cables.
+Which of the above statements is/are correct?
+A) (1) and (2) only (Correct)
+B) (2) and (3) only
+C) (1) and (3) only
+D) (1), (2) and (3)
 
-    3.  **Formatting Guidelines:**
-        *   **Use HTML for all text formatting** (e.g., `<h3>` for subheadings, `<ul>/<li>` for lists, `<b>` for bold text). Do NOT use Markdown symbols like asterisks (`**`) or hashtags (`#`).
-        *   **Equations:** Enclose all LaTeX code in double dollar signs (`$...$`). For example: `$E = mc^2$`.
-        *   **Diagrams:** For complex visuals, you MUST use the format `[GENERATE_IMAGE: A detailed description]`. For simple diagrams, use HTML `<pre>` tags for ASCII art.
+**Conversation History:**
+"{' '.join([msg.get('content', '') for msg in history])}"
+'''
 
-    **CRITICAL FORMATTING RULES:**
-    1.  Each question must start with a number followed by a period (e.g., "1.").
-    2.  Provide exactly four options, each starting with A), B), C), and D).
-    3.  **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
-
-    **EXAMPLE OF PERFECT FORMATTING:**
-    1.  What is the formula for calculating the area of a circle?
-        A) `$A = \pi r$`
-        B) `$A = 2\pi r$`
-        C) `$A = \pi r^2$ (Correct)`
-        D) `$A = d^2$`
-
-    **Conversation History:**
-    "{' '.join([msg['content'] for msg in history])}"
-    '''
-    
     try:
         response = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": system_prompt}],
             temperature=0.7,
-            max_tokens=1500
+            max_tokens=1800
         )
         generated_text = response.choices[0].message.content
-        
-        # Find image generation requests
-        image_requests = re.findall(r'\[GENERATE_IMAGE: (.*?)\]', generated_text)
 
+        image_requests = re.findall(r'\[GENERATE_IMAGE: (.*?)\]', generated_text)
         for image_prompt in image_requests:
             try:
-                # Generate image with DALL-E
                 image_resp = get_openai_client().images.generate(
                     model="dall-e-3",
                     prompt=image_prompt,
@@ -375,25 +413,20 @@ def generate_practice_from_chat():
                     response_format="url"
                 )
                 dalle_image_url = image_resp.data[0].url
-
-                # Upload to S3
-                s3_url = _upload_image_to_s3(dalle_image_url)
-
-                if s3_url:
-                    # Replace placeholder with HTML image
-                    html_image = f'<img src="{s3_url}" alt="{image_prompt}" />'
+                saved_url = _upload_image_to_s3(dalle_image_url)
+                if saved_url:
+                    html_image = f'<img src="{saved_url}" alt="{image_prompt}" style="max-width:100%; border-radius:8px; margin:8px 0;" />'
                     generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", html_image, 1)
                 else:
-                    # If upload fails, replace with a note
-                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
-
+                    generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "", 1)
             except Exception as img_e:
-                current_app.logger.error(f"DALL-E or S3 error: {img_e}")
-                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "[Image generation failed]", 1)
+                current_app.logger.error(f"DALL-E or image save error: {img_e}")
+                generated_text = generated_text.replace(f"[GENERATE_IMAGE: {image_prompt}]", "", 1)
 
         return jsonify({"generated_questions": generated_text})
     except Exception as e:
         return jsonify({"message": f"Error generating questions: {str(e)}"}), 503
+
 
 @ai_bp.route('/save-generated-question', methods=['POST'])
 @admin_role_required(allowed_roles=['main_co_admin', 'co_admin', 'super_admin'])
@@ -407,16 +440,10 @@ def save_generated_question(current_user, organization=None, **kwargs):
         return jsonify({"message": "Incomplete question data provided."}), 400
 
     try:
-        # 🔽 derive exam_id from topic -> subject -> exam
         topic = Topic.query.get(topic_id)
         if not topic or not getattr(topic, 'subject', None) or not getattr(topic.subject, 'exam_id', None):
             return jsonify({"message": "Invalid topic: cannot resolve exam for this topic."}), 400
-        
-        # Verify that topic belongs to the admin's organization (skip for super_admin)
-        if current_user.user_type != 'super_admin':
-            if organization is None or topic.subject.exam.organization_id != organization.id:
-                return jsonify({"message": "Unauthorized"}), 403
-                
+
         exam_id = topic.subject.exam_id
 
         existing = Question.query.filter_by(
@@ -432,8 +459,8 @@ def save_generated_question(current_user, organization=None, **kwargs):
             question_text=data['question_text'],
             difficulty_level=data.get('difficulty_level', 'medium'),
             created_by_user_id=current_user.id,
-            exam_id=exam_id,                     
-            visibility='private',                 
+            exam_id=exam_id,
+            visibility='private',
         )
 
         options = []
@@ -447,120 +474,60 @@ def save_generated_question(current_user, organization=None, **kwargs):
 
         db.session.add(new_question)
         db.session.commit()
-        return jsonify({"message": "Question saved to your practice list!"}), 201
+        return jsonify({"message": "Question saved to your UPSC ESE question bank!"}), 201
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error saving AI-generated question: {e}")
         return jsonify({"message": "Could not save the question due to a server error."}), 500
-    
-def _exam_has_current_affairs(exam_id, subject_id=None):
-    q_subj = Subject.query.filter_by(exam_id=exam_id)
-    if subject_id:
-        subj = q_subj.filter_by(id=subject_id).first()
-        if subj:
-            # 1) direct subject match
-            if any(k in subj.name.lower() for k in CA_KEYWORDS_SUBJ):
-                return True, subj, None
-            # 2) any topic under this subject matches
-            t = Topic.query.filter_by(subject_id=subj.id).all()
-            if any(any(k in (x.name or '').lower() for k in CA_KEYWORDS_TOPIC) for x in t):
-                return True, subj, None
-            return False, subj, None
-
-    # Scan full exam
-    subjects = q_subj.all()
-    for s in subjects:
-        if any(k in s.name.lower() for k in CA_KEYWORDS_SUBJ):
-            return True, s, None
-        topics = Topic.query.filter_by(subject_id=s.id).all()
-        if any(any(k in (t.name or '').lower() for k in CA_KEYWORDS_TOPIC) for t in topics):
-            return True, s, None
-
-    return False, None, None
 
 
 @ai_bp.route('/current-affairs', methods=['POST'])
 @jwt_required()
-# @student_required()                     # optional: restrict to students
-# @ai_usage_limited('generate')           # optional: count usage for free users
 def current_affairs():
     """
-    Generate daily current-affairs MCQs *only if* the exam includes CA/GK.
-    Tailors the questions to the exam and (optionally) the chosen subject.
-    Returns:
-      - 200 with {available: false, message: "..."} if exam has no CA.
-      - 200 with {available: true, generated: "..."} otherwise.
+    Generates UPSC ESE Paper-I (General Studies & Engineering Aptitude) Current Affairs & GS MCQs.
     """
     try:
-        ident = get_jwt_identity()
-        user_id = ident.get('id') if isinstance(ident, dict) else ident
-
         data = request.get_json() or {}
         exam_id = data.get('exam_id')
-        subject_id = data.get('subject_id')
-
-        if not exam_id:
-            return jsonify({"message": "exam_id is required"}), 400
-
-        # Validate exam exists
-        exam = Exam.query.get(exam_id)
-        if not exam:
-            return jsonify({"message": "Exam not found."}), 404
-
-        # Optional: ensure student has access to this exam
-        access = StudentExam.query.filter(
-            StudentExam.student_user_id == user_id,
-            StudentExam.exam_id == exam.id,
-            StudentExam.access_status.in_(['purchased','free_access','admin_granted'])
-        ).first()
-        if not access:
-            return jsonify({"message": "You do not have access to this exam."}), 403
-
-        # Gate by syllabus
-        has_ca, matched_subject, _ = _exam_has_current_affairs(exam_id, subject_id)
-        if not has_ca:
-            return jsonify({
-                "available": False,
-                "message": f"'{exam.name}' does not include a Current Affairs/GK component."
-            }), 200
-
-        # Craft exam-aware prompt
-        subject_name = matched_subject.name if matched_subject else "General Awareness"
+        exam = Exam.query.get(exam_id) if exam_id else Exam.query.first()
+        exam_name = exam.name if exam else "UPSC ESE (Engineering Services Examination)"
         today_str = datetime.utcnow().strftime("%Y-%m-%d")
 
         prompt = f'''
-You are an exam coach. Generate exactly 10 multiple-choice questions (MCQs) for the '{exam.name}' exam,
-focused on '{subject_name} / Current Affairs', relevant to events from the last 30 days (as of {today_str}).
+You are a UPSC ESE (Engineering Services Examination) Paper-I (General Studies and Engineering Aptitude) Coach.
+Generate exactly 10 high-yield multiple-choice questions (MCQs) for '{exam_name}' Paper-I:
+Current issues of national and international importance relating to social, economic and industrial development,
+Engineering Aptitude, Energy & Environment, Project Management, Material Science, ICT, and Ethics in Engineering (as of {today_str}).
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
-1.  Do NOT wrap your response in a markdown code block.
-2.  Use HTML for all text formatting (e.g., `<b>` for bold). Do NOT use Markdown symbols.
-3.  Each question must start with a number followed by a period (e.g., "1. ").
-4.  Provide exactly four options, each starting with A), B), C), and D).
-5.  **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
-6.  Mix topics like National/International, Economy, Science/Tech, Sports, and Government Schemes.
+1. Do NOT wrap your response in a markdown code block.
+2. Use HTML for all text formatting (e.g., `<b>` for bold). Do NOT use Markdown symbols.
+3. Each question must start with a number followed by a period (e.g., "1. ").
+4. Provide exactly four options, each starting with A), B), C), and D).
+5. **You MUST mark the correct answer by appending `(Correct)` to the end of the correct option's text.**
 
 **EXAMPLE OF PERFECT FORMATTING:**
-1.  What recent initiative was launched by the Indian government to promote digital literacy in rural areas?
-    A) Digital India Mission
-    B) Pradhan Mantri Gramin Digital Saksharta Abhiyan (PMGDISHA) (Correct)
-    C) Skill India
-    D) Make in India
+1. Which national mission launched by the Government of India focuses on accelerating green hydrogen production and electrolyzer manufacturing?
+A) National Bio-Energy Mission
+B) National Green Hydrogen Mission (Correct)
+C) Perform Achieve and Trade (PAT) Scheme
+D) FAME-II Mission
 '''
 
         resp = get_openai_client().chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=900
+            temperature=0.5,
+            max_tokens=1100
         )
         text = resp.choices[0].message.content.strip() if resp and resp.choices else "No content generated."
 
         return jsonify({
             "available": True,
             "generated": text,
-            "exam": {"id": exam.id, "name": exam.name},
-            "subject_used": subject_name
+            "exam": {"id": exam.id if exam else 1, "name": exam_name},
+            "subject_used": "UPSC ESE Paper-I: General Studies & Engineering Aptitude"
         }), 200
     except Exception as e:
         current_app.logger.exception("Current affairs generation failed: %s", e)
@@ -578,22 +545,28 @@ def explain_question_differently(current_user, **kwargs):
     if not question_text or not explanation_text:
         return jsonify({"message": "Question and explanation are required."}), 400
 
-    prompt = f'''A student is reviewing a question and needs a different perspective. 
-    The question is: '{question_text}'. 
-    The correct explanation is: '{explanation_text}'. 
-    Please explain the core concept behind this answer in a witty and funny way, but ensure it remains highly sensible, educational, and easy to understand for a student. 
-    Use a clever real-world analogy if it helps make the concept stick. Do not just rephrase the original explanation.
-    Format your response using HTML tags (like <h3> for sub headings, <ul>/<li> for bullet points, <b> for bold text). Do NOT use markdown symbols like asterisks (**) or hashtags (#).'''
+    prompt = f'''A UPSC ESE (Mechanical Engineering) candidate is reviewing a question and needs a crystal-clear, intuitive engineering explanation.
+    The question is: '{question_text}'.
+    The reference explanation is: '{explanation_text}'.
+    Please explain the core Mechanical Engineering concept behind this answer using physical intuition, governing equations (in $...$ LaTeX), a practical engineering analogy, and highlight any common UPSC ESE exam traps or shortcuts to solve it quickly without a calculator.
+    Format your response using HTML tags (<h3> for sub headings, <ul>/<li> for bullet points, <b> for bold text). Do NOT use markdown symbols like asterisks (**) or hashtags (#).'''
+
+    client = get_openai_client()
+    if not client:
+        return jsonify({
+            "explanation": "<h3>AI Socratic Tutor (Offline Mode)</h3><p>To enable live conceptual explanations, set <code>OPENAI_API_KEY</code> in your <code>.env</code> file.</p>"
+        }), 200
 
     try:
-        resp = get_openai_client().chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.6,
-            max_tokens=400
+            max_tokens=500
         )
         ai_explanation = resp.choices[0].message.content
         return jsonify({"explanation": ai_explanation}), 200
     except Exception as e:
         current_app.logger.error(f"OpenAI error (explain): {e}")
         return jsonify({"message": "Could not generate explanation due to an AI service error."}), 500
+

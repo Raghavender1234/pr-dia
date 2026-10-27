@@ -26,12 +26,12 @@ def get_razorpay_client():
     from razorpay import Client as RazorpayClient
     global razorpay_client
 
-    if razorpay_client is None:
-        key_id = current_app.config.get('RAZORPAY_KEY_ID') or os.getenv('RAZORPAY_KEY_ID')
-        key_secret = current_app.config.get('RAZORPAY_KEY_SECRET') or os.getenv('RAZORPAY_KEY_SECRET')
-        if not key_id or not key_secret:
-            raise RuntimeError("Razorpay keys are not configured (RAZORPAY_KEY_ID/SECRET).")
+    key_id = current_app.config.get('RAZORPAY_KEY_ID') or os.getenv('RAZORPAY_KEY_ID')
+    key_secret = current_app.config.get('RAZORPAY_KEY_SECRET') or os.getenv('RAZORPAY_KEY_SECRET')
+    if not key_id or not key_secret:
+        return None
 
+    if razorpay_client is None:
         razorpay_client = RazorpayClient(auth=(key_id, key_secret))
     return razorpay_client
 
@@ -39,7 +39,7 @@ def _get_rzp():
     key_id = current_app.config.get('RAZORPAY_KEY_ID') or os.getenv("RAZORPAY_KEY_ID")
     key_secret = current_app.config.get('RAZORPAY_KEY_SECRET') or os.getenv("RAZORPAY_KEY_SECRET")
     if not key_id or not key_secret:
-        raise RuntimeError("Razorpay keys are not configured.")
+        return None
     client = razorpay.Client(auth=(key_id, key_secret))
     return client
 
@@ -190,6 +190,11 @@ def create_org_ai_subscription(current_user, organization, **kwargs):
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         plan_id = current_app.config.get('AI_ASSISTANT_PLAN_ID')
 
         if not plan_id:
@@ -241,6 +246,11 @@ def create_ai_subscription_order():
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         
         data = request.get_json() or {}
 
@@ -307,6 +317,11 @@ def create_exam_payment_order():
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         
         # LOGIC: Even if frontend shows USD, we charge in INR.
         # Razorpay amounts are in PAISA (1 INR = 100 Paisa)
@@ -350,6 +365,11 @@ def verify_exam_payment():
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         
         # 1. VERIFY SIGNATURE (Security Check)
         params_dict = {
@@ -415,6 +435,11 @@ def verify_ai_subscription():
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         
         # 1. VERIFY SIGNATURE specifically for subscriptions
         params_dict = {
@@ -467,6 +492,11 @@ def verify_org_subscription():
 
     try:
         client = get_razorpay_client()
+        if not client:
+            return jsonify({
+                "message": "Payment gateway is not configured for this self-hosted instance. In community mode, all AI features are complimentary.",
+                "community_mode": True
+            }), 200
         params_dict = {
             'razorpay_subscription_id': razorpay_subscription_id,
             'razorpay_payment_id': razorpay_payment_id,

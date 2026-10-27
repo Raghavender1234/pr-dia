@@ -107,19 +107,8 @@ def _current_user_from_identity():
 
 
 def _has_active_premium(user_id: int) -> bool:
-    now = datetime.utcnow()
-    # ✅ respect user.is_premium as an instant override (optional but handy)
-    user = User.query.get(user_id)
-    if user and getattr(user, "is_premium", False):
-        return True
-
-    sub = StudentAISubscription.query.filter(
-        StudentAISubscription.student_user_id == user_id,
-        StudentAISubscription.status == 'active'
-    ).first()
-    if not sub:
-        return False
-    return sub.end_date is None or sub.end_date >= now
+    # Local personal mode: always grant full AI premium access without limits
+    return True
 
 
 def premium_feature_required():

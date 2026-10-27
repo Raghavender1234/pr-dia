@@ -95,9 +95,9 @@
     <div class="chat-input-area">
         <div id="aiChatError" class="mb-2"></div>
         <div class="suggestions-container">
-            <button class="suggestion-chip" data-text="Give me 5 MCQs about photosynthesis">📝 Generate MCQs</button>
-            <button class="suggestion-chip" data-text="Explain quantum physics in simple terms">🔬 Explain concepts</button>
-            <button class="suggestion-chip" data-text="Write a passage about the Renaissance period">📖 Create content</button>
+            <button class="suggestion-chip" data-text="Generate 5 UPSC ESE Mechanical MCQs (including Assertion-Reason) on Rankine Cycle, Reheating and Regeneration">⚙️ Thermodynamics MCQs</button>
+            <button class="suggestion-chip" data-text="Generate 5 UPSC ESE MCQs on Theory of Machines (Governors, Gyroscope, Balancing and Vibrations)">🔧 TOM & Vibrations MCQs</button>
+            <button class="suggestion-chip" data-text="Generate 5 UPSC ESE MCQs on Fluid Mechanics and Hydraulic Machines (Boundary Layer, Pelton, Francis and Kaplan Turbines)">🌊 Fluid & Turbo MCQs</button>
         </div>
         <form id="chatForm">
             <div class="input-container">
@@ -276,62 +276,62 @@ window.pageInit = function() {
 
     // Parse AI questions from text
     const parseAIQuestions = (text) => {
+        const lines = text.split('\n');
         const questions = [];
-        // Split the entire text into blocks for each question
-        const questionBlocks = text.split(/\n\s*(?=\d+\.\s)/).filter(Boolean);
+        let currentQ = null;
+        let currentOption = null;
 
-        questionBlocks.forEach(block => {
-            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-            if (lines.length < 5) return; // Skip malformed blocks
+        const qStartRegex = /^\s*(?:Question\s*)?(\d+)[\.\)]\s*(.*)/i;
+        const optRegex = /^\s*[-*]?\s*([A-D])\s*[\.\)]\s*(.*)/i;
 
-            const questionText = lines[0].replace(/^\d+\.\s/, '').trim();
-            const optionsRaw = lines.slice(1, 5);
-            let correctAnswerLine = lines.slice(5).find(l => /answer:|correct:/i.test(l));
-            let correctOptionLetter = '';
+        for (let rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) continue;
 
-            if (correctAnswerLine) {
-                // Extract the letter (e.g., "A", "B)")
-                const match = correctAnswerLine.match(/[A-D]\)/i);
-                if (match) {
-                    correctOptionLetter = match[0].charAt(0).toUpperCase();
-                }
-            }
-
-            const options = [];
-            optionsRaw.forEach(line => {
-                const optionLetterMatch = line.match(/^([A-D])\)\s*/i);
-                if (!optionLetterMatch) return;
-
-                const optionLetter = optionLetterMatch[1].toUpperCase();
-                const optionText = line.substring(optionLetterMatch[0].length).trim();
+            const optMatch = line.match(optRegex);
+            if (optMatch && currentQ) {
+                let letter = optMatch[1].toUpperCase();
+                let optText = optMatch[2].trim();
                 let isCorrect = false;
 
-                // Determine correctness by letter or by a fallback marker
-                if (correctOptionLetter) {
-                    isCorrect = (optionLetter === correctOptionLetter);
-                } else if (/\(Correct\)/i.test(optionText)) {
+                if (/\(Correct\)/i.test(optText) || /\*$/.test(optText) || /\bCorrect\b/i.test(optText)) {
                     isCorrect = true;
+                    optText = optText.replace(/\(Correct\)/ig, '').replace(/\*$/, '').replace(/\bCorrect\b/ig, '').trim();
                 }
-                
-                options.push({
-                    text: optionText.replace(/\(Correct\)/i, '').trim(),
-                    is_correct: isCorrect
-                });
-            });
-
-            // Final validation: ensure we have a valid question
-            if (options.length === 4 && options.some(opt => opt.is_correct)) {
-                questions.push({
-                    question_text: questionText,
-                    options: options
-                });
+                currentOption = { letter, text: `${letter}) ${optText}`, is_correct: isCorrect };
+                currentQ.options.push(currentOption);
+                continue;
             }
-        });
+
+            const qMatch = line.match(qStartRegex);
+            if (qMatch && (!currentQ || currentQ.options.length >= 2)) {
+                if (currentQ && currentQ.options.length >= 2) {
+                    questions.push(currentQ);
+                }
+                currentQ = {
+                    question_text: qMatch[2] ? qMatch[2].trim() : '',
+                    options: []
+                };
+                currentOption = null;
+                continue;
+            }
+
+            if (currentQ) {
+                if (currentQ.options.length === 0) {
+                    currentQ.question_text += (currentQ.question_text ? '\n' : '') + line;
+                } else if (currentOption && !line.match(/^(?:Answer|Explanation|Solution):/i)) {
+                    currentOption.text += ' ' + line;
+                }
+            }
+        }
+
+        if (currentQ && currentQ.options.length >= 2) {
+            questions.push(currentQ);
+        }
         return questions;
     };
 
-    // Render AI questions
-const renderAIQuestions = (questions) => {
+    const renderAIQuestions = (questions) => {
     const $container = $('#ai-q-content');
     $container.empty();
 
@@ -355,7 +355,7 @@ const renderAIQuestions = (questions) => {
                     </button>
                 </div>
                 <div class="card-body">
-                    <p class="card-text"><strong>${q.question_text}</strong></p>
+                    <p class="card-text" style="white-space: pre-wrap; font-size: 15px; line-height: 1.6;"><strong>${q.question_text}</strong></p>
                     <ul class="list-unstyled">
                         ${optionsHtml}
                     </ul>

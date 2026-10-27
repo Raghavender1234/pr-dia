@@ -66,7 +66,8 @@ def get_user_context():
             elif user_type == 'super_admin':
                 is_premium = True # Super admin always has premium access
 
-            user_context['is_premium'] = is_premium
+            is_premium = True
+            user_context['is_premium'] = True
             session['is_premium'] = is_premium # Keep the session in sync
 
             # organization context (unchanged) ...

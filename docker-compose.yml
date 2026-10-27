@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: openlms-web
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=false
+      - SECRET_KEY=generate-a-strong-random-key-for-production
+      - JWT_SECRET_KEY=generate-a-strong-jwt-secret-key
+      - DATABASE_URL=postgresql://openlms_user:openlms_password@db:5432/openlms_db
+      - FRONTEND_URL=http://localhost:5000
+    depends_on:
+      - db
+    volumes:
+      - openlms_uploads:/app/app/static/uploads
+
+  db:
+    image: postgres:15-alpine
+    container_name: openlms-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=openlms_user
+      - POSTGRES_PASSWORD=openlms_password
+      - POSTGRES_DB=openlms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+  openlms_uploads:

@@ -986,30 +986,88 @@ $reportForm.on('submit', async function (e) {
         }
     });
 
+    function parseQuestionsFromText(text) {
+        const lines = text.split('\n');
+        const questions = [];
+        let currentQ = null;
+        let currentOption = null;
+
+        const qStartRegex = /^\s*(?:Question\s*)?(\d+)[\.\)]\s*(.*)/i;
+        const optRegex = /^\s*[-*]?\s*([A-D])\s*[\.\)]\s*(.*)/i;
+
+        for (let rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) continue;
+
+            const optMatch = line.match(optRegex);
+            if (optMatch && currentQ) {
+                let letter = optMatch[1].toUpperCase();
+                let optText = optMatch[2].trim();
+                let isCorrect = false;
+
+                if (/\(Correct\)/i.test(optText) || /\*$/.test(optText) || /\bCorrect\b/i.test(optText)) {
+                    isCorrect = true;
+                    optText = optText.replace(/\(Correct\)/ig, '').replace(/\*$/, '').replace(/\bCorrect\b/ig, '').trim();
+                }
+                currentOption = { letter, text: `${letter}) ${optText}`, is_correct: isCorrect };
+                currentQ.options.push(currentOption);
+                continue;
+            }
+
+            const qMatch = line.match(qStartRegex);
+            // Treat as new question only if:
+            // 1. We don't have a current question yet, OR
+            // 2. The current question has already collected its options (>= 2 options)!
+            if (qMatch && (!currentQ || currentQ.options.length >= 2)) {
+                if (currentQ && currentQ.options.length >= 2) {
+                    questions.push(currentQ);
+                }
+                currentQ = {
+                    question_text: qMatch[2] ? qMatch[2].trim() : '',
+                    options: []
+                };
+                currentOption = null;
+                continue;
+            }
+
+            // If we are currently inside a question:
+            if (currentQ) {
+                if (currentQ.options.length === 0) {
+                    // Before options: any line (e.g. Statement 1, Statement (I), etc.) is part of the question text!
+                    currentQ.question_text += (currentQ.question_text ? '\n' : '') + line;
+                } else if (currentOption && !line.match(/^(?:Answer|Explanation|Solution):/i)) {
+                    // Continuation line of an option
+                    currentOption.text += ' ' + line;
+                }
+            }
+        }
+
+        if (currentQ && currentQ.options.length >= 2) {
+            questions.push(currentQ);
+        }
+        return questions;
+    }
+
     function parseAndRenderGeneratedQuestions(markdown) {
         $aiContent.html(''); // Clear previous content
-        const questionBlocks = markdown.split(/\n(?=\d+\.\s)/).filter(b => b.trim());
+        const questions = parseQuestionsFromText(markdown);
 
-        if (questionBlocks.length === 0 && markdown.trim()) {
-            // If no numbered questions, render as a single block
+        if (questions.length === 0 && markdown.trim()) {
             const singleBlock = $('<div class="generated-question-item card mb-3"></div>');
             const cardBody = $('<div class="card-body"></div>').text(markdown);
             singleBlock.append(cardBody);
             $aiContent.append(singleBlock);
         } else {
-            questionBlocks.forEach((block, index) => {
-                const questionData = parseQuestionBlock(block);
-                if (!questionData) return;
-
+            questions.forEach((questionData, index) => {
                 const $item = $('<div class="generated-question-item card mb-3"></div>');
                 const $cardBody = $('<div class="card-body"></div>');
 
-                const $questionText = $('<p class="fw-bold"></p>').text(questionData.question_text);
+                const $questionText = $('<p class="fw-bold" style="white-space: pre-wrap; font-size: 15px; line-height: 1.6;"></p>').text(questionData.question_text);
                 $cardBody.append($questionText);
 
                 const $optionsList = $('<ul class="list-unstyled mb-3"></ul>');
                 questionData.options.forEach(opt => {
-                    const $optionItem = $('<li></li>').text(opt.text);
+                    const $optionItem = $('<li class="py-1"></li>').text(opt.text);
                     if (opt.is_correct) {
                         $optionItem.addClass('text-success fw-bold').prepend('<i class="bi bi-check-circle-fill me-2"></i> ');
                     }
@@ -1035,102 +1093,4 @@ $reportForm.on('submit', async function (e) {
         }
     }
 
-    function parseQuestionBlock(block) {
-        const lines = block.trim().split('\n');
-        const questionMatch = lines[0].match(/^\d+\.\s*(.*)/) || lines[0].match(/^\*{0,2}Q\d*.*?\s*(.*)/) || [null, lines[0]];
-        const question_text = (questionMatch[1] || lines[0]).trim();
-
-        const options = [];
-        const optionRegex = /^[-*]?\s*([A-D])\s*[\.\)]\s*(.*)/i;
-
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            const match = line.match(optionRegex);
-            if (match) {
-                let text = match[2].trim();
-                let is_correct = false;
-                
-                if (text.endsWith('(Correct)') || text.endsWith('Correct') || text.endsWith('*')) {
-                    is_correct = true;
-                    text = text.replace(/\(Correct\)$|Correct$|\*$/, '').trim();
-                } else if (line.toLowerCase().includes('(correct)')) {
-                    is_correct = true;
-                    text = text.replace(/\(correct\)/i, '').trim();
-                }
-                options.push({ text, is_correct });
-            }
-        }
-
-        if (options.length === 0) return null;
-
-        return { question_text, options };
-    }
-
-    $(document).on('click', '.save-gen-q-btn', async function() {
-        const $btn = $(this);
-        const questionData = JSON.parse($btn.data('question-data'));
-
-        const payload = {
-            topic_id: currentTopicId,
-            question_text: questionData.question_text,
-            options: questionData.options,
-            difficulty_level: allQuestions[currentQuestionIndex]?.difficulty_level || 'medium'
-        };
-
-        $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
-
-        try {
-            const res = await window.authenticatedFetch('/api/ai/save-generated-question', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.message);
-
-            window.showToast(result.message, 'success');
-            $btn.removeClass('btn-outline-primary').addClass('btn-success').html('<i class="bi bi-check-lg me-1"></i>Saved');
-
-        } catch (err) {
-            window.showToast(err.message || 'Could not save question.', 'danger');
-            $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save for Practice');
-        }
-    });
-
-    // --- NEW: Explain Differently (AI) ---
-    $(document).on('click', '.explain-differently-btn', async function() {
-        const $btn = $(this);
-        const $container = $btn.siblings('.ai-explanation-container');
-        const $loading = $btn.siblings('.ai-explanation-loading');
-        const questionText = $btn.data('question-text');
-        const explanationText = $btn.data('explanation-text');
-
-        $btn.hide();
-        $loading.show();
-        $container.hide();
-
-        try {
-            const response = await window.authenticatedFetch('/api/ai/explain-question', {
-                method: 'POST',
-                body: JSON.stringify({
-                    question_text: questionText,
-                    explanation_text: explanationText
-                })
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
-
-            $container.html(data.explanation).show();
-        } catch (error) {
-            $container.html(`<div class="alert alert-danger">${error.message}</div>`).show();
-            $btn.show();
-        } finally {
-            $loading.hide();
-        }
-    });
-
-    // --- 7. INIT ---
-    startPracticeSession();
-});
-</script>
-{% endblock %}
+    

@@ -600,7 +600,7 @@ def get_available_mock_tests(current_user, **kwargs):
         if org_id:
             query = query.join(Exam).filter(Exam.organization_id == org_id)
 
-        query = query.add_column(MockTest.id.in_(db.select([open_ended_test_ids_sq.c.id])).label('has_open_ended'))
+        query = query.add_column(MockTest.id.in_(db.select(open_ended_test_ids_sq.c.id)).label('has_open_ended'))
         mock_tests_and_flags = query.all()
 
         output = []

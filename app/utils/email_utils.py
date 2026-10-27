@@ -23,7 +23,7 @@ def send_email(to_email, subject, html_content):
     api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(configuration))
 
     # 3. Define the sender and recipient
-    sender = sib_api_v3_sdk.SendSmtpEmailSender(email=from_email_address, name="PR-DIA App")
+    sender = sib_api_v3_sdk.SendSmtpEmailSender(email=from_email_address, name=os.getenv('APP_NAME', 'OpenLMS'))
     to = [sib_api_v3_sdk.SendSmtpEmailTo(email=to_email)]
 
     # 4. Create the email object with all the details

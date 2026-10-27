@@ -140,14 +140,12 @@ def init_prod():
 
     # 2. Seed Super Admin (Idempotent)
     print("Checking and seeding super admin...")
-    super_admin_email = 'brreddy16@gmail.com'
+    super_admin_email = os.getenv('SUPER_ADMIN_EMAIL', 'admin@openlms.dev')
     existing_super_admin = User.query.filter_by(email=super_admin_email).first()
 
     if not existing_super_admin:
         print(f"Creating super admin: {super_admin_email}")
-        super_admin_password = os.getenv('SUPER_ADMIN_PASSWORD')
-        if not super_admin_password:
-            raise ValueError("SUPER_ADMIN_PASSWORD environment variable not set. Cannot create super admin.")
+        super_admin_password = os.getenv('SUPER_ADMIN_PASSWORD', 'Admin@123')
         
         super_admin = User(
             email=super_admin_email,

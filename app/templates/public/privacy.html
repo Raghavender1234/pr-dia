@@ -47,7 +47,7 @@
                 {% if g.current_organization and g.current_organization.contact_email %}
                     <a href="mailto:{{ g.current_organization.contact_email }}">{{ g.current_organization.contact_email }}</a>
                 {% else %}
-                    <a href="mailto:info@pr-dia.com">info@pr-dia.com</a>
+                    <a href="mailto:{{ config.ADMIN_EMAIL }}">{{ config.ADMIN_EMAIL }}</a>
                 {% endif %}
             </p>
         </div>

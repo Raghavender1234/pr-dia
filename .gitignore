@@ -1,25 +1,63 @@
-# Python
+# ==========================================
+# OpenLMS Git Ignore Configuration
+# ==========================================
+
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
 venv/
-.pytest_cache/
-*.pyc
-*.pyo
-*.pyd
+env/
+ENV/
+.venv/
 
-# Node
-node_modules/
-
-# Environment
+# Environment Variables & Local Secrets (NEVER COMMIT SENSITIVE DATA)
 .env
+*.env
+env.txt
+secrets.json
+google_credentials*.json
 
-# IDE/Editor
-.vscode/
-.idea/
+# Databases & Local SQLite instances
+*.db
+*.sqlite
+*.sqlite3
+app.db
+instance/
 
-# Logs
-logs/
-
-# Flask session
+# Flask & Session Data
 flask_session/
+logs/
+*.log
 
-ROLES_AND_FEATURES.md
+# File Uploads (Ignore user uploaded media, but keep folder structure)
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+app/static/uploads/generated_questions/*
+!app/static/uploads/generated_questions/.gitkeep
+
+# Node & Frontend dependencies
+node_modules/
+package-lock.json
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & OS-specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/

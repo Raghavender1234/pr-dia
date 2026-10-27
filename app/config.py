@@ -10,23 +10,22 @@ class Config:
     """Base configuration settings."""
 
     # --- Core Flask Settings ---
-    # A strong, random secret key is critical for security (sessions, signing, etc.)
-    SECRET_KEY = os.getenv('SECRET_KEY')
+    SECRET_KEY = os.getenv('SECRET_KEY') or os.getenv('FLASK_SECRET_KEY') or 'openlms-development-secret-key-change-in-production'
     DEBUG = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
 
     # --- Database (SQLAlchemy) ---
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL')
+    default_db_path = os.path.join(basedir, '..', 'app.db').replace('\\', '/')
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL') or f"sqlite:///{default_db_path}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # --- JWT (Flask-JWT-Extended) ---
-    # It's good practice to use a separate secret for JWTs
-    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY') or SECRET_KEY
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES_HOURS', '24')))
 
     SERVER_NAME = os.getenv("SERVER_NAME", None)
 
     APPLICATION_ROOT = '/'
-    PREFERRED_URL_SCHEME = 'https'
+    PREFERRED_URL_SCHEME = 'https' if os.getenv('FLASK_ENV') == 'production' else 'http'
 
     # --- Session Cookie Settings ---
     SESSION_COOKIE_HTTPONLY = True
@@ -49,8 +48,7 @@ class Config:
     GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 
     # --- Frontend URL ---
-    # Used for creating links in emails (e.g., password reset)
-    FRONTEND_URL = os.getenv('FRONTEND_URL')
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://127.0.0.1:5000')
 
     # --- AWS S3 Configuration ---
     S3_BUCKET = os.getenv('S3_BUCKET')
@@ -59,21 +57,18 @@ class Config:
     S3_SECRET = os.getenv('AWS_SECRET_ACCESS_KEY')
 
     # --- File Upload Limits ---
-    # Max size for image/pdf uploads (e.g., 20MB)
     MAX_IMAGE_PDF_UPLOAD_SIZE = 20 * 1024 * 1024
-    # Max size for video uploads (e.g., 500MB)
     MAX_VIDEO_UPLOAD_SIZE = 500 * 1024 * 1024
 
     # --- Razorpay Plan Mapping ---
-    # Maps frontend plan identifiers to actual Razorpay Plan IDs
     RAZORPAY_PLANS = {
-        '1': os.environ.get('RAZORPAY_PLAN_ID_1'), # Basic
-        '2': os.environ.get('RAZORPAY_PLAN_ID_2'), # Pro
-        '3': os.environ.get('RAZORPAY_PLAN_ID_3')  # Premium
+        '1': os.environ.get('RAZORPAY_PLAN_ID_1'),
+        '2': os.environ.get('RAZORPAY_PLAN_ID_2'),
+        '3': os.environ.get('RAZORPAY_PLAN_ID_3')
     }
 
-    ADMIN_EMAIL = 'info@pr-dia.com'
+    ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@openlms.dev')
 
     # --- AI Subscription Plan IDs ---
-    AI_ASSISTANT_PLAN_ID = os.getenv('AI_ASSISTANT_PLAN_ID', 'plan_RRe2VVk0INlo0p')
-    AI_TUTOR_PLAN_ID = os.getenv('AI_TUTOR_PLAN_ID', 'plan_RRe1LwkOmKn6Y7')
+    AI_ASSISTANT_PLAN_ID = os.getenv('AI_ASSISTANT_PLAN_ID')
+    AI_TUTOR_PLAN_ID = os.getenv('AI_TUTOR_PLAN_ID')
