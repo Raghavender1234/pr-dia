@@ -146,38 +146,43 @@ def seed_open_source_environment():
         print("  [OK] Organization memberships configured")
 
         # 6. Seed Sample Multi-Domain Curriculum if no Exams exist
+        admin_user = created_users.get('super_admin') or User.query.filter_by(user_type='super_admin').first()
+        admin_id = admin_user.id if admin_user else 1
+
         if Exam.query.count() == 0:
             print("  -> Populating initial starter curriculum...")
             cs_exam = Exam(
                 name="Computer Science & Engineering (Core)",
                 description="Comprehensive undergraduate & competitive curriculum for Computer Science.",
                 organization_id=default_org.id,
-                is_active=True
+                created_by_user_id=admin_id,
+                is_free=True
             )
             db.session.add(cs_exam)
             db.session.commit()
 
-            subj1 = Subject(exam_id=cs_exam.id, name="Data Structures & Algorithms")
-            subj2 = Subject(exam_id=cs_exam.id, name="Operating Systems & Architecture")
-            subj3 = Subject(exam_id=cs_exam.id, name="Computer Networks & Cybersecurity")
+            subj1 = Subject(exam_id=cs_exam.id, name="Data Structures & Algorithms", created_by_user_id=admin_id)
+            subj2 = Subject(exam_id=cs_exam.id, name="Operating Systems & Architecture", created_by_user_id=admin_id)
+            subj3 = Subject(exam_id=cs_exam.id, name="Computer Networks & Cybersecurity", created_by_user_id=admin_id)
             db.session.add_all([subj1, subj2, subj3])
             db.session.commit()
 
             # Add topics
-            t1 = Topic(subject_id=subj1.id, name="Binary Trees & AVL Balancing", description="Tree traversals, balance factors, rotations.")
-            t2 = Topic(subject_id=subj2.id, name="Process Synchronization & Semaphores", description="Deadlocks, mutex locks, critical section problem.")
-            t3 = Topic(subject_id=subj3.id, name="TCP/IP Model, Subnetting & Routing Protocols", description="OSI layers, CIDR subnetting, BGP, OSPF.")
+            t1 = Topic(subject_id=subj1.id, name="Binary Trees & AVL Balancing", description="Tree traversals, balance factors, rotations.", created_by_user_id=admin_id)
+            t2 = Topic(subject_id=subj2.id, name="Process Synchronization & Semaphores", description="Deadlocks, mutex locks, critical section problem.", created_by_user_id=admin_id)
+            t3 = Topic(subject_id=subj3.id, name="TCP/IP Model, Subnetting & Routing Protocols", description="OSI layers, CIDR subnetting, BGP, OSPF.", created_by_user_id=admin_id)
             db.session.add_all([t1, t2, t3])
             db.session.commit()
 
             # Add sample question
             q1 = Question(
                 topic_id=t1.id,
+                exam_id=cs_exam.id,
                 question_text="In an AVL tree, what is the maximum permissible difference between the heights of the left and right subtrees for any node?",
                 question_type="MCQ",
-                difficulty="Easy",
-                correct_explanation="An AVL tree maintains a balance factor of -1, 0, or +1 for every node. Any difference exceeding 1 triggers tree rotation.",
-                marks=2.0
+                difficulty_level="Easy",
+                explanation_text="An AVL tree maintains a balance factor of -1, 0, or +1 for every node. Any difference exceeding 1 triggers tree rotation.",
+                created_by_user_id=admin_id
             )
             db.session.add(q1)
             db.session.commit()
