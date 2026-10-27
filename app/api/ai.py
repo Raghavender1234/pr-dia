@@ -81,26 +81,26 @@ def generate_similar_questions(current_user, **kwargs):
     original_question = data.get('question_text', '')
     passage_text = data.get('passage_text')  # for comprehension
     difficulty = data.get('difficulty', 'medium')
-    topic_name = data.get('topic_name', 'Mechanical Engineering')
-    subject_name = data.get('subject_name', 'Mechanical Engineering')
-    exam_name = data.get('exam_name') or 'UPSC ESE (Mechanical Engineering)'
+    topic_name = data.get('topic_name', 'Core Topic')
+    subject_name = data.get('subject_name', 'Core Subject')
+    exam_name = data.get('exam_name') or 'Academic & Competitive Examination'
 
     if not original_question and question_type != 'Comprehension':
         return jsonify({"message": "The 'question_text' field is required."}), 400
 
     if question_type == 'Comprehension':
         prompt = fr'''
-You are an elite Question Setter for the UPSC Engineering Services Examination (UPSC ESE / IES) — Mechanical Engineering & General Studies/Engineering Aptitude.
+You are an elite academic Question Setter and Subject Matter Expert specializing in "{subject_name}" for "{exam_name}".
 A candidate is studying the "{topic_name}" topic under "{subject_name}".
 
 **Your Task:**
-1. Based on the original technical passage/case study below, generate **one new, rigorous engineering case study or analytical comprehension passage** on the same subject matter suitable for UPSC ESE standards.
-2. After the new passage, generate **3 new, distinct multiple-choice sub-questions** that test analytical engineering reasoning, governing equations, or design principles.
+1. Based on the original passage/case study below, generate **one new, rigorous academic case study or analytical comprehension passage** on the same subject matter suitable for "{exam_name}" standards.
+2. After the new passage, generate **3 new, distinct multiple-choice sub-questions** that test analytical reasoning, governing principles, or practical applications.
 
-**Instructions for Generating High-Quality UPSC ESE Questions:**
-*   Test conceptual clarity, boundary conditions, thermodynamic/mechanical assumptions, and practical engineering application.
-*   Maintain "{difficulty}" difficulty level matching UPSC ESE Preliminary standards (solvable without a scientific calculator).
-*   Create plausible distractors based on common sign errors, unit mistakes, or conceptual misconceptions.
+**Instructions for Generating High-Quality Questions:**
+*   Test conceptual clarity, edge cases, underlying assumptions, and practical application.
+*   Maintain "{difficulty}" difficulty level matching standard curriculum benchmarks.
+*   Create plausible distractors based on common misconceptions and calculation errors.
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
 1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```). Use HTML tags (<b>, <h3>, <ul>, <li>) instead of markdown symbols (**, #) for formatting.
@@ -123,23 +123,23 @@ D) Option four
 '''
     else:
         prompt = fr'''
-You are an elite Question Author and Subject Matter Expert for the **UPSC Engineering Services Examination (UPSC ESE / IES) — Mechanical Engineering**.
-The candidate is preparing for **UPSC ESE ({exam_name})**, studying the subject **"{subject_name}"**, and focusing on the topic **"{topic_name}"**.
+You are an elite academic Question Author and Subject Matter Expert specializing in "{subject_name}" for "{exam_name}".
+The candidate is preparing for "{exam_name}", studying the subject "{subject_name}", and focusing on the topic "{topic_name}".
 
-Based on the following original question (difficulty: "{difficulty}"), generate **3 new, distinct, high-yield UPSC ESE standard Multiple-Choice Questions (MCQs)**.
+Based on the following original question (difficulty: "{difficulty}"), generate **3 new, distinct, high-yield examination Multiple-Choice Questions (MCQs)**.
 
-**UPSC ESE (Mechanical Engineering) Question Design Guidelines:**
-1. **Authentic UPSC ESE Patterns:**
-   * Mix standard UPSC ESE question archetypes across the 3 generated questions:
-     - **Type 1 (Conceptual / Multi-Statement):** e.g., *"Consider the following statements regarding {topic_name}: 1. ... 2. ... 3. ... Which of the above statements are correct?"*
-     - **Type 2 (Assertion-Reason / Statement-I & Statement-II):** e.g., *"Statement (I): ... Statement (II): ... Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I)"* (or high-precision conceptual analysis).
-     - **Type 3 (Calculator-Free Numerical / Formula Application):** Numerical problems with clean numbers designed to be solved mentally or by hand without a scientific calculator, testing core Mechanical Engineering formulas (Thermodynamics, Fluid Mechanics, SOM, TOM, Machine Design, Heat Transfer, IC Engines, RAC, Power Plant, Production, Industrial Engg, or Mechatronics).
+**Question Design Guidelines:**
+1. **Diverse Question Archetypes:**
+   * Mix standard rigorous question archetypes across the 3 generated questions:
+     - **Type 1 (Conceptual / Multi-Statement):** e.g., *"Consider the following statements regarding {topic_name}: (1) ... (2) ... (3) ... Which of the above statements is/are correct?"*
+     - **Type 2 (Assertion-Reason / Statement-I & Statement-II):** e.g., *"Statement (I): ... Statement (II): ... Both Statement (I) and Statement (II) are individually true and Statement (II) is the correct explanation of Statement (I)"*.
+     - **Type 3 (Analytical / Numerical / Practical Application):** Problems with clean numbers or direct application, testing core principles of "{subject_name}".
 2. **Mirror Complexity & Equations:**
    * **Use HTML for all text formatting** (`<h3>`, `<ul>/<li>`, `<b>`). Do NOT use Markdown symbols (`**`, `#`).
-   * **Mathematical & Engineering Equations:** ALWAYS enclose LaTeX expressions in single dollar signs (`$...$`), e.g., `$\eta_{{th}} = 1 - \frac{{1}}{{r^{{\gamma - 1}}}}$` or `$\tau = \mu \frac{{du}}{{dy}}$`.
-   * **Diagrams/Cycles:** For P-v, T-s, SFD/BMD, or mechanism visuals only if strictly required, use ASCII art inside `<pre>` tags or `[GENERATE_IMAGE: detailed technical description]`.
+   * **Mathematical & Scientific Equations:** ALWAYS enclose LaTeX expressions in single dollar signs (`$...$`).
+   * **Diagrams/Charts:** If strictly required, use ASCII art inside `<pre>` tags or `[GENERATE_IMAGE: detailed technical description]`.
 3. **High-Precision Distractors:**
-   * Incorrect options must reflect classic UPSC ESE traps (e.g., isothermal vs adiabatic exponent, gauge vs absolute pressure, kinematic vs dynamic viscosity, degree of freedom edge cases).
+   * Incorrect options must reflect common student misconceptions, sign errors, or classic edge cases.
 
 **CRITICAL FORMATTING RULES (STRICTLY ENFORCED):**
 1. Do NOT wrap your entire response in an HTML or markdown code block (do not use ```).
@@ -247,10 +247,10 @@ def validate_open_ended_answer(current_user, **kwargs):
         return jsonify({"message": "Both 'question' and 'answer' are required."}), 400
 
     prompt = f'''
-You are a strict yet encouraging UPSC ESE (Engineering Services Examination) Mechanical Engineering evaluator.
-A candidate was asked: '{question}'
-The candidate answered: '{student_answer}'
-Evaluate the technical accuracy, governing formulas/assumptions, and completeness according to UPSC ESE standards in 2–3 concise sentences.
+You are a knowledgeable and encouraging academic evaluator.
+A student was asked: '{question}'
+The student answered: '{student_answer}'
+Evaluate the technical accuracy, key principles, formulas, and completeness in 2–3 concise sentences.
 '''
 
     client = get_openai_client()
@@ -287,24 +287,23 @@ def handle_ai_chat():
         return jsonify({"message": "A message is required."}), 400
 
     history = data.get('history', [])
-    exam_name = data.get('exam_name') or 'UPSC ESE (Mechanical Engineering)'
-    subject_name = data.get('subject_name') or 'Mechanical Engineering & Engineering Aptitude'
+    exam_name = data.get('exam_name') or 'Academic & Competitive Examination'
+    subject_name = data.get('subject_name') or 'Core Subject Concepts'
 
     if user.user_type == 'student':
         system_prompt = (
-            f"You are DIA, an elite UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Mentor helping {user.first_name} "
-            f"prepare for '{exam_name}', specifically focusing on '{subject_name}'. "
-            "Focus on deep conceptual clarity, derivations, governing equations, physical intuition, standard UPSC ESE traps, Assertion-Reason logic, "
-            "and calculator-free numerical solving tricks for Prelims (Paper-I & Paper-II) as well as Mains conventional problem-solving. "
+            f"You are OpenLMS AI, an intelligent academic mentor helping {user.first_name} "
+            f"master '{exam_name}', specifically focusing on '{subject_name}'. "
+            "Focus on deep conceptual clarity, derivations, governing principles, practical intuition, common exam traps, "
+            "and step-by-step problem solving. "
             "Format your responses using clean HTML tags (<h3> for subheadings, <ul>/<li> for bullet points, <b> for bold text) and enclose equations in $...$. "
             "Do NOT use markdown symbols like hashtags (#) or asterisks (**)."
         )
     else:  # For admins / question generation
         system_prompt = (
-            f"You are an expert UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Question Setter and Technical Content Architect "
-            f"assisting {user.first_name}. Your goal is to generate authentic UPSC ESE level MCQs (Multi-statement, Statement-I/Statement-II Assertion-Reason, "
-            f"and calculator-free numericals), concise revision notes, formula sheets, and high-yield explanations across all UPSC ESE Mechanical Engineering "
-            f"(Paper-I & Paper-II) and General Studies & Engineering Aptitude topics. "
+            f"You are an expert academic Question Setter and Technical Content Architect "
+            f"assisting {user.first_name}. Your goal is to generate authentic examination-level MCQs (Multi-statement, Statement-I/Statement-II Assertion-Reason, "
+            f"and analytical numericals), concise revision notes, formula sheets, and high-yield explanations across '{subject_name}' for '{exam_name}'. "
             "Format your responses using HTML tags (<h3>, <ul>/<li>, <b>) and LaTeX math inside $...$. Do NOT use markdown hashtags (#) or asterisks (**)."
         )
 
@@ -338,21 +337,21 @@ def generate_practice_from_chat():
 
     data = request.get_json() or {}
     history = data.get('history', [])
-    subject_name = data.get('subject_name', 'UPSC ESE Mechanical Engineering')
+    subject_name = data.get('subject_name', 'Core Course Concepts')
 
     question_count = 10 if user.user_type != 'student' else 5
 
     system_prompt = f'''
-You are an elite UPSC ESE (Engineering Services Examination / IES) Mechanical Engineering Question Setter.
-Based on the following technical discussion about '{subject_name}', create exactly {question_count} high-yield UPSC ESE standard multiple-choice questions (MCQs).
+You are an elite academic Question Setter and Curriculum Architect.
+Based on the following discussion about '{subject_name}', create exactly {question_count} high-yield examination multiple-choice questions (MCQs).
 
-**Instructions for Generating Authentic UPSC ESE Mechanical Questions:**
-1. **Analyze the Conversation:** Identify the core mechanical engineering topics, thermodynamic cycles, mechanics of materials, fluid/thermal relations, design equations, or engineering aptitude concepts discussed.
-2. **Use Authentic UPSC ESE Question Styles:**
+**Instructions for Generating Authentic Questions:**
+1. **Analyze the Discussion:** Identify the key principles, theories, equations, problem-solving methods, or analytical concepts discussed.
+2. **Use Rigorous Question Styles:**
    * Include a mix of:
-     - Conceptual multi-statement questions (*"Consider the following statements: 1... 2... Which of the above is/are correct?"*)
+     - Conceptual multi-statement questions (*"Consider the following statements regarding [Topic]: (1)... (2)... Which of the above is/are correct?"*)
      - Statement (I) and Statement (II) (Assertion-Reason) questions
-     - Calculator-free numerical problems testing exact formulas and dimensional/ratio analysis.
+     - Practical application and numerical problems testing exact formulas.
 3. **Formatting Guidelines:**
    * **Use HTML for all text formatting** (`<h3>`, `<ul>/<li>`, `<b>`). Do NOT use Markdown symbols (`**`, `#`).
    * **Equations:** Enclose all LaTeX code in dollar signs (`$...$`).
@@ -474,7 +473,7 @@ def save_generated_question(current_user, organization=None, **kwargs):
 
         db.session.add(new_question)
         db.session.commit()
-        return jsonify({"message": "Question saved to your UPSC ESE question bank!"}), 201
+        return jsonify({"message": "Question saved to your question bank!"}), 201
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"Error saving AI-generated question: {e}")
