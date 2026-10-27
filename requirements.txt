@@ -71,4 +71,4 @@ flask-apscheduler
 Flask-Session==0.5.0
 reportlab
 matplotlib
-setuptools
+setuptools<81

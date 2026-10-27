@@ -7,7 +7,10 @@ from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 import os
-from razorpay import Client as RazorpayClient
+try:
+    from razorpay import Client as RazorpayClient
+except Exception:
+    RazorpayClient = None
 from authlib.integrations.flask_client import OAuth
 from sqlalchemy import func
 from flask_mail import Mail, Message
@@ -15,7 +18,10 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignat
 from app import mail
 from app.utils.email_utils import send_email 
 from .decorators import admin_role_required
-import razorpay
+try:
+    import razorpay
+except Exception:
+    razorpay = None
 
 # --- Blueprint Setup ---
 auth_bp = Blueprint('auth_api', __name__, url_prefix='/api/auth')
