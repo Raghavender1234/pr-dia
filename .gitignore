@@ -61,3 +61,9 @@ Desktop.ini
 build/
 dist/
 *.egg-info/
+
+# Local Desktop Bot / Launchers (kept local on user PC, not tracked in git)
+UPSC_ESE_Bot.py
+Start_UPSC_ESE_Bot.bat
+create_desktop_shortcut.py
+
